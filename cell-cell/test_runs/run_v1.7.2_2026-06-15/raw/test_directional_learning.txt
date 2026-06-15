@@ -1,0 +1,107 @@
+======================================================================
+Experiment 5: Cross-Modal Directional Learning
+======================================================================
+Heat at [58, 50, 50] �� +x direction from body
+Body oscillates in x-axis only �� dT/dt correlates with oto_x
+
+--- Step      0 ---
+  pos=[50.0000, 50.0000, 50.0000]  dist=8.005
+  T_raw=4.8980  adapted=0.000000
+  col_therm=0.000000
+
+--- Step  10000 ---
+  pos=[50.0040, 50.0036, 50.0035]  dist=51.358
+  T_raw=0.1000  adapted=-4.591180
+  col_therm=0.000000
+  Shadow cross-modal weights:
+    oto_y-therm: 0.001098
+    oto_x-therm: 0.000969 ��
+    roll-therm: 0.000959
+    oto_z-therm: 0.000868
+    yaw-therm: 0.000830
+    pitch-therm: 0.000757
+
+--- Step  20000 ---
+  pos=[50.0172, 50.0162, 50.0174]  dist=58.191
+  T_raw=0.1000  adapted=-4.371071
+  col_therm=0.000000
+  Shadow cross-modal weights:
+    oto_y-therm: 0.001619
+    oto_x-therm: 0.001504 ��
+    roll-therm: 0.001477
+    oto_z-therm: 0.001363
+    yaw-therm: 0.001358
+    pitch-therm: 0.001284
+
+--- Step  30000 ---
+  pos=[50.0378, 50.0357, 50.0383]  dist=67.252
+  T_raw=0.1000  adapted=-4.160937
+  col_therm=0.000000
+  Shadow cross-modal weights:
+    oto_y-therm: 0.002431
+    oto_x-therm: 0.002322 ��
+    roll-therm: 0.002297
+    yaw-therm: 0.002178
+    oto_z-therm: 0.002158
+    pitch-therm: 0.002104
+
+--- Step  40000 ---
+  pos=[50.0525, 50.0502, 50.0530]  dist=41.162
+  T_raw=0.1000  adapted=-3.958006
+  col_therm=0.000000
+  Shadow cross-modal weights:
+    oto_y-therm: 0.003194
+    oto_x-therm: 0.003089 ��
+    roll-therm: 0.003067
+    yaw-therm: 0.002947
+    oto_z-therm: 0.002909
+    pitch-therm: 0.002873
+
+--- Step  50000 ---
+  pos=[50.0637, 50.0643, 50.0634]  dist=56.687
+  T_raw=0.1000  adapted=-3.764971
+  col_therm=0.000000
+  Shadow cross-modal weights:
+    oto_y-therm: 0.003914
+    oto_x-therm: 0.003812 ��
+    roll-therm: 0.003790
+    yaw-therm: 0.003669
+    oto_z-therm: 0.003623
+    pitch-therm: 0.003597
+
+======================================================================
+DIRECTIONAL LEARNING ANALYSIS
+======================================================================
+
+Thermal signal evolution:
+  step      0: adapted=0.000000  col_therm=0.000000  pos_x=50.0000
+  step   6000: adapted=-4.683928  col_therm=0.000000  pos_x=50.0016
+  step  12000: adapted=-4.545497  col_therm=0.000000  pos_x=50.0060
+  step  18000: adapted=-4.041216  col_therm=0.000000  pos_x=50.0142
+  step  24000: adapted=-4.287657  col_therm=0.000000  pos_x=50.0268
+  step  30000: adapted=-4.160937  col_therm=0.000000  pos_x=50.0378
+  step  36000: adapted=-4.037963  col_therm=0.000000  pos_x=50.0467
+  step  42000: adapted=-3.918623  col_therm=0.000000  pos_x=50.0550
+  step  48000: adapted=-3.802810  col_therm=0.000000  pos_x=50.0616
+  step  54000: adapted=-3.690419  col_therm=0.000000  pos_x=50.0679
+
+Shadow cross-modal weight evolution:
+    Step       oto_x       oto_y       oto_z         yaw   ratio x/y
+  ------  ----------  ----------  ----------  ----------  ----------
+   10000    0.000969    0.001098    0.000868    0.000830       0.883
+   20000    0.001504    0.001619    0.001363    0.001358       0.929
+   30000    0.002322    0.002431    0.002158    0.002178       0.955
+   40000    0.003089    0.003194    0.002909    0.002947       0.967
+   50000    0.003812    0.003914    0.003623    0.003669       0.974
+
+>>> NO directional learning: oto_x(0.003812) �� oto_y(0.003914)
+    Cross-modal weights are not direction-selective
+
+Main circuit enc��col weights:
+  enc_to_col_yaw: 0.162166
+  enc_to_col_pitch: 0.129794
+  enc_to_col_roll: 0.157905
+  enc_to_col_oto_x: 0.143668
+  enc_to_col_oto_y: 0.140529
+  enc_to_col_oto_z: 0.151336
+  enc_to_col_therm: 0.126617

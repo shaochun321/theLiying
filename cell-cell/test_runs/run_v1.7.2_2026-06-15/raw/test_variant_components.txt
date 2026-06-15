@@ -1,0 +1,57 @@
+======================================================================
+PHASE 1 �� VARIANT COMPONENT STANDALONE VERIFICATION
+======================================================================
+
+���� 1. ResonantOscillator ����
+  [PASS] Frequency (50 Hz target)                 actual=               50 Hz  expected=40-60 Hz
+  [PASS] Amplitude bounded                        actual=              0.0127  expected=< 1.0
+  [PASS] Amplitude nonzero                        actual=              0.0127  expected=> 0.01
+  [PASS] Phase computable                         actual=          -0.025 rad  expected=[-��, ��]
+  [PASS] Relaxation osc stable                    actual=           |x|=2.000  expected=< 20
+
+���� 2. NDRElement ����
+  [PASS] Region 1 positive I                      actual=              0.2000  expected=> 0
+  [PASS] Peak current                             actual=              0.3000  expected=> 0
+  [PASS] NDR: I(0.25) < I_peak                    actual=     0.2000 < 0.3000  expected=True
+  [PASS] Valley current minimal                   actual=              0.1000  expected=�� 0.3000
+  [PASS] Region 3: I(0.5) > I_valley              actual=     0.1750 > 0.1000  expected=True
+  [PASS] NDR: negative dR                         actual=             -1.0000  expected=< 0
+  [PASS] Dynamic NDR computable                   actual=              0.5467  expected=float
+
+���� 3. MagnetofluidDamper ����
+  [PASS] Zero current: R = R_base                 actual=              1.0000  expected=�� 1.0
+  [PASS] High current: R > R_base                 actual=              1.1250  expected=> 1.0000
+  [PASS] Compression: large signals attenuated more actual=     0.8889 < 1.0000  expected=True
+  [PASS] Faraday below threshold: 0               actual=            0.000000  expected=�� 0
+  [PASS] Faraday above threshold: computable      actual=            0.047553  expected=float
+
+���� 4. LiquidMetalRouter ����
+  [PASS] Initial state: disconnected              actual=              0.0000  expected=�� 0
+  [PASS] High corr �� connected                    actual=              0.9657  expected=> 0.5
+  [PASS] Connected: signal passes                 actual=              0.9591  expected=> 0.3
+  [PASS] Zero corr �� pruning                      actual=              0.0006  expected=< 0.5
+  [PASS] Force connect: s=1                       actual=              1.0000  expected== 1.0
+  [PASS] Force disconnect: s=0                    actual=              0.0000  expected== 0.0
+
+���� 5. Neuromodulator ����
+  [PASS] DA baseline                              actual=              0.1000  expected=�� 0.1
+  [PASS] DA elevated after release                actual=              0.4873  expected=> 0.15
+  [PASS] DA gain factor > 1                       actual=              1.5810  expected=> 1.0
+  [PASS] DA lr factor > 1                         actual=              1.7746  expected=> 1.0
+  [PASS] DA decays to baseline                    actual=              0.1029  expected=�� 0.1
+  [PASS] 5-HT baseline higher than DA             actual=              0.2000  expected=> 0.1000
+  [PASS] 5-HT slower decay                        actual=               10.0s  expected=> 2.0s
+
+======================================================================
+PHASE 1 VERIFICATION SUMMARY
+======================================================================
+  PASS: 30
+  FAIL: 0
+  TOTAL: 30
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_variant_components.py", line 285, in <module>
+    print(f"\n  \u2713 ALL COMPONENTS VERIFIED �� ready for Phase 2")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2713' in position 4: illegal multibyte sequence

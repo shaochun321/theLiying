@@ -1,0 +1,53 @@
+======================================================================
+PHASE 3 �� ECM + VASCULAR STANDALONE VERIFICATION
+======================================================================
+
+���� 1. ECM Thermal Dynamics ����
+  [PASS] G6a ECM temp rises with heat                  actual=         0.3290  expected=> 0.0
+  [PASS] G6b ECM cools without heat                    actual=       0.2520��C  expected=< 0.3290
+  [PASS] G6c ECM converges toward ambient              actual=         0.0175  expected=�� 0.0 (��0.05)
+
+���� 2. ECM Ion Buffer ����
+  [PASS] G7a Ion buffer fills with activity            actual=         0.2000  expected=> 0.1
+  [PASS] G7b Ion buffer drains without activity        actual=         0.0000  expected=< 0.0200
+  [PASS] G7c Ion buffer saturates at capacity          actual=         1.0000  expected=<= 1.0
+
+���� 3. PNN Maturation ����
+  [PASS] G8a PNN starts immature                       actual=          0.000  expected=< 0.1
+  [PASS] G8b Plasticity gate starts open               actual=          1.000  expected=> 0.9
+  [PASS] G8c PNN matures toward target                 actual=          0.692  expected=> 0.5
+  [PASS] G8d Plasticity gate closes                    actual=          0.308  expected=< 0.5
+
+���� 4. Q10 Temperature Effects ����
+  [PASS] G9a tau at T_ref                              actual=         1.0000  expected=�� 1.0
+  [PASS] G9b tau decreases with +10 ��T (Q10=3)         actual=         0.3333  expected=< 0.5000
+  [PASS] G9c gm increases with +10 ��T (Q10=1.5)        actual=         1.5000  expected=> 1.3000
+  [PASS] G9d Capacitance boost at full PNN             actual=          1.300  expected=�� 1.3
+
+���� 5. Vascular NVC ����
+  [PASS] G10a Baseline flow                            actual=          1.500  expected=�� 1.5
+  [PASS] G10b Flow increases with activity             actual=          3.000  expected=> 1.5
+  [PASS] G10c Flow bounded by max_flow                 actual=          3.000  expected=<= 3.0
+
+���� 6. Vascular Heat Removal + Energy ����
+  [PASS] G11 Heat removed when T > T_ref               actual=       0.500250  expected=> 0
+  [PASS] G12 Energy delivered > 0                      actual=       0.000100  expected=> 0
+  [PASS] G11b No heat removed when T = T_ref           actual=       0.000000  expected== 0
+
+���� 7. ECM-Vascular Coupled Equilibrium ����
+  [PASS] G13a Equilibrium reached (T stable)           actual=         0.6246  expected=(0, 5)
+  [PASS] G13b NVC flow elevated                        actual=          2.400  expected=> 1.5
+
+======================================================================
+PHASE 3 VERIFICATION SUMMARY
+======================================================================
+  PASS: 22
+  FAIL: 0
+  TOTAL: 22
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_ecm_vascular.py", line 238, in <module>
+    print(f"\n  \u2713 ALL COMPONENTS VERIFIED �� ready for integration")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2713' in position 4: illegal multibyte sequence

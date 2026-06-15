@@ -1,0 +1,67 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "J:\cell-cc\nexus_v1\tests\test_multiaxis.py", line 86, in <module>
+    print(f"  {status} Active axis {ax}: col_act={act:.4f} > 0")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2717' in position 2: illegal multibyte sequence
+======================================================================
+Task A: Multi-Axis Joint Input Verification
+======================================================================
+
+©¤©¤ Test 1: Single axis (yaw=0.8) ©¤©¤
+  Col activations:
+         yaw: act= 0.0000  energy=1.000
+       pitch: act= 0.0000  energy=1.000
+        roll: act= 0.0000  energy=1.000
+       oto_x: act= 0.0000  energy=1.000
+       oto_y: act= 0.0000  energy=1.000
+       oto_z: act= 0.0000  energy=1.000
+  Motor spikes: {'move_x': 10, 'move_y': 7, 'move_z': 7}
+
+©¤©¤ Test 2: Two axes (yaw=0.8, pitch=0.6) ©¤©¤
+  Col activations:
+         yaw: act= 0.0000  energy=1.000
+       pitch: act= 0.0000  energy=1.000
+        roll: act= 0.0000  energy=1.000
+       oto_x: act= 0.0000  energy=1.000
+       oto_y: act= 0.0000  energy=1.000
+       oto_z: act= 0.0000  energy=1.000
+  Motor spikes: {'move_x': 9, 'move_y': 8, 'move_z': 6}
+
+©¤©¤ Test 3: Three axes (yaw=0.8, pitch=0.6, oto_x=0.4) ©¤©¤
+  Col activations:
+         yaw: act= 0.0000  energy=1.000
+       pitch: act= 0.0000  energy=1.000
+        roll: act= 0.0000  energy=1.000
+       oto_x: act= 0.0000  energy=1.000
+       oto_y: act= 0.0000  energy=1.000
+       oto_z: act= 0.0000  energy=1.000
+  Motor spikes: {'move_x': 14, 'move_y': 12, 'move_z': 10}
+
+©¤©¤ Test 4: All 6 axes ©¤©¤
+  Col activations:
+         yaw: act= 0.0000  energy=1.000  (input=0.8)
+       pitch: act= 0.0000  energy=1.000  (input=0.6)
+        roll: act= 0.0000  energy=1.000  (input=0.3)
+       oto_x: act= 0.0000  energy=1.000  (input=0.4)
+       oto_y: act= 0.0000  energy=1.000  (input=0.2)
+       oto_z: act= 0.0000  energy=1.000  (input=0.5)
+  Motor spikes: {'move_x': 14, 'move_y': 12, 'move_z': 11}
+
+©¤©¤ Test 5: Lateral Inhibition Verification ©¤©¤
+  Yaw col (single-axis): 0.0000
+  Yaw col (all-axes):    0.0000
+  Suppression from lateral inhibition: 100.0%
+
+©¤©¤ Test 6: STDP Weight Evolution (multi-axis, 5s) ©¤©¤
+  enc_to_col_yaw           : w=0.1504 (init=0.15)
+  enc_to_col_pitch         : w=0.1608 (init=0.15)
+  enc_to_col_roll          : w=0.1599 (init=0.15)
+  enc_to_col_oto_x         : w=0.1531 (init=0.15)
+  enc_to_col_oto_y         : w=0.1250 (init=0.15)
+  enc_to_col_oto_z         : w=0.1494 (init=0.15)
+  enc_to_col_therm         : w=0.1303 (init=0.15)
+  col_to_motor_cross       : w=0.0499 (init=0.05)
+
+©¤©¤ VERDICT ©¤©¤

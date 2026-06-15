@@ -1,0 +1,9 @@
+Binding activations:
+Total motor inject per step from binding: 0.000000
+Normal col->mot propagated: ['0.0040']
+Normal col->mot propagated: ['0.0000']
+Normal col->mot propagated: ['0.0000']
+Normal col->mot propagated: ['0.0004', '0.0004', '0.0004']
+Motor move_x: V_mem=0.1797, charge=0.0539, heat=0.00, E=1.0000
+Motor move_y: V_mem=0.1163, charge=0.0349, heat=0.00, E=1.0000
+Motor move_z: V_mem=0.1163, charge=0.0349, heat=0.00, E=1.0000

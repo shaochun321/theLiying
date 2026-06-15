@@ -1,0 +1,7 @@
+{"terminal.integrated.env.windows": {
+  "ANTHROPIC_BASE_URL": "https://opencc.281023.xyz",
+  "ANTHROPIC_AUTH_TOKEN": "sk-d924930a929f8b0f523446e048d87c667fdcb5947b8b55cddfd9b7a660eadb9c",
+  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+  "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
+}
+}

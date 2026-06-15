@@ -1,0 +1,41 @@
+# B3: 引擎文件拆分 — §17 合规（完成）
+
+## 变更概要
+
+将 1379 行单体 `hebbian_ab_engine.py` 拆分为 §17 结构的独立模块：
+
+| 文件 | 内容 | 大小 |
+|------|------|:----:|
+| `engines/_common.py` | ABConfig, MeasureCoordinate, InternalMeasureTime, WeightEntry | 8KB |
+| `engines/engine_a_manual_strata.py` | Baseline A: 三层 Oja 规则 | 5KB |
+| `engines/engine_b_topological_inertia.py` | Candidate B: 拓扑惯性 + d_σ_t + V_Φ + 异常检测 | 10KB |
+| `engines/engine_c_guarded_hybrid.py` | Candidate C: 守卫混合 | 5KB |
+| `engines/harness.py` | DualBlindABHarness: 三引擎测试框架 | 27KB |
+| `engines/__init__.py` | 包级 re-export | 1KB |
+| `hebbian_ab_engine.py` | **向后兼容桥接**（re-export only） | 1KB |
+
+## 向后兼容
+
+原始 import 路径完全保留：
+```python
+# 这行代码继续工作，无需修改
+from hebbian_ab_engine import DualBlindABHarness, ABConfig, MeasureCoordinate
+```
+
+## 归档
+
+旧 `engines/hebbian_ab_engine.py`（v37.4.62 时代副本）→ `engines/archive/hebbian_ab_engine_v37462.py`
+
+## 验证结果
+
+| 测试套件 | 结果 |
+|----------|:----:|
+| AB Stress Benchmark | **46/46 ALL PASS** ✅ |
+| Integrated Pipeline | **8/8 ALL PASS** ✅ |
+| **合计** | **54/54 ALL PASS** ✅ |
+
+## 剩余项
+
+| 项目 | 状态 |
+|------|:----:|
+| C1: v37.5 解锁 | 🔒 BLOCKED（需外部数据） |

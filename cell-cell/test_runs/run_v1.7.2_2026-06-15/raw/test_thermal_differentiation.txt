@@ -1,0 +1,77 @@
+======================================================================
+Experiment: Thermal-Vestibular Coupling Differentiation
+======================================================================
+Body start: [55.0, 50.0, 50.0], v=[0.05, 0.0, 0.0]
+Heat source: pos=[65.0, 50.0, 50.0], T=5.0, E=200.0, r=25.0
+Steps: 20000, dt=0.001
+Bindings: 15 intra-vestibular, 6 cross-modal
+
+--- Step   5000 ---
+  Body: [55.09, 50.00, 50.00]  dist_to_heat=10.6  T=2.9734
+  Enc therm: reg=0.000000  irr=0.000000  Col=0.000000
+  Motor: x=0.0000 y=0.0000 z=0.0000
+  yaw: enc=0.000000 col=0.000000
+  oto_x: enc=0.000000 col=0.000000
+  Bindings active: intra=0/15 cross=0/6
+  Heat source energy: 199.5
+
+--- Step  10000 ---
+  Body: [55.10, 50.00, 50.00]  dist_to_heat=21.1  T=0.8891
+  Enc therm: reg=0.000000  irr=0.000000  Col=0.000000
+  Motor: x=0.0000 y=0.0000 z=0.0000
+  yaw: enc=0.000000 col=0.000000
+  oto_x: enc=0.000000 col=0.000000
+  Bindings active: intra=0/15 cross=0/6
+  Heat source energy: 199.2
+
+--- Step  15000 ---
+  Body: [55.10, 50.00, 50.00]  dist_to_heat=33.0  T=0.1163
+  Enc therm: reg=0.000000  irr=0.000000  Col=0.000000
+  Motor: x=0.0000 y=0.0000 z=0.0000
+  yaw: enc=0.000000 col=0.000000
+  oto_x: enc=0.000000 col=0.000000
+  Bindings active: intra=0/15 cross=0/6
+  Heat source energy: 199.2
+
+======================================================================
+FINAL ANALYSIS
+======================================================================
+
+Body trajectory range:
+  x: [55.00, 55.10]
+  y: [50.00, 50.00]
+  z: [50.00, 50.00]
+
+Temperature at body:
+  range: [0.1000, 3.4732]
+  final: 0.1000
+
+Thermal axis peak activations:
+  Enc reg (tonic):  1.000000
+  Enc irr (phasic): 0.000000
+  Col therm:        0.000000
+
+Binding layer differentiation:
+  Intra-vestibular mean activation: 0.00000000
+  Cross-modal mean activation:      0.00000000
+  Max simultaneous active: intra=0/15, cross=0/6
+
+Column neuron states:
+  col_yaw: V=0.049925 act=0.000000 E=0.9995
+  col_pitch: V=0.049925 act=0.000000 E=0.9995
+  col_roll: V=0.049925 act=0.000000 E=0.9995
+  col_oto_x: V=0.049925 act=0.000000 E=0.9995
+  col_oto_y: V=0.049925 act=0.000000 E=0.9995
+  col_oto_z: V=0.049925 act=0.000000 E=0.9995
+  col_therm: V=0.177596 act=0.000000 E=1.0000
+
+Enc��Col bundle weights:
+  enc_to_col_yaw: w=0.153283
+  enc_to_col_pitch: w=0.139601
+  enc_to_col_roll: w=0.146784
+  enc_to_col_oto_x: w=0.156171
+  enc_to_col_oto_y: w=0.156110
+  enc_to_col_oto_z: w=0.165512
+  enc_to_col_therm: w=0.117610
+
+Col��Motor bundle (mean): 0.419300

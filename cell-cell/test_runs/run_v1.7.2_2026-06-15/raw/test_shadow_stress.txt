@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_shadow_stress.py", line 11, in <module>
+    circuit.shadow_sandbox.metric.eta = 0.1  # 20x default
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ShadowSandbox' object has no attribute 'metric'

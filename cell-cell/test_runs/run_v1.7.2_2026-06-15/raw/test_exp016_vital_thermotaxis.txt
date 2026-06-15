@@ -1,0 +1,14 @@
+======================================================================
+EXP-016: Vital Heartbeat Thermal Taxis
+======================================================================
+Body start:   [50.0, 50.0, 50.0]
+Heat source:  pos=[70.0, 50.0, 50.0], T=5.0, r=30.0
+Distance:     20.0
+Steps:        100000
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_exp016_vital_thermotaxis.py", line 63, in <module>
+    cfg = c.vital_oscillator.config
+          ^^^^^^^^^^^^^^^^^^
+AttributeError: 'VariantCircuit' object has no attribute 'vital_oscillator'

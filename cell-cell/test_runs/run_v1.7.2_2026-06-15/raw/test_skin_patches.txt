@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_skin_patches.py", line 14, in <module>
+    from nexus_v1.components.world import World, Body, HeatSource, SkinPatch
+ImportError: cannot import name 'SkinPatch' from 'nexus_v1.components.world' (j:\cell-cc\nexus_v1\components\world.py)

@@ -1,0 +1,76 @@
+# v40 Hebbian Circuit — Implementation Walkthrough
+
+## What Was Built
+
+### Core File: `engines/hebbian_circuit.py` (~980 lines)
+
+Three biologically-grounded structural mechanisms, referencing STDP (Bi & Poo 1998), memristor crossbar arrays, and homeostatic plasticity:
+
+#### 1. MetaNeuron — Threshold-gated computational node
+- **STDP traces**: `pre_trace`/`post_trace` exponentially-decaying timing memory
+- **Homeostatic target rate**: calcium-based slow integration (Ca²⁺ proxy) with target_rate=0.03
+- **Memristor conductance gating**: dynamic `threshold` that adapts — input < threshold → 10% leak; ≥ threshold → full pass
+- **Threshold adaptation**: calcium > target → raise threshold; calcium < target → lower threshold
+- Energy cost routed to entropy ledger proxy (annotated `DEGRADED`)
+
+#### 2. MetaSynapticBundle — STDP + structural plasticity
+- **STDP learning** replaces Oja: `ΔW = A+ × pre_trace × |post_act| − A− × post_trace × |pre_act|`
+- **Multiplicative weight dependence**: near w_max → LTP slows; near w_min → LTD slows (prevents runaway)
+- **Structural pruning**: considers BOTH weight magnitude AND conductance history (recent learning activity)
+- **Conductance state** (memristor analogy): total activity through bundle lowers bundle_inertia
+- **Xin dormant fruit**: tension > 0.5 → creates dormant fruit; bias alignment → activates it
+
+#### 3. HebbianCircuit — T/O/P/R/Xin lifecycle
+- **Lateral inhibition**: winner-take-more among z_t neurons, modulated by entropy ledger temperature
+- **Circulation detection**: DFS-based P (primary) and R (secondary) closed-path detection
+- **Transport feedback injection**: pipeline edge costs modulate circuit neurons (gain modulation)
+- **Substrate**: DEGRADED to entropy ledger proxy (annotated, not a new thermal system)
+
+## Verification Results
+
+### Circuit Validation (5/5 PASS)
+- 20 neurons (13 encoding + 7 column), 10 bundles (6 forward + 3 feedback + 1 inter-layer)
+- P circulation: **detected** ✅
+- R circulation: **detected** ✅
+- STDP learning: dW up to 0.62 per tick (vs old Oja's 0.0004)
+- Bundle strength differentiation: 0.17 → 0.37 range (was 0.10 → 0.13 with Oja)
+- All neurons alive, temperature stable
+
+### Discrimination Test (structural progress, not yet superior)
+| Pair | Flat W_signal | Circuit (STDP) |
+|------|:---:|:---:|
+| movie vs scenes | 0.9995 | 1.0000 |
+| movie vs gratings | 0.9990 | 0.9994 |
+| scenes vs gratings | 0.9999 | 0.9995 |
+
+**Key structural observation**: static_gratings activates 6/7 z_t dimensions while natural_movie/scenes only activate 1-2. This is the first genuine structural discrimination — the circuit creates different sparse codes for different stimulus types.
+
+## Deep Problems Addressed
+
+### 1. W_signal Discrimination (structural approach)
+- Each W_signal row → separate MetaSynapticBundle with own inertia, strength, Xin tension
+- STDP creates causal timing patterns (not just correlation)
+- Lateral inhibition + threshold gating → sparse selective codes
+- **Status**: Structural mechanism working; discrimination emerging but needs more training time
+
+### 2. Defense Layer Mismatch (structural approach)  
+- Circuit-level hysteresis via bundle_inertia and conductance history
+- Homeostatic target rate prevents runaway in any single layer
+- Bundle pruning considers structural health, not just weight magnitude
+- **Status**: Mechanism in place; no layer mismatch observed in validation
+
+## Degradation Annotations
+All proxy/degraded components marked inline:
+- `DEGRADED: Substrate → entropy ledger proxy`
+- `DEGRADED: Column layer → EMA (not BCM)`
+- `DEGRADED: Circulation → depth-4 DFS (not homology)`
+- `DEGRADED: Feedback bundles → uniform (not emergent topology)`
+- `DEGRADED: sig_sync → always zero (cell coupling spectral gap)`
+
+## Files Created/Modified
+
+| File | Action | Lines |
+|------|--------|-------|
+| `engines/hebbian_circuit.py` | **NEW** | ~980 |
+| `runners/run_v40_circuit_validation.py` | **NEW** | ~165 |
+| `runners/run_v40_discrimination_test.py` | **NEW** | ~250 |

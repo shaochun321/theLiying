@@ -1,0 +1,115 @@
+======================================================================
+TEST 1: Motor energy budget at different input levels
+======================================================================
+
+   I_input    spikes  rate(Hz)   E_final    heat_tot    VR_eff    lifetime
+       0.0         0       0.0    1.0000        2.00      2.0000       ALIVE
+       0.1         4       0.4    1.0000       42.19     42.1882       ALIVE
+       0.5        26       2.6    1.0000     1003.22   1003.2249       ALIVE
+       1.0        47       4.7    0.1005     1014.95   1014.0514       ALIVE
+       2.0        71       7.1    0.1006     1022.14   1021.2428       ALIVE
+       5.0         0       0.0    0.1000     1000.90   1000.0000       ALIVE
+      10.0         0       0.0    0.1000     1000.90   1000.0000       ALIVE
+
+======================================================================
+TEST 2: Energy trace at I=2.0 (typical col->mot current)
+======================================================================
+
+    step     V_mem     act    energy        heat   spike   w_adapt
+       0   +0.0024    0.00    0.1000      1.0000            0.0000
+       1   +0.0048    0.00    0.1000      0.1000            0.0000
+       2   +0.0072    0.00    0.1000      0.1000            0.0000
+       3   +0.0096    0.00    0.1000      0.1000            0.0000
+       4   +0.0120    0.00    0.1000      0.1000            0.0000
+       5   +0.0144    0.00    0.1000      0.1000            0.0000
+       6   +0.0168    0.00    0.1000      0.1000            0.0000
+       7   +0.0192    0.00    0.1000      0.1000            0.0000
+       8   +0.0216    0.00    0.1000      0.1000            0.0000
+       9   +0.0240    0.00    0.1000      0.1000            0.0000
+      25   +0.0622    0.00    0.1000      0.1000            0.0000
+      50   +0.1218    0.00    0.1000      0.1000            0.0000
+      75   +0.1810    0.00    0.1000      0.1000            0.0000
+     100   +0.2399    0.00    0.1000      0.1000            0.0000
+     126   +0.0770    1.00    0.1030      0.1000     YES    0.0200
+     150   +0.1336    0.00    0.1024      0.1024            0.0200
+     200   +0.2507    0.00    0.1014      0.1014            0.0200
+     222   +0.0770    1.00    0.1041      0.1012     YES    0.0400
+     250   +0.1424    0.00    0.1031      0.1032            0.0399
+     300   +0.2584    0.00    0.1019      0.1019            0.0399
+     319   +0.0770    1.00    0.1046      0.1016     YES    0.0599
+     350   +0.1488    0.00    0.1033      0.1034            0.0598
+     400   +0.2638    0.00    0.1020      0.1020            0.0598
+     416   +0.0770    1.00    0.1047      0.1017     YES    0.0798
+     450   +0.1551    0.00    0.1034      0.1034            0.0797
+
+======================================================================
+TEST 3: Actual col->motor current in live circuit
+======================================================================
+
+         Motor         E    spikes    avg_heat    max_heat   avg_act
+        move_x    1.0000         9        0.00        0.00    0.0000
+        move_y    1.0000         9        0.00        0.00    0.0000
+        move_z    1.0000         9        0.00        0.00    0.0000
+
+======================================================================
+TEST 4: col_to_motor bundle propagation analysis
+======================================================================
+
+  Bundle: col_yaw_to_move_x
+  synapse_gain = 5.0
+  n_sources = 1, n_targets = 1
+  Propagated currents: ['0.0000']
+  Source activations:
+    col_yaw: act=0.000000, pre_tr=0.000000
+  Memristor weights (sample):
+    [0][0]: w=0.366340, R=6.37, G=0.1569
+
+  Bundle: col_pitch_to_move_y
+  synapse_gain = 5.0
+  n_sources = 1, n_targets = 1
+  Propagated currents: ['0.0198']
+  Source activations:
+    col_pitch: act=0.000000, pre_tr=0.020242
+  Memristor weights (sample):
+    [0][0]: w=0.493400, R=5.12, G=0.1955
+
+  Bundle: col_roll_to_move_z
+  synapse_gain = 5.0
+  n_sources = 1, n_targets = 1
+  Propagated currents: ['0.0000']
+  Source activations:
+    col_roll: act=0.000000, pre_tr=0.000000
+  Memristor weights (sample):
+    [0][0]: w=0.473300, R=5.31, G=0.1882
+
+  Bundle: col_to_motor_cross
+  synapse_gain = 0.7
+  n_sources = 7, n_targets = 3
+  Propagated currents: ['0.0052', '0.0052', '0.0051']
+  Source activations:
+    col_yaw: act=0.000000, pre_tr=0.000000
+    col_pitch: act=0.000000, pre_tr=0.020242
+    col_roll: act=0.000000, pre_tr=0.000000
+    col_oto_x: act=0.000000, pre_tr=0.000000
+    col_oto_y: act=0.000000, pre_tr=0.000000
+    col_oto_z: act=0.000000, pre_tr=0.000000
+    col_therm: act=0.000000, pre_tr=0.049787
+  Memristor weights (sample):
+    [0][0]: w=0.054965, R=9.46, G=0.1058
+    [0][1]: w=0.051028, R=9.49, G=0.1053
+    [0][2]: w=0.060113, R=9.40, G=0.1063
+    [1][0]: w=0.061053, R=9.40, G=0.1064
+    [1][1]: w=0.061795, R=9.39, G=0.1065
+    [1][2]: w=0.045880, R=9.55, G=0.1048
+    [2][0]: w=0.060862, R=9.40, G=0.1064
+    [2][1]: w=0.052885, R=9.48, G=0.1055
+    [2][2]: w=0.048948, R=9.52, G=0.1051
+
+======================================================================
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_motor_isolation.py", line 140, in <module>
+    print("TEST 5: PowerRail I\xb2R at different scaled_current levels")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\xb2' in position 19: illegal multibyte sequence

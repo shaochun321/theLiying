@@ -1,0 +1,21 @@
+=== MET Dynamic Range Sweep ===
+
+   Input   MET_act    HC_rel
+    0.00    0.0000    0.0000
+    0.10    0.0999    0.0000
+    0.20    0.3973    0.0000
+    0.30    0.8863    0.0214
+    0.50    2.1978    0.2259
+    0.70    3.0461    0.3052
+    0.80    3.4635    0.3060
+    1.00    4.2847    0.3073
+
+MET config check:
+  v_rest: 0.0
+  capacitance: 1.0
+  r_leak: 5.0
+  vdd: 1.0
+  r_supply: 0.05
+  channel gm: 2.0
+  channel v_thresh: 0.001
+  channel reversal: 0.615

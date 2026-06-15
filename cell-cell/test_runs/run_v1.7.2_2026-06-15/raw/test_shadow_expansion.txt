@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_shadow_expansion.py", line 164, in <module>
+    test_initial_axes()
+    ~~~~~~~~~~~~~~~~~^^
+  File "j:\cell-cc\nexus_v1\tests\test_shadow_expansion.py", line 60, in test_initial_axes
+    print(f"\u2713 Initial: {len(sandbox._axes)} axes, "
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          f"{len(sandbox.neurons)} neurons, {len(sandbox.bundles)} bundles")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2713' in position 0: illegal multibyte sequence

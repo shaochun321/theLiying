@@ -1,0 +1,17 @@
+Step 5000:
+  Body: [50.000, 50.000, 50.000]
+  T_raw: 0.1000
+  Sensor state: {'methylation': 2.074876901335039, 'prev_T': 0.1, 'adapted': -1.9748769013350391}
+  Col therm: 0.000000
+  Motor spikes so far: 0
+
+Final (10k steps):
+  Body: [50.002, 50.003, 50.003]
+  Distance to heat: 47.17
+  Total motor spikes: 25
+  Axes: ['yaw', 'pitch', 'roll', 'oto_x', 'oto_y', 'oto_z', 'therm']
+  Encoding neurons: 14
+  Column neurons: 7
+  Binding cells: 21
+  Shadow neurons: 24
+>>> PASS: Motor firing, closed loop active <<<

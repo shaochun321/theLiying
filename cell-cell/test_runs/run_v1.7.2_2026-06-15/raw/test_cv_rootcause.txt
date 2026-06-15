@@ -1,0 +1,29 @@
+======================================================================
+CV ROOT CAUSE ANALYSIS �� Transient vs Steady State
+======================================================================
+
+���� YAW ����
+  Total spikes: 181
+  Phase           N_ISI   mean ISI    freq Hz       CV
+  All               180    20.82 ms     48.0 Hz    0.584
+  Transient           0     0.00 ms      0.0 Hz      nan
+  Steady            158    18.96 ms     52.7 Hz    0.055
+
+  Time-resolved ISI (10 bins):
+    [0.0-0.5s] N=  0  (no spikes)
+    [0.5-1.0s] N=  0  (no spikes)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_cv_rootcause.py", line 94, in <module>
+    print(f"    [{t_lo:.1f}-{t_hi:.1f}s] N={n_b:>3d}  "
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          f"mean={mean_b*1000:.2f}ms  "
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          f"freq={1/mean_b:.1f}Hz  "
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+          f"CV={cv_b:.3f}  "
+          ^^^^^^^^^^^^^^^^^^
+          f"{'\u25fc' * max(1, min(20, int(cv_b * 20)))}")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u25fc' in position 59: illegal multibyte sequence

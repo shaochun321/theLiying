@@ -1,0 +1,16 @@
+[OK] Governance initialized, fuse enabled
+[OK] 500 steps completed, 0 spikes, heat=0.015360
+  Gain chain: 5 links measured
+    L1_MET¡úL2_HC: 0.0000
+    L2_HC¡úL3_Aff: 0.0000
+    L3_Aff¡úL4_Enc: 0.0000
+    L4_Enc¡úL5_Col: 0.0000
+    L5_Col¡úL6_Mot: 0.0000
+  Baselines tracked for 52 neurons
+[OK] No fuse trips
+[OK] Fuse detected violation: F3 Weight bound: bundle=met_to_hc_yaw, w=1.5000 not in [0.0,1.0]
+[OK] Fuse tripped in strict mode (as expected)
+[OK] Modeler correctly warns: Baseline activation ~= 0 (0.00e+00). V_ss=0.005 << V_th=0.300. Need bc_current >= 0.0600 for threshold.
+[OK] Modeler predicts baseline=0.0500
+
+=== ALL GOVERNANCE TESTS PASSED ===

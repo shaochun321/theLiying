@@ -1,0 +1,76 @@
+============================================================
+TIMING DIFFERENTIATION
+============================================================
+
+Intra-vestibular (first activation step):
+  bind_oto_x_oto_y: step -1
+  bind_oto_x_oto_z: step -1
+  bind_oto_y_oto_z: step -1
+  bind_pitch_oto_x: step -1
+  bind_pitch_oto_y: step 11688
+  bind_pitch_oto_z: step 12297
+  bind_pitch_roll: step 3842
+  bind_roll_oto_x: step -1
+  bind_roll_oto_y: step 9923
+  bind_roll_oto_z: step 12870
+  bind_yaw_oto_x: step -1
+  bind_yaw_oto_y: step 6634
+  bind_yaw_oto_z: step 8365
+  bind_yaw_pitch: step -1
+  bind_yaw_roll: step 14216
+
+Cross-modal (first activation step):
+  bind_oto_x_therm: step -1
+  bind_oto_y_therm: step -1
+  bind_oto_z_therm: step -1
+  bind_pitch_therm: step -1
+  bind_roll_therm: step -1
+  bind_yaw_therm: step -1
+
+Avg first activation: intra=9979  cross=-1
+
+============================================================
+WEIGHT DIFFERENTIATION (enc_to_col)
+============================================================
+  Step    vest_avg       therm     ratio    divergence
+------------------------------------------------------
+     0    0.140434    0.151886    1.0816     +0.000000
+  2000    0.140432    0.147215    1.0483     -0.033252
+  4000    0.140466    0.142405    1.0138     -0.067743
+  6000    0.140522    0.139712    0.9942     -0.087319
+  8000    0.140614    0.139225    0.9901     -0.091427
+ 10000    0.140768    0.139222    0.9890     -0.092535
+ 12000    0.140945    0.139219    0.9878     -0.093795
+ 14000    0.141121    0.139216    0.9865     -0.095051
+ 16000    0.141298    0.139213    0.9852     -0.096307
+ 18000    0.141473    0.139210    0.9840     -0.097553
+
+============================================================
+MOTOR DIAGNOSIS
+============================================================
+  move_x: V=0.179844  act=0.000000  E=0.0097  threshold=0.15
+  move_y: V=0.005949  act=0.000000  E=0.0118  threshold=0.15
+  move_z: V=0.196227  act=0.000000  E=0.0095  threshold=0.15
+  move_x_m20000: V=0.000000  act=0.000000  E=0.0097  threshold=0.15
+  move_y_m20000: V=0.000000  act=0.000000  E=0.0118  threshold=0.15
+  move_z_m20000: V=0.000000  act=0.000000  E=0.0095  threshold=0.15
+
+  Col->Motor synapse_gain: 5.0
+  Col->Motor mean_weight: 0.385745
+  Col->Motor base_gain: 5.0
+
+  Motor homeostasis check:
+  Avg motor energy: 0.0104
+  E_CRIT=0.3, E_SCALE=0.5
+  WARNING: Energy < E_SCALE �� synaptic scaling may be active
+
+============================================================
+SHADOW LAYER STATUS
+============================================================
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_thermal_timing.py", line 124, in <module>
+    print(f"  Contraction: {sb._contraction:.6f}")
+                            ^^^^^^^^^^^^^^^
+AttributeError: 'ShadowSandbox' object has no attribute '_contraction'

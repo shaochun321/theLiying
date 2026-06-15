@@ -1,0 +1,46 @@
+Step      0:
+  move_x: V=0.000501  act=0.0000  E=1.0000  threshold=0.1500  spikes=0
+  move_y: V=0.000501  act=0.0000  E=1.0000  threshold=0.1500  spikes=0
+  move_z: V=0.000501  act=0.0000  E=1.0000  threshold=0.1500  spikes=0
+  Col->Motor: gain=5.0000  w=0.4469  I=0.0000
+  V_supply=1.0000  (need > threshold)
+  Body: [55.000, 50.000, 50.000]
+  Aff_yaw_reg: E=1.0000
+
+Step   5000:
+  move_x: V=0.019931  act=0.0000  E=1.0000  threshold=0.1500  spikes=1
+  move_y: V=0.073288  act=0.0000  E=1.0000  threshold=0.1500  spikes=0
+  move_z: V=0.171027  act=0.0000  E=1.0000  threshold=0.1500  spikes=0
+  Col->Motor: gain=5.0000  w=0.4469  I=0.0052
+  V_supply=0.9995  (need > threshold)
+  Body: [55.093, 50.001, 50.001]
+  Aff_yaw_reg: E=0.0636
+
+Step  10000:
+  move_x: V=0.094903  act=0.0000  E=0.0212  threshold=0.1500  spikes=7
+  move_y: V=0.106659  act=0.0000  E=0.0214  threshold=0.1500  spikes=2
+  move_z: V=0.114916  act=0.0000  E=0.0213  threshold=0.1500  spikes=5
+  Col->Motor: gain=5.0000  w=0.4444  I=0.0074
+  V_supply=0.0212  (need > threshold)
+  Body: [55.103, 50.004, 50.004]
+  Aff_yaw_reg: E=0.0636
+
+Step  15000:
+  move_x: V=0.173279  act=0.0000  E=0.0201  threshold=0.1500  spikes=28
+  move_y: V=0.177570  act=0.0000  E=0.0204  threshold=0.1500  spikes=27
+  move_z: V=0.160831  act=0.0000  E=0.0210  threshold=0.1500  spikes=34
+  Col->Motor: gain=5.0000  w=0.4046  I=0.0069
+  V_supply=0.0201  (need > threshold)
+  Body: [55.109, 50.010, 50.010]
+  Aff_yaw_reg: E=0.0637
+
+============================================================
+FINAL SUMMARY
+============================================================
+Motor spikes: {'move_x': 46, 'move_y': 43, 'move_z': 53}
+Total motor spikes: 142
+Body start: [55.000049975, 50.0, 50.0]
+Body end:   [55.11463426731492, 50.0156982591339, 50.01620887225709]
+Distance moved: 0.1168
+Muscle energy spent: 0.296922
+>>> MOTOR IS FIRING! Closed loop is active! <<<

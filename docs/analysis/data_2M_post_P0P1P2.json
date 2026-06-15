@@ -1,0 +1,443 @@
+{
+  "experiment": "2M_post_P0P1P2",
+  "duration_sec": 4804,
+  "timeline": [
+    {
+      "step": 200000,
+      "motor_xyz": [
+        18,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 147.00422405855636,
+        "vestibular": 12.574641865881583,
+        "thermal": 0.3684386699984951
+      },
+      "spikes": {
+        "motor": 114019,
+        "otolith": 3929,
+        "vestibular": 2539,
+        "thermal": 10909
+      },
+      "body_pos": [
+        55.69,
+        59.51,
+        58.68
+      ],
+      "speed": 0.148096,
+      "efficacy": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 103,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 57,
+        "prune": 51,
+        "mitosis": 55
+      },
+      "boundary_crossings": 0
+    },
+    {
+      "step": 400000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 102.18649895713982,
+        "vestibular": 12.553794316213466,
+        "thermal": 0.33592448590704077
+      },
+      "spikes": {
+        "motor": 166498,
+        "otolith": 8251,
+        "vestibular": 5641,
+        "thermal": 11493
+      },
+      "body_pos": [
+        67.23,
+        77.16,
+        75.67
+      ],
+      "speed": 0.125061,
+      "efficacy": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 59,
+        "prune": 59,
+        "mitosis": 2
+      },
+      "boundary_crossings": 0
+    },
+    {
+      "step": 600000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 37.337735998443485,
+        "vestibular": 12.609414862343678,
+        "thermal": 0.18993768955035678
+      },
+      "spikes": {
+        "motor": 214583,
+        "otolith": 11453,
+        "vestibular": 8720,
+        "thermal": 12128
+      },
+      "body_pos": [
+        79.69,
+        94.75,
+        90.32
+      ],
+      "speed": 0.131039,
+      "efficacy": {
+        "x": 1.0,
+        "y": 0.9987000000000001,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 58,
+        "prune": 58,
+        "mitosis": 0
+      },
+      "boundary_crossings": 0
+    },
+    {
+      "step": 800000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 31.569996721750464,
+        "vestibular": 12.393405946612212,
+        "thermal": 0.2154128880136855
+      },
+      "spikes": {
+        "motor": 240330,
+        "otolith": 13918,
+        "vestibular": 10904,
+        "thermal": 12709
+      },
+      "body_pos": [
+        93.21,
+        7.92,
+        3.87
+      ],
+      "speed": 0.098051,
+      "efficacy": {
+        "x": 0.9860000000000015,
+        "y": 1.0,
+        "z": 0.9926000000000008
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 51,
+        "prune": 51,
+        "mitosis": 0
+      },
+      "boundary_crossings": 2
+    },
+    {
+      "step": 1000000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 126.40542748517957,
+        "vestibular": 11.644947402929615,
+        "thermal": 0.24114085005443253
+      },
+      "spikes": {
+        "motor": 257233,
+        "otolith": 16245,
+        "vestibular": 12805,
+        "thermal": 13237
+      },
+      "body_pos": [
+        3.85,
+        17.59,
+        14.34
+      ],
+      "speed": 0.084698,
+      "efficacy": {
+        "x": 1.0,
+        "y": 0.963800000000004,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 54,
+        "prune": 54,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    },
+    {
+      "step": 1200000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 18.904524092138363,
+        "vestibular": 11.819682791425421,
+        "thermal": 0.18639911751503885
+      },
+      "spikes": {
+        "motor": 275033,
+        "otolith": 18068,
+        "vestibular": 14678,
+        "thermal": 13981
+      },
+      "body_pos": [
+        13.19,
+        21.48,
+        23.48
+      ],
+      "speed": 0.053243,
+      "efficacy": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 49,
+        "prune": 49,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    },
+    {
+      "step": 1400000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 73.02864039597839,
+        "vestibular": 11.575523139414306,
+        "thermal": 0.16816060033378163
+      },
+      "spikes": {
+        "motor": 300228,
+        "otolith": 20108,
+        "vestibular": 16582,
+        "thermal": 14926
+      },
+      "body_pos": [
+        22.0,
+        23.92,
+        30.34
+      ],
+      "speed": 0.061012,
+      "efficacy": {
+        "x": 0.9706000000000123,
+        "y": 0.9860000000000015,
+        "z": 0.9846000000000017
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 57,
+        "prune": 57,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    },
+    {
+      "step": 1600000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 90.76143202953645,
+        "vestibular": 11.859645309055484,
+        "thermal": 0.1739513108567367
+      },
+      "spikes": {
+        "motor": 321740,
+        "otolith": 22623,
+        "vestibular": 18413,
+        "thermal": 15977
+      },
+      "body_pos": [
+        29.77,
+        25.6,
+        35.75
+      ],
+      "speed": 0.054026,
+      "efficacy": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 51,
+        "prune": 51,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    },
+    {
+      "step": 1800000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 112.6223644635538,
+        "vestibular": 11.724216353776528,
+        "thermal": 0.17771429430689173
+      },
+      "spikes": {
+        "motor": 344143,
+        "otolith": 25667,
+        "vestibular": 20425,
+        "thermal": 17014
+      },
+      "body_pos": [
+        38.76,
+        28.57,
+        40.71
+      ],
+      "speed": 0.064502,
+      "efficacy": {
+        "x": 0.973000000000003,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 36,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 54,
+        "prune": 56,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    },
+    {
+      "step": 2000000,
+      "motor_xyz": [
+        20,
+        20,
+        20
+      ],
+      "xin": {
+        "motor": 0,
+        "otolith": 59.102016878397826,
+        "vestibular": 11.989886225744458,
+        "thermal": 0.18816080940736626
+      },
+      "spikes": {
+        "motor": 364784,
+        "otolith": 27833,
+        "vestibular": 22286,
+        "thermal": 18037
+      },
+      "body_pos": [
+        49.18,
+        31.17,
+        47.89
+      ],
+      "speed": 0.065875,
+      "efficacy": {
+        "x": 0.990800000000001,
+        "y": 0.9922000000000009,
+        "z": 0.9936000000000007
+      },
+      "da": 0.1,
+      "n_neurons": 105,
+      "n_bundles": 38,
+      "ultra_depth": 5,
+      "growth": {
+        "sprout": 51,
+        "prune": 49,
+        "mitosis": 0
+      },
+      "boundary_crossings": 3
+    }
+  ],
+  "boundary_crossings": [
+    {
+      "step": 665018,
+      "axis": "y",
+      "from": 99.99999182677054,
+      "to": 5.8023470174362046e-05
+    },
+    {
+      "step": 734159,
+      "axis": "z",
+      "from": 99.99996556165102,
+      "to": 3.0345124073960505e-05
+    },
+    {
+      "step": 924281,
+      "axis": "x",
+      "from": 99.99999123108279,
+      "to": 4.430772602859179e-05
+    }
+  ],
+  "total_crossings": 3,
+  "final": {
+    "neurons": 105,
+    "motors": 60,
+    "bundles": 38,
+    "growth_events": 1133
+  }
+}

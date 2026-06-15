@@ -1,0 +1,49 @@
+======================================================================
+SIGNAL CHAIN DIAGNOSTIC (after 20k steps)
+======================================================================
+
+--- Stage 1: MET (mechanotransduction) ---
+  yaw: V=1.2567  act=2.5120  E=1.0000
+  oto_x: V=-0.3982  act=0.0000  E=0.0010
+
+--- Stage 2: HairCell ---
+  yaw: V=1.7657  act=0.3025  E=1.0000
+  oto_x: V=0.0881  act=0.0000  E=1.0000
+
+--- Stage 3: Afferent ---
+  yaw reg: V=0.0831  act=0.000000  E=0.0642
+  yaw irr: V=-2.2629  act=0.000000  E=0.0500
+  oto_x reg: V=0.0084  act=0.000000  E=1.0000
+  oto_x irr: V=0.1185  act=0.000000  E=1.0000
+
+--- Stage 4: Encoding ---
+  reg_yaw: V=0.3006  act=0.000000  E=0.0461
+  irr_yaw: V=0.1992  act=0.000000  E=1.0000
+  reg_oto_x: V=0.1991  act=0.000000  E=1.0000
+  irr_oto_x: V=0.2253  act=0.000000  E=1.0000
+  reg_therm: V=-0.0000  act=0.000000  E=0.0400
+  irr_therm: V=-3.0072  act=0.000000  E=0.0402
+
+--- Stage 5: Column ---
+  yaw: V=0.0319  act=0.000000  E=0.0212
+  pitch: V=0.0542  act=0.000000  E=0.0211
+  roll: V=0.0778  act=0.000000  E=0.9995
+  oto_x: V=0.0268  act=0.000000  E=0.9995
+  oto_y: V=0.1960  act=0.000000  E=0.0182
+  oto_z: V=0.0695  act=0.000000  E=0.0209
+  therm: V=0.1113  act=0.000000  E=1.0000
+
+--- Stage 6: Col->Motor Bundle ---
+  bundle: col_yaw_to_move_x
+  synapse_gain: 5.0
+  mean_weight: 0.266312
+  weight_max: 0.5
+  n_sources: 1, n_targets: 1
+  propagated currents: [0.5042]
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_chain_diagnostic.py", line 89, in <module>
+    total_G += b._memristors[i][j].conductance()
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+TypeError: 'float' object is not callable

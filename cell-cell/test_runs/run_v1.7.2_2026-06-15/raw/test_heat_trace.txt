@@ -1,0 +1,23 @@
+  t=     0  heat=      0.00  E=1.0000  V= +0.0007  vth=0.15  spk=0  b_max=0.00
+  t=   500  heat=      0.00  E=1.0000  V= +0.0300  vth=0.15  spk=1  b_max=0.00
+  t=  1000  heat=      0.00  E=1.0000  V= +0.1152  vth=0.15  spk=3  b_max=0.00
+  t=  1500  heat=      0.00  E=1.0000  V= +0.1313  vth=0.15  spk=5  b_max=0.00
+  t=  2000  heat=      0.00  E=1.0000  V= +0.0586  vth=0.15  spk=6  b_max=0.00
+  t=  2500  heat=      0.00  E=1.0000  V= -0.0048  vth=0.15  spk=6  b_max=0.00
+  t=  3000  heat=      0.00  E=1.0000  V= -0.0170  vth=0.15  spk=6  b_max=0.00
+  t=  3500  heat=      0.00  E=1.0000  V= +0.0254  vth=0.15  spk=6  b_max=0.00
+  t=  4000  heat=      0.00  E=1.0000  V= +0.0868  vth=0.15  spk=6  b_max=0.00
+  t=  4500  heat=      0.00  E=1.0000  V= +0.1462  vth=0.15  spk=6  b_max=0.00
+  t=  5000  heat=      0.00  E=1.0000  V= +0.1980  vth=0.15  spk=6  b_max=0.00
+  t=  5500  heat=      0.00  E=1.0000  V= +0.1550  vth=0.15  spk=7  b_max=0.00
+  t=  6000  heat=      0.00  E=1.0000  V= +0.1251  vth=0.15  spk=8  b_max=0.00
+  t=  6500  heat=      0.00  E=1.0000  V= +0.1283  vth=0.15  spk=9  b_max=0.00
+  t=  7000  heat=      0.00  E=1.0000  V= +0.1619  vth=0.15  spk=10  b_max=0.00
+  t=  7500  heat=      0.00  E=1.0000  V= +0.0206  vth=0.15  spk=12  b_max=0.00
+  t=  8000  heat=      0.00  E=1.0000  V= +0.1154  vth=0.15  spk=13  b_max=0.00
+  t=  8500  heat=      0.00  E=1.0000  V= +0.0323  vth=0.15  spk=15  b_max=0.00
+  t=  9000  heat=      0.00  E=1.0000  V= +0.1857  vth=0.15  spk=16  b_max=0.00
+  t=  9500  heat=      0.00  E=1.0000  V= +0.0754  vth=0.15  spk=19  b_max=0.00
+
+Max heat seen: 0.00
+Heat>100 first at: None

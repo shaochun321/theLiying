@@ -1,0 +1,2 @@
+With STDP:   186 spikes, w_met=0.4582, w_hc=0.8326
+Frozen STDP: 186 spikes, w_met=0.4554, w_hc=0.8326

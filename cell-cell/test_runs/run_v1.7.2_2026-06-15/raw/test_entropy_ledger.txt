@@ -1,0 +1,49 @@
+======================================================================
+�� �� �� (Entropy Ledger)
+======================================================================
+  ģ��ʱ��: 10.0s (10000 steps)
+  �� spike: 1359
+  ���Ⱥ�ɢ: 26.0275
+  ƽ�� spike ��: 135.9 spk/s
+  �ز����� dS/dt: 5.325846
+  ��Ч (spk/heat): 0.0291
+
+  Layer            Avg E  Avg Heat   Avg Act   E trend
+  DA              0.7912  0.792045    0.2775   +0.1349
+  L1_MET          0.9956  0.010005    2.4644   +0.0133
+  L2_HC           0.9948  0.404422    1.5523   +0.0022
+  L3_Aff          0.5277  0.028230    0.0093   +0.0001
+  L4_Enc          0.8640  0.007581    0.0025   +0.0001
+  L5_Col          0.9996  0.002159    0.0011   -0.0000
+  L6_Mot          1.0000  0.000980    0.0017   +0.0000
+
+  ISI Entropy (bits):
+    aff_irr_oto_x            : 0.444 bits (48 spikes)
+    aff_irr_pitch            : 1.757 bits (151 spikes)
+    aff_irr_yaw              : 0.534 bits (38 spikes)
+    aff_reg_oto_x            : 0.384 bits (344 spikes)
+    aff_reg_pitch            : 0.283 bits (404 spikes)
+    aff_reg_yaw              : 1.132 bits (38 spikes)
+    col_oto_x                : 2.067 bits (15 spikes)
+    col_pitch                : 1.912 bits (28 spikes)
+    enc_irr_oto_x            : 1.753 bits (15 spikes)
+    enc_irr_pitch            : 3.481 bits (44 spikes)
+    enc_irr_yaw              : 1.208 bits (13 spikes)
+    enc_reg_oto_x            : 1.467 bits (81 spikes)
+    enc_reg_pitch            : 1.585 bits (109 spikes)
+    enc_reg_yaw              : 1.571 bits (11 spikes)
+
+  Layer Transfer (correlation):
+    L1_MET �� L2_HC:  1.000  ��������������������������������������
+    L2_HC �� L3_Aff:  0.164  ������
+    L3_Aff �� L4_Enc: -0.073  
+    L4_Enc �� L5_Col: -0.127  
+    L5_Col �� L6_Mot: -0.076  
+    DA �� L6_Mot: -0.113  
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_entropy_ledger.py", line 20, in <module>
+    print(f"\n  Energy Balance: {'\u2713' if ok else '\u2717'} {msg}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2713' in position 20: illegal multibyte sequence

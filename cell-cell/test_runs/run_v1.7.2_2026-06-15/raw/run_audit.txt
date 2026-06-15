@@ -1,0 +1,108 @@
+======================================================================
+nexus_v1 Extended Entropy Audit (5000 steps)
+======================================================================
+  t=   0  depth=0/6  active=0  spikes=0  heat=0.05
+         met=0.0000
+  t= 500  depth=2/6  active=1  spikes=0  heat=0.06
+         met=0.1842 | haircell=0.6702 | afferent_reg=0.0000
+  t=1000  depth=2/6  active=1  spikes=6  heat=0.12
+         met=0.8080 | haircell=0.8777 | afferent_reg=0.0000
+  t=1500  depth=3/6  active=2  spikes=20  heat=0.39
+         met=1.7646 | haircell=1.4548 | afferent_reg=6.0000 | encoding=0.0000
+  t=2000  depth=4/6  active=2  spikes=47  heat=0.63
+         met=2.4265 | haircell=2.2285 | afferent_reg=15.0000 | encoding=1.0000 | column=0.0000
+  t=2500  depth=4/6  active=2  spikes=111  heat=0.86
+         met=2.9270 | haircell=2.7820 | afferent_reg=40.0000 | encoding=6.0000 | column=0.0000
+  t=3000  depth=4/6  active=2  spikes=161  heat=1.06
+         met=3.3792 | haircell=3.0883 | afferent_reg=62.0000 | encoding=13.0000 | column=0.0000
+  t=3500  depth=5/6  active=3  spikes=209  heat=1.12
+         met=3.7883 | haircell=3.2554 | afferent_reg=88.0000 | encoding=21.0000 | column=1.0000 | motor=0.0000
+  t=4000  depth=5/6  active=2  spikes=248  heat=1.16
+         met=4.1586 | haircell=3.3561 | afferent_reg=108.0000 | encoding=30.0000 | column=2.0000 | motor=0.0000
+  t=4500  depth=5/6  active=2  spikes=292  heat=1.19
+         met=4.4936 | haircell=3.4240 | afferent_reg=134.0000 | encoding=39.0000 | column=3.0000 | motor=0.0000
+  t=4999  depth=6/6  active=2  spikes=331  heat=1.21
+         met=4.7961 | haircell=3.4731 | afferent_reg=155.0000 | encoding=48.0000 | column=5.0000 | motor=1.0000
+
+
+======================================================================
+ENTROPY LEDGER SUMMARY
+======================================================================
+
+Tick: 4999
+Active neurons: 2
+Total spikes:   331
+Total energy:   42.2361
+Total heat:     1.214739
+
+--- Layer Activations (signal propagation) ---
+  met            :   4.7961 #######################
+  haircell       :   3.4731 #################
+  afferent_reg   : 155.0000 ##################################################
+  encoding       :  48.0000 ##################################################
+  column         :   5.0000 #########################
+  motor          :   1.0000 #####
+  Signal depth: 6/6
+
+--- Layer Energies ---
+  met            : 5.9997
+  haircell       : 5.9731
+  afferent_reg   : 5.0622
+  afferent_irr   : 5.0547
+  encoding       : 11.1468
+  column         : 5.9996
+  motor          : 3.0000
+
+--- Bundle Weights ---
+  met_to_hc_yaw                      : 0.5869
+  hc_to_aff_yaw                      : 0.7394
+  met_to_hc_pitch                    : 0.3757
+  hc_to_aff_pitch                    : 0.7765
+  met_to_hc_roll                     : 0.3882
+  hc_to_aff_roll                     : 0.8123
+  met_to_hc_oto_x                    : 0.6178
+  hc_to_aff_oto_x                    : 0.6791
+  met_to_hc_oto_y                    : 0.5822
+  hc_to_aff_oto_y                    : 0.7964
+  met_to_hc_oto_z                    : 0.5839
+  hc_to_aff_oto_z                    : 0.6797
+  aff_reg_to_enc_yaw                 : 0.1766
+  aff_irr_to_enc_yaw                 : 0.1481
+  aff_reg_to_enc_pitch               : 0.2315
+  aff_irr_to_enc_pitch               : 0.1677
+  aff_reg_to_enc_roll                : 0.2416
+  aff_irr_to_enc_roll                : 0.1762
+  aff_reg_to_enc_oto_x               : 0.1839
+  aff_irr_to_enc_oto_x               : 0.2146
+  aff_reg_to_enc_oto_y               : 0.2187
+  aff_irr_to_enc_oto_y               : 0.2221
+  aff_reg_to_enc_oto_z               : 0.1823
+  aff_irr_to_enc_oto_z               : 0.1986
+  enc_to_col_yaw                     : 0.1433
+  enc_to_col_pitch                   : 0.1328
+  enc_to_col_roll                    : 0.1802
+  enc_to_col_oto_x                   : 0.1517
+  enc_to_col_oto_y                   : 0.1382
+  enc_to_col_oto_z                   : 0.1366
+  col_yaw_to_move_x                  : 0.4981
+  col_pitch_to_move_y                : 0.3767
+  col_roll_to_move_z                 : 0.3621
+  col_to_motor_cross                 : 0.0514
+
+--- Entropy Accounting ---
+  Dissipation (heat): 1.214739
+  Stored (capacitors):7.313022
+  Transport (bundles):0.011132
+
+--- Signal Depth History ---
+  t=   0: [......] 0/6
+  t= 500: [>>....] 2/6
+  t=1000: [>>....] 2/6
+  t=1500: [>>>...] 3/6
+  t=2000: [>>>>..] 4/6
+  t=2500: [>>>>..] 4/6
+  t=3000: [>>>>..] 4/6
+  t=3500: [>>>>>.] 5/6
+  t=4000: [>>>>>.] 5/6
+  t=4500: [>>>>>.] 5/6
+  t=4999: [>>>>>>] 6/6

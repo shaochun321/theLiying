@@ -1,0 +1,16 @@
+======================================================================
+PHASE 3 GATE TEST: Thermal �� Shadow �� DA Closed Loop
+======================================================================
+
+all_axes: ['yaw', 'pitch', 'roll', 'oto_x', 'oto_y', 'oto_z', 'therm']
+extra_axes: ['therm']
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_phase3_da_loop.py", line 227, in <module>
+    run_phase3_gate(total_steps=20000, report_interval=2000)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "j:\cell-cc\nexus_v1\tests\test_phase3_da_loop.py", line 57, in run_phase3_gate
+    for patch in body.skin_patches:
+                 ^^^^^^^^^^^^^^^^^
+AttributeError: 'Body' object has no attribute 'skin_patches'

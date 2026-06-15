@@ -1,0 +1,57 @@
+=== Binding Layer ===
+  Active bindings: 0/21
+
+=== Xin Tension ===
+  met_to_hc_yaw: tension=-0.1847 fruit=none
+  hc_to_aff_yaw: tension=0.1385 fruit=none
+  met_to_hc_pitch: tension=-0.1843 fruit=none
+  hc_to_aff_pitch: tension=0.1878 fruit=none
+  met_to_hc_roll: tension=-0.1842 fruit=none
+  hc_to_aff_roll: tension=0.1587 fruit=none
+  met_to_hc_oto_x: tension=-0.1850 fruit=none
+  hc_to_aff_oto_x: tension=0.1546 fruit=none
+  met_to_hc_oto_y: tension=-0.1852 fruit=none
+  hc_to_aff_oto_y: tension=0.1476 fruit=none
+  met_to_hc_oto_z: tension=-0.1849 fruit=none
+  hc_to_aff_oto_z: tension=0.1425 fruit=none
+  enc_to_col_therm: tension=0.0013 fruit=none
+  col_yaw_to_move_x: tension=-0.0034 fruit=none
+  col_pitch_to_move_y: tension=-0.0034 fruit=none
+  col_roll_to_move_z: tension=-0.0034 fruit=none
+  col_to_motor_cross: tension=-0.0033 fruit=none
+  shadow_to_da: tension=-0.7868 fruit=dormant
+  xin_to_da: tension=-0.7868 fruit=dormant
+
+=== Circulation ===
+  P: None
+  R: None
+  Total flow: 0.000000
+  �� = {'p_c': 0.0, 'p_b': 0.0, 'r_c': 0.0, 'r_b': 0.0, 'm_b': 0.0, 'x': 0.99999999724424, 'u': 2.755759953565473e-09}
+
+=== Maturation ===
+  enc_reg_yaw: stage=0 (spine)
+  enc_irr_yaw: stage=0 (spine)
+  enc_reg_pitch: stage=0 (spine)
+  enc_irr_pitch: stage=0 (spine)
+  enc_reg_roll: stage=0 (spine)
+  enc_irr_roll: stage=0 (spine)
+  enc_reg_oto_x: stage=0 (spine)
+  enc_irr_oto_x: stage=0 (spine)
+  enc_reg_oto_y: stage=0 (spine)
+  enc_irr_oto_y: stage=0 (spine)
+  enc_reg_oto_z: stage=0 (spine)
+  enc_irr_oto_z: stage=0 (spine)
+  enc_reg_therm: stage=0 (spine)
+  enc_irr_therm: stage=0 (spine)
+  col_yaw: stage=0 (spine)
+  col_pitch: stage=0 (spine)
+  col_roll: stage=0 (spine)
+  col_oto_x: stage=0 (spine)
+  col_oto_y: stage=0 (spine)
+  col_oto_z: stage=0 (spine)
+  col_therm: stage=0 (spine)
+
+=== Crystallization ===
+  Any crystallized: False
+
+[OK] All new systems operational.

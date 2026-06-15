@@ -1,0 +1,252 @@
+{
+  "main": {
+    "id": "f72098fab5b70383",
+    "type": "split",
+    "children": [
+      {
+        "id": "d5adc0733af57467",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "934d236f341c7844",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "00_Dashboard/AI编程自足文档.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "AI编程自足文档"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "700767b9018d77c7",
+    "type": "split",
+    "children": [
+      {
+        "id": "3e34f1b9f619974f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "790d0bac3b8715de",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "byModifiedTimeReverse",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "cdeceaeec05738ea",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "d1e6b36663c8cf31",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "ff538f11764cd76b",
+    "type": "split",
+    "children": [
+      {
+        "id": "b194687f86f2adeb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1cefb1060b796764",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "00_Dashboard/矛盾·遗留·生长点.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "矛盾·遗留·生长点 的反向链接列表"
+            }
+          },
+          {
+            "id": "0af50e8f9f4612cb",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "00_Dashboard/矛盾·遗留·生长点.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "矛盾·遗留·生长点 的出链列表"
+            }
+          },
+          {
+            "id": "79d901f999c0a00d",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "830e335265e1ef2d",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "86cc7ffc98f74ada",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "00_Dashboard/矛盾·遗留·生长点.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "矛盾·遗留·生长点 的大纲"
+            }
+          },
+          {
+            "id": "433ed7ab5efe877f",
+            "type": "leaf",
+            "state": {
+              "type": "claudian-view",
+              "state": {},
+              "icon": "bot",
+              "title": "Claudian"
+            }
+          },
+          {
+            "id": "2e892ed39919b03d",
+            "type": "leaf",
+            "state": {
+              "type": "footnotes",
+              "state": {
+                "file": "00_Dashboard/矛盾·遗留·生长点.md"
+              },
+              "icon": "lucide-file-signature",
+              "title": "脚注"
+            }
+          }
+        ],
+        "currentTab": 5
+      }
+    ],
+    "direction": "horizontal",
+    "width": 756.5
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false,
+      "terminal:Open terminal": false,
+      "realclaudian:Open Claudian": false,
+      "workspaces:管理工作区布局": false
+    }
+  },
+  "active": "934d236f341c7844",
+  "lastOpenFiles": [
+    "专题分析/熵账本构建规范-约束与纪律.md",
+    "报告/熵账本构建规范_代码校验报告_v1.0_2026-06-15.md",
+    "报告/熵账本构建规范_代码校验报告_v1.0_2026-06-15.md.tmp.18848.54f07f33cc7a",
+    "专题分析/熵账本系统-报告调和与矛盾分析.md",
+    "专题分析/熵账本构建规范-约束与纪律.md.tmp.20952.2230a74a45d3",
+    "00_Dashboard/📋 按概念查询.md",
+    "报告/熵账本系统_定义_演化_缺口_综合报告.md.tmp.18820.2a9a5e486fde",
+    "00_Dashboard/Plan-Walkthrough-Analysis三角映射.md",
+    "00_Dashboard/AI编程自足文档.md",
+    "00_Dashboard/概念演化链.md",
+    "00_Dashboard/理念架构图.md",
+    "00_Dashboard/矛盾·遗留·生长点.md",
+    "00_Dashboard/对话日志孤岛-未纳入方案.md",
+    "00_Dashboard/架构演化树.canvas",
+    "00_Dashboard/概念演化链.canvas",
+    "报告/项目全景分析报告.md",
+    "00_Dashboard/项目全景分析报告.md",
+    "00_Dashboard/📊 Vault 仪表盘.md",
+    "00_Dashboard/当前方向与缺口追踪.md",
+    "专题分析/熵账本系统-报告调和与矛盾分析.md.tmp.20952.4710d8d5c147",
+    "专题分析",
+    "00_Dashboard/孤岛-B组-部分失联.md",
+    "00_Dashboard/当前方向与缺口追踪.md.tmp.20952.baf2ee49aa7e",
+    "报告/熵账本系统_定义_演化_缺口_综合报告.md",
+    "报告/熵账本系统_定义_演化_缺口_综合报告.md.tmp.18820.e63f2f4505e1",
+    "报告/熵账本系统实测分析报告.md",
+    "报告",
+    "新建文件夹",
+    "00_Dashboard/熵账本系统实测分析报告.md",
+    "00_Dashboard/熵账本系统实测分析报告.md.tmp.18820.f04b6618d9e4",
+    "00_Dashboard/孤岛-A组-完全失联.md",
+    "00_Dashboard/阶段实施方案_v0.9.0_to_v1.0.md",
+    "00_Dashboard/🔴 按优先级查询.md",
+    "00_Dashboard/🏷️ 按类型查询.md",
+    "00_Dashboard/核心词条索引.md",
+    "00_Dashboard/📅 按时间线查询.md",
+    "2026-06/audit_implementation_v1.项目实现审计-v1.0-2026-06-07.md",
+    "2026-06/audit_master_task_crossref.2026.6.7.md"
+  ]
+}

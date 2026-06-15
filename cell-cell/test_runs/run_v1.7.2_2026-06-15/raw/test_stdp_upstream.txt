@@ -1,0 +1,39 @@
+=== STDP Upstream Propagation Diagnosis ===
+
+���� Trace values (5s steady-state) ����
+Neuron                 pre_trace  post_trace  activation   spiking
+  Aff_reg_yaw               0.8209      0.8209      0.0000      True
+  Aff_irr_yaw               0.0000      0.0000      0.0000      True
+  Enc_reg_yaw               0.9107      0.9107      0.0000      True
+  Enc_irr_yaw               0.0000      0.0000      0.0000      True
+  Col_yaw                   0.0006      0.0006      0.0000      True
+  Motor_x                   0.0000      0.0000      0.0000      True
+
+���� Bundle STDP Analysis ����
+
+  aff_reg_to_enc_yaw:
+    learning_rule: stdp
+    stdp_lr: 0.01
+    weight: 0.225338 (init=0.2)
+    [0,0] src.pre=0.8209 tgt.post=0.9107
+           src.post=0.8209 tgt.pre=0.9107
+           LTP=0.747573 LTD=0.747573
+           dw/step = 0.00000000
+
+  enc_to_col_yaw:
+    learning_rule: stdp
+    stdp_lr: 0.008
+    weight: 0.178263 (init=0.15)
+    [0,0] src.pre=0.9107 tgt.post=0.0006
+           src.post=0.9107 tgt.pre=0.0006
+           LTP=0.000530 LTD=0.000530
+           dw/step = 0.00000000
+    [1,0] src.pre=0.0000 tgt.post=0.0006
+           src.post=0.0000 tgt.pre=0.0006
+           LTP=0.000000 LTD=0.000000
+           dw/step = 0.00000000
+
+���� 5s �ۻ� dw ���� ����
+  ��� dw/step �� 0��˵�� LTP �� LTD���Գ�ȡ����
+  ������Ϊ pre_trace �� post_trace for each neuron
+  �� pre.pre �� tgt.post �� src.post �� tgt.pre

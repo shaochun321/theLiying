@@ -1,0 +1,39 @@
+======================================================================
+PHASE 2 ¡ª MOTHER vs VARIANT COMPARISON
+======================================================================
+
+Running Mother (HebbianCircuit)...
+Running Variant (VariantCircuit)...
+
+======================================================================
+Metric                                  Mother         Variant      Delta
+----------------------------------------------------------------------
+  Aff spikes                                97             118 +       21
+  Aff frequency (Hz)                      26.2            35.2 +      9.1
+  Aff CV                                 1.005           0.605    -0.399
+  Enc activation                        0.0000          0.0000 +   0.0000
+  Col activation                        0.0000          0.0000 +   0.0000
+  Motor spikes                               0              32 +       32
+  Signal depth                               3               4 +        1
+  Total energy                           43.11           49.16 +     6.05
+  Min energy                            0.0500          0.0454   -0.0046
+  Total heat                              0.99            1.04 +     0.06
+  Enc energy                             12.00           13.05 +     1.05
+  Col energy                              6.00            7.00 +     1.00
+  Motor energy                            3.00            3.00 +     0.00
+
+======================================================================
+VERIFICATION GATES
+======================================================================
+  FAIL G1: Mother not degraded (depth=3, spk=97)
+  PASS G2: Variant ¡Ý Mother (depth 4¡Ý3, mot 32¡Ý0)
+  FAIL G3: Variant depth ¡Ý 6 (actual=4)
+  PASS G4: No new energy depletion (variant min=0.0454 ¡Ý mother min=0.0500)
+  PASS G5: Heat bounded (total=1.04)
+
+  GATES: 3/5 PASSED
+Traceback (most recent call last):
+  File "J:\cell-cc\nexus_v1\run_variant_contracts.py", line 180, in <module>
+    print(f"\n  \u2717 {gates_total - gates_passed} GATES FAILED ¡ª do NOT tag, investigate")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2717' in position 4: illegal multibyte sequence

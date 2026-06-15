@@ -1,0 +1,39 @@
+Phase 1: Circuit construction...
+Phase 2: Running 10k steps (oto_x=200sin 0.5Hz)...
+  Simulation: 24.1s
+Phase 3: Noether checks...
+Phase 4: Encoding selectivity...
+Phase 5: Column differentiation...
+Phase 6: Motor topology...
+Phase 7: FFT periodicity...
+Phase 8: Sprouting sanity...
+Phase 9: A7 motor potential...
+Phase 10: Structural entropy...
+Phase 11: Xin fan-in check...
+
+============================================================
+  REGRESSION TEST RESULTS — v1.7.1
+  21 passed, 0 failed, 24.3s
+============================================================
+  [PASS] T0.1 Circuit builds: OK (threshold: no crash) 
+  [PASS] T0.2 10k steps complete: OK (threshold: no crash) 
+  [PASS] T1.1 Noether violations: 0 (threshold: == 0) 
+  [PASS] T1.2 Energy balance: 0.000043 (threshold: < 0.01) 
+  [PASS] T1.3 Landauer bound: True (threshold: True) 
+  [PASS] T2.1 Active encoding > 0.3: 0.6739 (threshold: > 0.3) (oto_x encoding should be active)
+  [PASS] T2.2 Quiet encoding < 0.5: 0.0189 (threshold: < 0.5) (therm encoding should be quiet with no thermal input)
+  [PASS] T2.3 Encoding selectivity ratio: 35.64x (threshold: > 1.5x) (active/quiet ratio)
+  [PASS] T3.1 Vestibular column active: 0.6825 (threshold: > 0.3) 
+  [PASS] T3.2 Thermal column < vestibular: therm=0.4998 vest=0.6825 (threshold: therm < vest) (column should differentiate based on encoding input)
+  [PASS] T4.1 Axis/Cross weight ratio > 2.0: 5.90x (threshold: > 2.0x) (axis=0.3916 cross=0.0663)
+  [PASS] T4.2 Cross weight max < 0.20: 0.0778 (threshold: < 0.20) (cross-axis ceiling should prevent chase)
+  [PASS] T4.3 Motor diff > 0.001: 0.0050 (threshold: > 0.001) (x=0.6402 y=0.6352 z=0.6386)
+  [PASS] T5.1 Xin peak near input freq: 0.49Hz (threshold: 0.5Hz +/- 0.2Hz) 
+  [PASS] T5.2 Xin input power > 10%: 58.6% (threshold: > 10%) (input frequency should dominate Xin spectrum)
+  [PASS] T6.1 Sprouted bundles < 20 at 10k: 3 (threshold: < 20) (sprouting should not explode)
+  [PASS] T7.1 Kinetic energy > 0: 0.006110 (threshold: > 0) 
+  [PASS] T7.2 Polarization in [0.3, 1.0]: 0.4753 (threshold: [0.3, 1.0]) 
+  [PASS] T8.1 H_struct > 0: 4.1841 (threshold: > 0) 
+  [PASS] T8.2 H_flow > 0: 4.0315 (threshold: > 0) 
+  [PASS] T9.1 Xin fan-in ratio < 2.0: 0.90x (threshold: < 2.0x) (cross=330.3 axis_avg=365.9)
+============================================================

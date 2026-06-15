@@ -1,0 +1,498 @@
+Running 20000 steps with strong input...
+
+--- tick=2000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin= -0.199827
+    met_to_hc_pitch          : xin= -0.171189
+    met_to_hc_roll           : xin= -0.185355
+    met_to_hc_oto_x          : xin= -0.184676
+    met_to_hc_oto_y          : xin= -0.184949
+    met_to_hc_oto_z          : xin= -0.184681
+    enc_to_col_yaw           : xin= +0.000000
+    enc_to_col_pitch         : xin= +0.000000
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= +0.001160
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +0.02362933  E=0.786630  pre_tr=0.05832225
+    s_enc_reg_oto_y          : act=   +0.02361963  E=0.785622  pre_tr=0.05829509
+    s_enc_reg_oto_z          : act=   +0.02367140  E=0.782050  pre_tr=0.05842746
+    s_enc_reg_pitch          : act=   +0.02039988  E=0.921979  pre_tr=0.05033827
+    s_enc_reg_roll           : act=   +0.02373228  E=0.777887  pre_tr=0.05857405
+    s_enc_reg_therm          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_yaw            : act=   +0.01973424  E=0.810001  pre_tr=0.04844196
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=1.000000  V_mem=0.0033505586
+    s_col_oto_y              : act=   +0.00000000  E=1.000000  V_mem=0.0032881865
+    s_col_oto_z              : act=   +0.00000000  E=1.000000  V_mem=0.0032661621
+    s_col_pitch              : act=   +0.00000000  E=1.000000  V_mem=0.0029192177
+    s_col_roll               : act=   +0.00000000  E=1.000000  V_mem=0.0032369083
+    s_col_therm              : act=   +0.00000000  E=1.000000  V_mem=0.0000000000
+    s_col_yaw                : act=   +0.00000000  E=1.000000  V_mem=0.0024984804
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['0.01973424', '0.00000000'], propagated=['0.0214032061'], w=0.089533
+    s_enc_to_col_pitch: src_acts=['0.02039988', '0.00000000'], propagated=['0.0231796755'], w=0.106902
+    s_enc_to_col_roll: src_acts=['0.02373228', '0.00000000'], propagated=['0.0258827662'], w=0.104055
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00094711  silent=False
+    s_cross_pitch_oto_y           : w=0.00081432  silent=False
+    s_cross_pitch_oto_z           : w=0.00102700  silent=False
+    s_cross_pitch_roll            : w=0.00119263  silent=False
+    s_cross_pitch_therm           : w=0.00115384  silent=False
+    s_cross_yaw_oto_x             : w=0.00120478  silent=False
+    s_cross_yaw_oto_y             : w=0.00086716  silent=False
+    s_cross_yaw_oto_z             : w=0.00108374  silent=False
+    s_cross_yaw_pitch             : w=0.00107174  silent=False
+    s_cross_yaw_roll              : w=0.00090806  silent=False
+    s_cross_yaw_therm             : w=0.00091431  silent=False
+
+--- tick=4000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin= -1.272919
+    met_to_hc_pitch          : xin= -0.880419
+    met_to_hc_roll           : xin= -0.326905
+    met_to_hc_oto_x          : xin= -0.340081
+    met_to_hc_oto_y          : xin= -0.345784
+    met_to_hc_oto_z          : xin= -0.338682
+    enc_to_col_yaw           : xin= +0.001563
+    enc_to_col_pitch         : xin= +0.000259
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.000606
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +0.25344096  E=1.000000  pre_tr=0.63667850
+    s_enc_reg_oto_y          : act=   +0.25573704  E=1.000000  pre_tr=0.64236460
+    s_enc_reg_oto_z          : act=   +0.25321267  E=1.000000  pre_tr=0.63613184
+    s_enc_reg_pitch          : act=   +0.44016345  E=0.230082  pre_tr=1.09736351
+    s_enc_reg_roll           : act=   +0.24903309  E=1.000000  pre_tr=0.62581208
+    s_enc_reg_therm          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_yaw            : act=   +0.67282382  E=0.346412  pre_tr=1.67837890
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=1.000000  V_mem=0.0832509438
+    s_col_oto_y              : act=   +0.00000000  E=1.000000  V_mem=0.0821816910
+    s_col_oto_z              : act=   +0.00000000  E=1.000000  V_mem=0.0811388990
+    s_col_pitch              : act=   +0.00000000  E=0.776390  V_mem=0.1062891291
+    s_col_roll               : act=   +0.00000000  E=1.000000  V_mem=0.0797922240
+    s_col_therm              : act=   +0.00000000  E=1.000000  V_mem=0.0000000000
+    s_col_yaw                : act=   +0.00000000  E=0.010000  V_mem=0.1461478201
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['0.67282382', '0.00000000'], propagated=['0.7297259126'], w=0.089533
+    s_enc_to_col_pitch: src_acts=['0.44016345', '0.00000000'], propagated=['0.5001423479'], w=0.106902
+    s_enc_to_col_roll: src_acts=['0.24903309', '0.00000000'], propagated=['0.2715991099'], w=0.104055
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00094701  silent=False
+    s_cross_pitch_oto_y           : w=0.00081424  silent=False
+    s_cross_pitch_oto_z           : w=0.00102690  silent=False
+    s_cross_pitch_roll            : w=0.00119251  silent=False
+    s_cross_pitch_therm           : w=0.00115372  silent=False
+    s_cross_yaw_oto_x             : w=0.00120466  silent=False
+    s_cross_yaw_oto_y             : w=0.00086708  silent=False
+    s_cross_yaw_oto_z             : w=0.00108364  silent=False
+    s_cross_yaw_pitch             : w=0.00107164  silent=False
+    s_cross_yaw_roll              : w=0.00090797  silent=False
+    s_cross_yaw_therm             : w=0.00091422  silent=False
+
+--- tick=6000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin= -3.518607
+    met_to_hc_pitch          : xin= -2.867716
+    met_to_hc_roll           : xin= -0.441478
+    met_to_hc_oto_x          : xin= -0.479742
+    met_to_hc_oto_y          : xin= -0.496666
+    met_to_hc_oto_z          : xin= -0.475250
+    enc_to_col_yaw           : xin= +0.002377
+    enc_to_col_pitch         : xin= +0.003075
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.005593
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00000001  E=1.000000  pre_tr=0.00000002
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +0.77326600  E=1.000000  pre_tr=1.95289824
+    s_enc_reg_oto_y          : act=   +0.79223726  E=1.000000  pre_tr=2.00060304
+    s_enc_reg_oto_z          : act=   +0.76881590  E=1.000000  pre_tr=1.94172366
+    s_enc_reg_pitch          : act=   +1.64050314  E=1.000000  pre_tr=4.14995804
+    s_enc_reg_roll           : act=   +0.72900345  E=1.000000  pre_tr=1.84156176
+    s_enc_reg_therm          : act=   +0.00000001  E=1.000000  pre_tr=0.00000002
+    s_enc_reg_yaw            : act=   +1.85229338  E=1.000000  pre_tr=4.68891030
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.010000  V_mem=0.4022549251
+    s_col_oto_y              : act=   +0.00000000  E=0.010000  V_mem=0.4015669429
+    s_col_oto_z              : act=   +0.00000000  E=0.010000  V_mem=0.3911874351
+    s_col_pitch              : act=   +0.00000000  E=0.010000  V_mem=0.7660341384
+    s_col_roll               : act=   +0.00000000  E=0.010000  V_mem=0.3753703224
+    s_col_therm              : act=   +0.00000000  E=1.000000  V_mem=0.0000000000
+    s_col_yaw                : act=   +0.00000000  E=0.010000  V_mem=0.8942814980
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['1.85229338', '0.00000000'], propagated=['2.0089456357'], w=0.089533
+    s_enc_to_col_pitch: src_acts=['1.64050314', '0.00000000'], propagated=['1.8640463890'], w=0.106902
+    s_enc_to_col_roll: src_acts=['0.72900345', '0.00000000'], propagated=['0.7950617521'], w=0.104055
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00094692  silent=False
+    s_cross_pitch_oto_y           : w=0.00081416  silent=False
+    s_cross_pitch_oto_z           : w=0.00102680  silent=False
+    s_cross_pitch_roll            : w=0.00119240  silent=False
+    s_cross_pitch_therm           : w=0.00115361  silent=False
+    s_cross_yaw_oto_x             : w=0.00120454  silent=False
+    s_cross_yaw_oto_y             : w=0.00086699  silent=False
+    s_cross_yaw_oto_z             : w=0.00108353  silent=False
+    s_cross_yaw_pitch             : w=0.00107153  silent=False
+    s_cross_yaw_roll              : w=0.00090788  silent=False
+    s_cross_yaw_therm             : w=0.00091413  silent=False
+
+--- tick=8000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin= -5.971466
+    met_to_hc_pitch          : xin= -5.300311
+    met_to_hc_roll           : xin= -0.549610
+    met_to_hc_oto_x          : xin= -0.597038
+    met_to_hc_oto_y          : xin= -0.622655
+    met_to_hc_oto_z          : xin= -0.586237
+    enc_to_col_yaw           : xin= +0.001983
+    enc_to_col_pitch         : xin= +0.004255
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010286
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00020849  E=1.000000  pre_tr=0.00052047
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +1.20902484  E=1.000000  pre_tr=3.06691415
+    s_enc_reg_oto_y          : act=   +1.22940143  E=1.000000  pre_tr=3.11853548
+    s_enc_reg_oto_z          : act=   +1.20266462  E=1.000000  pre_tr=3.05084284
+    s_enc_reg_pitch          : act=   +2.49671667  E=1.000000  pre_tr=6.33136340
+    s_enc_reg_roll           : act=   +1.16330498  E=1.000000  pre_tr=2.95098425
+    s_enc_reg_therm          : act=   +0.00020849  E=1.000000  pre_tr=0.00052047
+    s_enc_reg_yaw            : act=   +2.65100045  E=1.000000  pre_tr=6.72476204
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.010000  V_mem=1.0557519668
+    s_col_oto_y              : act=   +0.00000000  E=0.010000  V_mem=1.0558448117
+    s_col_oto_z              : act=   +0.00000000  E=0.010000  V_mem=1.0293799550
+    s_col_pitch              : act=   +0.00000000  E=0.012877  V_mem=0.6604977695
+    s_col_roll               : act=   +0.00000000  E=0.010000  V_mem=0.9884609371
+    s_col_therm              : act=   +0.00000000  E=0.681707  V_mem=0.0824943673
+    s_col_yaw                : act=   +0.00000000  E=0.012215  V_mem=0.8042846752
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['2.65100045', '0.00000000'], propagated=['2.8752211423'], w=0.089536
+    s_enc_to_col_pitch: src_acts=['2.49671667', '0.00000000'], propagated=['2.8369452923'], w=0.106905
+    s_enc_to_col_roll: src_acts=['1.16330498', '0.00000000'], propagated=['1.2687173047'], w=0.104055
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00094683  silent=False
+    s_cross_pitch_oto_y           : w=0.00081408  silent=False
+    s_cross_pitch_oto_z           : w=0.00102670  silent=False
+    s_cross_pitch_roll            : w=0.00119228  silent=False
+    s_cross_pitch_therm           : w=0.00115350  silent=False
+    s_cross_yaw_oto_x             : w=0.00120443  silent=False
+    s_cross_yaw_oto_y             : w=0.00086691  silent=False
+    s_cross_yaw_oto_z             : w=0.00108343  silent=False
+    s_cross_yaw_pitch             : w=0.00107353  silent=False
+    s_cross_yaw_roll              : w=0.00090780  silent=False
+    s_cross_yaw_therm             : w=0.00091404  silent=False
+
+--- tick=10000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin= -8.418592
+    met_to_hc_pitch          : xin= -7.783094
+    met_to_hc_roll           : xin= -0.663156
+    met_to_hc_oto_x          : xin= -0.685889
+    met_to_hc_oto_y          : xin= -0.717287
+    met_to_hc_oto_z          : xin= -0.668052
+    enc_to_col_yaw           : xin= +0.000639
+    enc_to_col_pitch         : xin= +0.003567
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010686
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00003656  E=1.000000  pre_tr=0.00009172
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00095530  E=1.000000  pre_tr=0.00240943
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +1.46849090  E=1.000000  pre_tr=3.72777915
+    s_enc_reg_oto_y          : act=   +1.49562948  E=1.000000  pre_tr=3.79664911
+    s_enc_reg_oto_z          : act=   +1.45694847  E=1.000000  pre_tr=3.69854474
+    s_enc_reg_pitch          : act=   +3.07563572  E=1.000000  pre_tr=7.80771632
+    s_enc_reg_roll           : act=   +1.42019508  E=1.000000  pre_tr=3.60486003
+    s_enc_reg_therm          : act=   +0.00095530  E=1.000000  pre_tr=0.00240943
+    s_enc_reg_yaw            : act=   +3.17027026  E=1.000000  pre_tr=8.04926996
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.011964  V_mem=0.8397137966
+    s_col_oto_y              : act=   +0.00000000  E=0.011964  V_mem=0.8680513782
+    s_col_oto_z              : act=   +0.00000000  E=0.012107  V_mem=0.8507040564
+    s_col_pitch              : act=   +0.00000000  E=0.012786  V_mem=0.8435624881
+    s_col_roll               : act=   +0.00000000  E=0.012401  V_mem=0.7025047356
+    s_col_therm              : act=   +0.00000000  E=0.010000  V_mem=0.5632497769
+    s_col_yaw                : act=   +0.00000000  E=0.012341  V_mem=0.9219783588
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['3.17027026', '0.00000000'], propagated=['3.4385810036'], w=0.089559
+    s_enc_to_col_pitch: src_acts=['3.07563572', '0.00003656'], propagated=['3.4949496382'], w=0.106924
+    s_enc_to_col_roll: src_acts=['1.42019508', '0.00000000'], propagated=['1.5488911584'], w=0.104057
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00095283  silent=False
+    s_cross_pitch_oto_y           : w=0.00082009  silent=False
+    s_cross_pitch_oto_z           : w=0.00103244  silent=False
+    s_cross_pitch_roll            : w=0.00119755  silent=False
+    s_cross_pitch_therm           : w=0.00115339  silent=False
+    s_cross_yaw_oto_x             : w=0.00121097  silent=False
+    s_cross_yaw_oto_y             : w=0.00087349  silent=False
+    s_cross_yaw_oto_z             : w=0.00108962  silent=False
+    s_cross_yaw_pitch             : w=0.00108905  silent=False
+    s_cross_yaw_roll              : w=0.00091307  silent=False
+    s_cross_yaw_therm             : w=0.00091396  silent=False
+
+--- tick=12000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin=-10.822469
+    met_to_hc_pitch          : xin=-10.240340
+    met_to_hc_roll           : xin= -0.787722
+    met_to_hc_oto_x          : xin= -0.751424
+    met_to_hc_oto_y          : xin= -0.786694
+    met_to_hc_oto_z          : xin= -0.728971
+    enc_to_col_yaw           : xin= +0.000798
+    enc_to_col_pitch         : xin= +0.002211
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010665
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00008789  E=1.000000  pre_tr=0.00022267
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00203541  E=1.000000  pre_tr=0.00514976
+    s_enc_irr_yaw            : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_reg_oto_x          : act=   +1.65763170  E=1.000000  pre_tr=4.20976794
+    s_enc_reg_oto_y          : act=   +1.68861005  E=1.000000  pre_tr=4.28844797
+    s_enc_reg_oto_z          : act=   +1.64153641  E=1.000000  pre_tr=4.16893803
+    s_enc_reg_pitch          : act=   +3.43427375  E=1.000000  pre_tr=8.72282922
+    s_enc_reg_roll           : act=   +1.63015658  E=1.000000  pre_tr=4.13932311
+    s_enc_reg_therm          : act=   +0.00203541  E=1.000000  pre_tr=0.00514976
+    s_enc_reg_yaw            : act=   +3.48403398  E=1.000000  pre_tr=8.85004176
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.012349  V_mem=0.9048836073
+    s_col_oto_y              : act=   +0.00000000  E=0.012168  V_mem=0.9986586396
+    s_col_oto_z              : act=   +0.00000000  E=0.012187  V_mem=1.0220374636
+    s_col_pitch              : act=   +0.00000000  E=0.012045  V_mem=1.1408689868
+    s_col_roll               : act=   +0.00000000  E=0.013141  V_mem=0.6712019374
+    s_col_therm              : act=   +0.00000000  E=0.014950  V_mem=0.3061115035
+    s_col_yaw                : act=   +0.00000000  E=0.011888  V_mem=1.1369480058
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['3.48403398', '0.00000000'], propagated=['3.7795139231'], w=0.089635
+    s_enc_to_col_pitch: src_acts=['3.43427375', '0.00008789'], propagated=['3.9031693101'], w=0.106997
+    s_enc_to_col_roll: src_acts=['1.63015658', '0.00000000'], propagated=['1.7779164416'], w=0.104066
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00097942  silent=False
+    s_cross_pitch_oto_y           : w=0.00084764  silent=False
+    s_cross_pitch_oto_z           : w=0.00105999  silent=False
+    s_cross_pitch_roll            : w=0.00122104  silent=False
+    s_cross_pitch_therm           : w=0.00115349  silent=False
+    s_cross_yaw_oto_x             : w=0.00123766  silent=False
+    s_cross_yaw_oto_y             : w=0.00090115  silent=False
+    s_cross_yaw_oto_z             : w=0.00111730  silent=False
+    s_cross_yaw_pitch             : w=0.00113515  silent=False
+    s_cross_yaw_roll              : w=0.00093671  silent=False
+    s_cross_yaw_therm             : w=0.00091408  silent=False
+
+--- tick=14000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin=-13.189998
+    met_to_hc_pitch          : xin=-12.670207
+    met_to_hc_roll           : xin= -0.925133
+    met_to_hc_oto_x          : xin= -0.801758
+    met_to_hc_oto_y          : xin= -0.839506
+    met_to_hc_oto_z          : xin= -0.776337
+    enc_to_col_yaw           : xin= +0.000877
+    enc_to_col_pitch         : xin= +0.000470
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010644
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00008867  E=1.000000  pre_tr=0.00022592
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00328672  E=1.000000  pre_tr=0.00832779
+    s_enc_irr_yaw            : act=   +0.00000009  E=1.000000  pre_tr=0.00000023
+    s_enc_reg_oto_x          : act=   +1.78739903  E=1.000000  pre_tr=4.54060994
+    s_enc_reg_oto_y          : act=   +1.81997503  E=1.000000  pre_tr=4.62338730
+    s_enc_reg_oto_z          : act=   +1.76816084  E=1.000000  pre_tr=4.49176412
+    s_enc_reg_pitch          : act=   +3.63825133  E=1.000000  pre_tr=9.24374759
+    s_enc_reg_roll           : act=   +1.80051527  E=1.000000  pre_tr=4.57300006
+    s_enc_reg_therm          : act=   +0.00328672  E=1.000000  pre_tr=0.00832779
+    s_enc_reg_yaw            : act=   +3.65623542  E=1.000000  pre_tr=9.28997835
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.011921  V_mem=1.1467372234
+    s_col_oto_y              : act=   +0.00000000  E=0.011658  V_mem=1.2939510642
+    s_col_oto_z              : act=   +0.00000000  E=0.011594  V_mem=1.3404688291
+    s_col_pitch              : act=   +0.00000000  E=0.011370  V_mem=1.4654946034
+    s_col_roll               : act=   +0.00000000  E=0.012846  V_mem=0.8128077732
+    s_col_therm              : act=   +0.00000000  E=0.014671  V_mem=0.4659371128
+    s_col_yaw                : act=   +0.00000000  E=0.011383  V_mem=1.3895702824
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['3.65623542', '0.00000009'], propagated=['3.9677064472'], w=0.089797
+    s_enc_to_col_pitch: src_acts=['3.63825133', '0.00008867'], propagated=['4.1365031399'], w=0.107159
+    s_enc_to_col_roll: src_acts=['1.80051527', '0.00000000'], propagated=['1.9638559449'], w=0.104099
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00104359  silent=False
+    s_cross_pitch_oto_y           : w=0.00091395  silent=False
+    s_cross_pitch_oto_z           : w=0.00112700  silent=False
+    s_cross_pitch_roll            : w=0.00127987  silent=False
+    s_cross_pitch_therm           : w=0.00118185  silent=False
+    s_cross_yaw_oto_x             : w=0.00130145  silent=False
+    s_cross_yaw_oto_y             : w=0.00096710  silent=False
+    s_cross_yaw_oto_z             : w=0.00118394  silent=False
+    s_cross_yaw_pitch             : w=0.00122699  silent=False
+    s_cross_yaw_roll              : w=0.00099523  silent=False
+    s_cross_yaw_therm             : w=0.00094228  silent=False
+
+--- tick=16000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin=-15.529750
+    met_to_hc_pitch          : xin=-15.077975
+    met_to_hc_roll           : xin= -1.075158
+    met_to_hc_oto_x          : xin= -0.842227
+    met_to_hc_oto_y          : xin= -0.881552
+    met_to_hc_oto_z          : xin= -0.814904
+    enc_to_col_yaw           : xin= +0.001882
+    enc_to_col_pitch         : xin= -0.001013
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010623
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00006024  E=1.000000  pre_tr=0.00015326
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00459927  E=1.000000  pre_tr=0.01166324
+    s_enc_irr_yaw            : act=   +0.00000262  E=1.000000  pre_tr=0.00000652
+    s_enc_reg_oto_x          : act=   +1.87045666  E=1.000000  pre_tr=4.75250181
+    s_enc_reg_oto_y          : act=   +1.90307618  E=1.000000  pre_tr=4.83541455
+    s_enc_reg_oto_z          : act=   +1.84941906  E=1.000000  pre_tr=4.69905889
+    s_enc_reg_pitch          : act=   +3.73580594  E=1.000000  pre_tr=9.49340715
+    s_enc_reg_roll           : act=   +1.93750128  E=1.000000  pre_tr=4.92175191
+    s_enc_reg_therm          : act=   +0.00459927  E=1.000000  pre_tr=0.01166324
+    s_enc_reg_yaw            : act=   +3.73157776  E=1.000000  pre_tr=9.48302703
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.011354  V_mem=1.4607022282
+    s_col_oto_y              : act=   +0.00000000  E=0.015410  V_mem=0.4191543384
+    s_col_oto_z              : act=   +0.00000000  E=0.015349  V_mem=0.4107513676
+    s_col_pitch              : act=   +0.00000000  E=0.014267  V_mem=0.6119816541
+    s_col_roll               : act=   +0.00000000  E=0.012157  V_mem=1.0723913100
+    s_col_therm              : act=   +0.00000000  E=0.013280  V_mem=0.8002055444
+    s_col_yaw                : act=   +0.00000000  E=0.015021  V_mem=0.4627999756
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['3.73157776', '0.00000262'], propagated=['4.0519527263'], w=0.090082
+    s_enc_to_col_pitch: src_acts=['3.73580594', '0.00006024'], propagated=['4.2502101662'], w=0.107454
+    s_enc_to_col_roll: src_acts=['1.93750128', '0.00000000'], propagated=['2.1136109095'], w=0.104174
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00116269  silent=False
+    s_cross_pitch_oto_y           : w=0.00103922  silent=False
+    s_cross_pitch_oto_z           : w=0.00125324  silent=False
+    s_cross_pitch_roll            : w=0.00139167  silent=False
+    s_cross_pitch_therm           : w=0.00125767  silent=False
+    s_cross_yaw_oto_x             : w=0.00141825  silent=False
+    s_cross_yaw_oto_y             : w=0.00109008  silent=False
+    s_cross_yaw_oto_z             : w=0.00130789  silent=False
+    s_cross_yaw_pitch             : w=0.00138191  silent=False
+    s_cross_yaw_roll              : w=0.00110476  silent=False
+    s_cross_yaw_therm             : w=0.00101646  silent=False
+
+--- tick=18000 ---
+  Main bundle Xin tensions:
+    met_to_hc_yaw            : xin=-17.848568
+    met_to_hc_pitch          : xin=-17.468460
+    met_to_hc_roll           : xin= -1.236569
+    met_to_hc_oto_x          : xin= -0.876289
+    met_to_hc_oto_y          : xin= -0.916581
+    met_to_hc_oto_z          : xin= -0.847755
+    enc_to_col_yaw           : xin= +0.001957
+    enc_to_col_pitch         : xin= -0.004462
+    enc_to_col_roll          : xin= +0.000000
+    enc_to_col_oto_x         : xin= +0.000000
+    enc_to_col_oto_y         : xin= +0.000000
+    enc_to_col_oto_z         : xin= +0.000000
+    enc_to_col_therm         : xin= -0.010601
+  Shadow encoding activations (8 decimal places):
+    s_enc_irr_oto_x          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_y          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_oto_z          : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_pitch          : act=   +0.00008861  E=1.000000  pre_tr=0.00022299
+    s_enc_irr_roll           : act=   +0.00000000  E=1.000000  pre_tr=0.00000000
+    s_enc_irr_therm          : act=   +0.00589997  E=1.000000  pre_tr=0.01496972
+    s_enc_irr_yaw            : act=   +0.00001654  E=1.000000  pre_tr=0.00004173
+    s_enc_reg_oto_x          : act=   +1.91793025  E=1.000000  pre_tr=4.87375957
+    s_enc_reg_oto_y          : act=   +1.94957239  E=1.000000  pre_tr=4.95420431
+    s_enc_reg_oto_z          : act=   +1.89616379  E=1.000000  pre_tr=4.81844608
+    s_enc_reg_pitch          : act=   +3.76020116  E=1.000000  pre_tr=9.55659337
+    s_enc_reg_roll           : act=   +2.04603238  E=1.000000  pre_tr=5.19810003
+    s_enc_reg_therm          : act=   +0.00589997  E=1.000000  pre_tr=0.01496972
+    s_enc_reg_yaw            : act=   +3.74052876  E=1.000000  pre_tr=9.50685019
+  Shadow column activations:
+    s_col_oto_x              : act=   +0.00000000  E=0.014306  V_mem=0.6045297137
+    s_col_oto_y              : act=   +0.00000000  E=0.013631  V_mem=0.7118035151
+    s_col_oto_z              : act=   +0.00000000  E=0.014164  V_mem=0.5491725394
+    s_col_pitch              : act=   +0.00000000  E=0.012743  V_mem=0.9540731472
+    s_col_roll               : act=   +0.00000000  E=0.011513  V_mem=1.3552239771
+    s_col_therm              : act=   +0.00000000  E=0.012163  V_mem=1.1121678469
+    s_col_yaw                : act=   +0.00000000  E=0.013436  V_mem=0.7530802355
+  Bundle propagation test:
+    s_enc_to_col_yaw: src_acts=['3.74052876', '0.00001654'], propagated=['4.0646015026'], w=0.090416
+    s_enc_to_col_pitch: src_acts=['3.76020116', '0.00008861'], propagated=['4.2812119949'], w=0.107788
+    s_enc_to_col_roll: src_acts=['2.04603238', '0.00000000'], propagated=['2.2326611749'], w=0.104310
+  Cross-axis bundle weights:
+    s_cross_pitch_oto_x           : w=0.00132657  silent=False
+    s_cross_pitch_oto_y           : w=0.00120482  silent=False
+    s_cross_pitch_oto_z           : w=0.00141754  silent=False
+    s_cross_pitch_roll            : w=0.00154405  silent=False
+    s_cross_pitch_therm           : w=0.00137505  silent=False
+    s_cross_yaw_oto_x             : w=0.00158215  silent=False
+    s_cross_yaw_oto_y             : w=0.00125574  silent=False
+    s_cross_yaw_oto_z             : w=0.00147223  silent=False
+    s_cross_yaw_pitch             : w=0.00155523  silent=False
+    s_cross_yaw_roll              : w=0.00125716  silent=False
+    s_cross_yaw_therm             : w=0.00113384  silent=False
+
+[DONE]

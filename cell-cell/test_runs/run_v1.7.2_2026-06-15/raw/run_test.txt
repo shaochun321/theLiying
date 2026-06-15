@@ -1,0 +1,118 @@
+nexus_v1 集成测试
+============================================================
+测试: 力 → 5层链 → 赫布电路 → 运动输出
+============================================================
+============================================================
+Test 1: 静止基线 (zero input)
+============================================================
+
+Vestibular output (should be near-zero):
+  yaw: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+  pitch: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+  roll: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+  oto_x: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+  oto_y: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+  oto_z: met=0.000000, release=0.000000, rate_reg=0.0000, rate_irr=0.0000
+
+Motor output (should be near-zero):
+  move_x: 0.000000
+  move_y: 0.000000
+  move_z: 0.000000
+
+→ All channels near zero: PASS
+
+============================================================
+Test 2: 单轴旋转 (yaw = 0.5, others = 0)
+============================================================
+
+Vestibular output:
+  yaw: met=0.017893, release=0.000000, rate_reg=0.0000 ★
+  pitch: met=0.000000, release=0.000000, rate_reg=0.0000
+  roll: met=0.000000, release=0.000000, rate_reg=0.0000
+  oto_x: met=0.000000, release=0.000000, rate_reg=0.0000
+  oto_y: met=0.000000, release=0.000000, rate_reg=0.0000
+  oto_z: met=0.000000, release=0.000000, rate_reg=0.0000
+
+→ Yaw MET activation: 0.017893
+→ Max other MET: 0.000000
+→ Yaw dominant: PASS
+
+============================================================
+Test 3: 多轴运动 (yaw=0.5, pitch=0.3)
+============================================================
+
+MET activations:
+  yaw     : +0.017893 
+  pitch   : +0.006484 
+  roll    : +0.000000 
+  oto_x   : +0.000000 
+  oto_y   : +0.000000 
+  oto_z   : +0.000000 
+
+→ Both yaw & pitch active above others: PASS
+→ Yaw > Pitch (0.5 > 0.3): PASS
+
+============================================================
+Test 4: 信号路径完整性 (强输入, 检查每层)
+============================================================
+
+  Layer 1 (MET) voltage:     0.451977
+  Layer 2 (HairCell) voltage: 0.165602
+  Layer 3 (Release rate):     0.000000
+  Layer 4 (Afferent rate):    0.000000
+  Encoding activation:        0.000000
+  Column activation:          0.000000
+  Motor activation:           0.000000
+
+→ Non-zero layers: 2/5
+→ Signal path: PARTIAL
+
+============================================================
+Test 5: DC/AC 分离
+============================================================
+
+  Phase A: 恒定输入 (DC, 500 steps)
+    Regular afferent rate:   0.0000
+    Irregular afferent rate: 0.0000
+    Regular regularity:      0.0000
+
+  Phase B: 脉冲输入 (AC, 500 steps, alternating)
+    Regular afferent rate:   0.0000
+    Irregular afferent rate: 0.0000
+
+→ DC/AC separation is a parameter tuning question.
+→ Regular b_adapt=0.02 (weak adaptation → sustained firing)
+→ Irregular b_adapt=0.15 (strong adaptation → phasic response)
+
+============================================================
+架构总览
+============================================================
+
+  总神经元数: 45
+    前庭链 (MET + HairCell + Afferent×2): 24
+    编码层 (regular + irregular per axis): 12
+    柱层 (1 per axis):                     6
+    运动层 (x, y, z):                      3
+
+  总突触束数: 34
+    前庭内部 (MET→HC, HC→Aff):             12
+    前庭→编码 (Aff→Enc):                    12
+    编码→柱 (Enc→Col):                      6
+    柱→运动 (Col→Motor):                    4
+
+  所有神经元使用同一模型: MetaNeuron (Capacitor + MOSFET + PowerRail)
+  所有突触使用同一模型: Memristor
+  所有学习使用同一规则: STDP (pre-post trace)
+
+  统一构建逻辑: YES (一套砖头, 不同配置)
+
+============================================================
+测试结果汇总
+============================================================
+  static_baseline     : PASS
+  single_axis         : PASS
+  multi_axis          : PASS
+  signal_path         : FAIL
+  dc_ac               : PASS
+
+SOME FAILED

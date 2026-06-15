@@ -1,0 +1,21 @@
+=== STDP TRACE DIAGNOSIS ===
+
+HairCell pre_trace:  9.647495
+HairCell post_trace: 0.275535  �� THIS IS THE BUG
+Aff_reg pre_trace:   0.135340
+Aff_reg post_trace:  0.135340  �� THIS IS THE BUG
+Enc pre_trace:       0.000000
+Enc post_trace:      0.000000  �� THIS IS THE BUG
+
+=== WEIGHT EVOLUTION ===
+
+yaw:
+  MET��HC weight: 0.493057  (init: 0.5)
+  HC��Aff weight: 0.739200  (init: 0.8)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_stdp_diagnosis.py", line 36, in <module>
+    for name, b in c.encoding_bundles.items():
+                   ^^^^^^^^^^^^^^^^^^
+AttributeError: 'HebbianCircuit' object has no attribute 'encoding_bundles'

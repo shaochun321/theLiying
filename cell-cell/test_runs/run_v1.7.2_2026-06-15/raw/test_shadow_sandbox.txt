@@ -1,0 +1,32 @@
+=== Structural Shadow Layer (10000 steps) ===
+  Status:   active
+  Neurons:  24
+  Bundles:  35
+
+--- Contraction ---
+  Active cross-links:  0
+  Silent bundles:      0
+
+--- Energy ---
+  Total energy:  16.5526
+  Min energy:    0.01
+  Total heat:    0.977882
+
+--- Free Energy ---
+  K (raw):    1.94421815
+  K (EMA):    73.28338972
+  nu (dK/dt): 0.3189061302
+  Trend:      increasing
+
+--- ECM ---
+  Enc temp:  0.8689
+  Col temp:  -0.0024
+  Mot temp:  -0.0754
+  Enc PNN:   0.0478
+
+--- Minkowski ds^2 ---
+  Pair:    s_col_yaw <-> s_col_pitch
+  ds^2:    0.0
+  Causal:  spacelike
+
+[OK] Structural shadow test complete.

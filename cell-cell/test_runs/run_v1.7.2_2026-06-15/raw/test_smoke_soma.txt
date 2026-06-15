@@ -1,0 +1,16 @@
+============================================================
+INTEGRATION TEST: 3 Mandatory Architectural Corrections
+============================================================
+
+[1] Importing and instantiating VariantCircuit...
+    all_axes: ['yaw', 'pitch', 'roll', 'oto_x', 'oto_y', 'oto_z', 'therm']
+    extra_axes: ['therm']
+    encoding neurons: 14
+    column neurons: 7
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "j:\cell-cc\nexus_v1\tests\test_smoke_soma.py", line 22, in <module>
+    print(f"    somatosensory patches: {circuit.somatosensory.patch_ids}")
+                                        ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'VariantCircuit' object has no attribute 'somatosensory'

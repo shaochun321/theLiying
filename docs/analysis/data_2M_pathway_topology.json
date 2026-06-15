@@ -1,0 +1,121 @@
+{
+  "experiment": "2M_pathway_topology",
+  "total_steps": 2000000,
+  "duration_sec": 6957,
+  "final_structure": {
+    "neurons": 331,
+    "bundles": 38,
+    "sprouted": 6,
+    "growth_events": 1401,
+    "ultra_depth": 33,
+    "noether_violations": 0
+  },
+  "timeline": [
+    {
+      "step": 200000,
+      "width": {"motor": 65, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 114930, "otolith": 4398, "vestibular": 2396, "thermal": 12139},
+      "spike_pct": {"motor": 85.9, "otolith": 3.3, "vestibular": 1.8, "thermal": 9.1},
+      "xin": {"motor": 0, "otolith": 122.75, "vestibular": 12.59, "thermal": 0.84},
+      "entropy": {"motor": 0, "otolith": 1.206, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [58.03, 56.00, 58.21], "body_speed": 0.116682,
+      "growth": {"sprout": 57, "prune": 51, "mitosis": 62}
+    },
+    {
+      "step": 400000,
+      "width": {"motor": 104, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 179349, "otolith": 9844, "vestibular": 5216, "thermal": 16273},
+      "spike_pct": {"motor": 85.1, "otolith": 4.7, "vestibular": 2.5, "thermal": 7.7},
+      "xin": {"motor": 0, "otolith": 244.17, "vestibular": 12.58, "thermal": 0.47},
+      "entropy": {"motor": 0, "otolith": 1.979, "vestibular": 2.820, "thermal": 1.0},
+      "body_pos": [72.18, 70.77, 73.50], "body_speed": 0.151919,
+      "growth": {"sprout": 56, "prune": 58, "mitosis": 39}
+    },
+    {
+      "step": 600000,
+      "width": {"motor": 125, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 225621, "otolith": 14211, "vestibular": 8263, "thermal": 16876},
+      "spike_pct": {"motor": 85.1, "otolith": 5.4, "vestibular": 3.1, "thermal": 6.4},
+      "xin": {"motor": 0, "otolith": 120.16, "vestibular": 12.61, "thermal": 0.36},
+      "entropy": {"motor": 0, "otolith": 1.059, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [89.80, 89.67, 94.53], "body_speed": 0.178730,
+      "growth": {"sprout": 58, "prune": 56, "mitosis": 21}
+    },
+    {
+      "step": 800000,
+      "width": {"motor": 149, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 260083, "otolith": 17546, "vestibular": 10535, "thermal": 17551},
+      "spike_pct": {"motor": 85.1, "otolith": 5.7, "vestibular": 3.4, "thermal": 5.7},
+      "xin": {"motor": 0, "otolith": 66.27, "vestibular": 12.51, "thermal": 0.21},
+      "entropy": {"motor": 0, "otolith": 1.161, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000040,
+      "growth": {"sprout": 55, "prune": 56, "mitosis": 24}
+    },
+    {
+      "step": 1000000,
+      "width": {"motor": 173, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 276719, "otolith": 19319, "vestibular": 12462, "thermal": 18118},
+      "spike_pct": {"motor": 84.7, "otolith": 5.9, "vestibular": 3.8, "thermal": 5.5},
+      "xin": {"motor": 0, "otolith": 12.86, "vestibular": 11.61, "thermal": 0.24},
+      "entropy": {"motor": 0, "otolith": 1.275, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000041,
+      "growth": {"sprout": 54, "prune": 53, "mitosis": 24}
+    },
+    {
+      "step": 1200000,
+      "width": {"motor": 204, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 296252, "otolith": 21134, "vestibular": 14261, "thermal": 18660},
+      "spike_pct": {"motor": 84.6, "otolith": 6.0, "vestibular": 4.1, "thermal": 5.3},
+      "xin": {"motor": 0, "otolith": 10.04, "vestibular": 12.01, "thermal": 0.26},
+      "entropy": {"motor": 0, "otolith": 1.275, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000046,
+      "growth": {"sprout": 56, "prune": 56, "mitosis": 31}
+    },
+    {
+      "step": 1400000,
+      "width": {"motor": 225, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 316472, "otolith": 23012, "vestibular": 16081, "thermal": 19365},
+      "spike_pct": {"motor": 84.4, "otolith": 6.1, "vestibular": 4.3, "thermal": 5.2},
+      "xin": {"motor": 0, "otolith": 10.13, "vestibular": 11.62, "thermal": 0.16},
+      "entropy": {"motor": 0, "otolith": 1.902, "vestibular": 2.820, "thermal": 1.5},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000044,
+      "growth": {"sprout": 56, "prune": 56, "mitosis": 21}
+    },
+    {
+      "step": 1600000,
+      "width": {"motor": 243, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 341050, "otolith": 24864, "vestibular": 17916, "thermal": 20367},
+      "spike_pct": {"motor": 84.4, "otolith": 6.2, "vestibular": 4.4, "thermal": 5.0},
+      "xin": {"motor": 0, "otolith": 10.32, "vestibular": 12.05, "thermal": 0.19},
+      "entropy": {"motor": 0, "otolith": 1.281, "vestibular": 2.833, "thermal": 1.5},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000046,
+      "growth": {"sprout": 57, "prune": 57, "mitosis": 18}
+    },
+    {
+      "step": 1800000,
+      "width": {"motor": 263, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 366032, "otolith": 26707, "vestibular": 19681, "thermal": 21411},
+      "spike_pct": {"motor": 84.4, "otolith": 6.2, "vestibular": 4.5, "thermal": 4.9},
+      "xin": {"motor": 0, "otolith": 10.54, "vestibular": 12.02, "thermal": 0.17},
+      "entropy": {"motor": 0, "otolith": 1.654, "vestibular": 2.820, "thermal": 1.5},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000043,
+      "growth": {"sprout": 55, "prune": 55, "mitosis": 20}
+    },
+    {
+      "step": 2000000,
+      "width": {"motor": 286, "otolith": 9, "vestibular": 9, "thermal": 3},
+      "spikes": {"motor": 390405, "otolith": 28573, "vestibular": 21582, "thermal": 22410},
+      "spike_pct": {"motor": 84.3, "otolith": 6.2, "vestibular": 4.7, "thermal": 4.8},
+      "xin": {"motor": 0, "otolith": 10.70, "vestibular": 11.97, "thermal": 0.20},
+      "entropy": {"motor": 0, "otolith": 1.275, "vestibular": 2.833, "thermal": 1.0},
+      "body_pos": [100.0, 100.0, 100.0], "body_speed": 0.000044,
+      "growth": {"sprout": 58, "prune": 58, "mitosis": 23}
+    }
+  ],
+  "derived_metrics": {
+    "motor_oto_ratio": [7.22, 11.56, 13.89, 16.56, 19.22, 22.67, 25.00, 27.00, 29.22, 31.78],
+    "motor_fraction_of_total": [0.756, 0.832, 0.856, 0.876, 0.892, 0.907, 0.915, 0.920, 0.926, 0.932],
+    "spike_density_at_2M": {"motor": 1365.1, "otolith": 3174.8, "vestibular": 2398.0, "thermal": 7470.0},
+    "xin_density_at_2M": {"motor": 0, "otolith": 1.1884, "vestibular": 1.3295, "thermal": 0.0674}
+  }
+}
