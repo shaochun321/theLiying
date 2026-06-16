@@ -94,6 +94,21 @@ class MotionState:
     # P→1: single-axis motion (偏振). P→1/3: uniform (非偏振).
     polarization: float = 0.333
 
+    # ── 步骤2: VitalOscillator output (宏观传出轨) ──
+    # BIO: hemodynamic pulsation → postural sway (Collins & De Luca 1993)
+    vital_pulse: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    vital_amplitude: float = 0.0
+
+    # ── B.06: Thermal potential ν_th = dT_skin/dt ──
+    # ν_th > 0: skin warming (moving toward heat)
+    # ν_th < 0: skin cooling (moving away from heat)
+    # BIO: klinokinesis — bacteria-style chemotaxis via temporal comparison.
+    # REF: AI编程自足文档 步骤1 B.06
+    thermal_potential: float = 0.0      # ν_th = mean dT/dt across patches
+    thermal_gradient: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    # dot(∇T, v): positive = moving toward heat source
+    thermal_gradient_dot_velocity: float = 0.0
+
 
 class MotorRhythmGenerator:
     """Central Pattern Generator (CPG) — coupled oscillator model.

@@ -518,7 +518,16 @@ class ShadowSandbox:
 
     def _update_free_energy(self, xin_values: List[float]):
         """Update free energy kernel K and motion potential ν. §5."""
-        K = sum(xi ** 2 for xi in xin_values)
+        K_raw = sum(xi ** 2 for xi in xin_values)
+        # Michaelis-Menten saturation: K is bounded by physical state space.
+        # BIO: calmodulin/CaMKII activation saturates at finite Ca2+ concentration
+        #      (Bhaskara 2011). No free-energy variable can grow unboundedly.
+        # Normal K_raw (|xi|~0.1-1.0, ~35 bundles) ≈ 0.35-35 → linear region.
+        # Pathological K_raw (xi diverges) → bounded near K_MM_LIMIT.
+        # CALIBRATE: K_MM_LIMIT=1000 keeps normal range fully linear (<3% sat).
+        # Pending EXP validation of exact saturation point.
+        K_MM_LIMIT = 1000.0
+        K = K_raw * K_MM_LIMIT / (K_raw + K_MM_LIMIT)
         self._k_ema = self._k_ema * 0.99 + K * 0.01
 
         if self._k_history:

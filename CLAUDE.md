@@ -78,6 +78,46 @@ Axes: `yaw, pitch, roll` (canals) + `oto_x, oto_y, oto_z` (otoliths) + `therm`. 
 - **Track regressions and fixes** in `cell-cell/docs/degradation_registry.md` (`DEG-XXX`) and `fix_registry.md` (`FIX-XXX`), cross-referenced.
 - **Run the entropy audit after parameter changes** (signal depth must not regress; `|V|<100`; energy `>0`; no NaN).
 
+## 结构构建原则（Structure-First, No Semantic Hardcoding）
+
+这是本项目最核心的约束，违反会导致行为无法涌现：
+
+**禁止的做法（语义硬编码）：**
+- 用 Python 数学直接计算语义结论（如 `sign(∇T · v)` 判断"朝热源"）
+- 直接向神经元注入电流而不经过 `SynapticBundle`
+- 用 `if`/`sign`/`dot product` 等逻辑替代物理电路
+- 把行为目标写进代码（如"朝热源移动时 DA↑"）
+- 无来源地填写参数值（如 `initial_weight=0.5`）
+
+**正确的做法：**
+- 新信号路径 = 新 `SynapticBundle`（类比 `bundles_shadow_to_da`、`bundles_xin_to_da`）
+- 方向性和选择性从**前后/左右补丁的激活差异**中物理涌现，不显式计算
+- 每个新组件映射到真实生物/物理对象，使用 `Capacitor / MOSFET / Memristor / PowerRail` 原语
+- 行为从结构中涌现（sprout/prune/STDP），不从公式中输出
+
+**判断标准：** 如果你写了一个 `if` 或数学公式来决定 DA 的增减，就是硬编码。应该让 bundle 的 propagate() + STDP 自然完成这件事。
+
+## ⛔ 写代码前的强制三问（违反则停止）
+
+**任何新信号路径或新参数，必须先回答以下三问，答不出来就停下来查文献或问用户，不许动手写代码：**
+
+```
+Q1. 生物对应物是什么？
+    → 写出 BIO: 注释来源（论文/教材/已有代码注释）
+    → 例："BIO: 脊髓 relay → VTA 通路（Bhaskara 2011）"
+
+Q2. 物理结构是什么？
+    → 写出 Sources → SynapticBundle → Targets
+    → 每一端用已有的 Neuron 对象，不能是 Python 变量
+
+Q3. 每个参数的依据是什么？
+    → initial_weight / weight_max / stdp_lr 必须有推导或实验来源
+    → 例："initial_weight=5.0 # EXP-012: 0.1 too thin → DA sleeps"
+    → 没有依据 = 不能填这个数字
+```
+
+如果任何一问答不上来 → **停下来，向用户说明缺少什么信息，等待指示**。
+
 ## Current state (as of v1.7.2)
 
 Regression 21/21 PASS, signal depth 6/6. Known open issues surfaced by testing: Col→Motor coupling weak (C6 Motor-signal contract fails under some inputs), shadow-layer free energy diverges (`K_ema` grows unbounded), lateral inhibition can drive all Columns to zero under multi-axis input, and thermotaxis behavior has not emerged. See `cell-cell/报告/` for the latest measured analysis reports.

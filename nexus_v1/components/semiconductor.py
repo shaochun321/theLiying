@@ -221,7 +221,10 @@ class Memristor:
 
     @property
     def conductance(self) -> float:
-        return 1.0 / max(self.resistance, 1e-6)
+        # BUG FIX: clamp at r_min (not 1e-6) so w > 1.0 doesn't produce
+        # negative resistance → infinite conductance → current explosion.
+        # Physical: r_min is wire resistance floor; conductance ≤ 1/r_min.
+        return 1.0 / max(self.resistance, self.r_min)
 
     def conduct(self, v_in: float) -> float:
         """Pass current through memristor. I = V × G."""

@@ -127,6 +127,8 @@ class EntropyLedger:
             'S_Enc': [], 'S_Col': [], 'S_Mot': [],
             # DA circuit
             'DA': [],
+            # Somatosensory chain (V07)
+            'Soma_Therm': [], 'Soma_Noci': [], 'Soma_Relay': [],
         }
         for n in neurons:
             nid = n.config.neuron_id
@@ -142,6 +144,12 @@ class EntropyLedger:
                 layers['S_Col'].append(n)
             elif nid.startswith('s_mot_'):
                 layers['S_Mot'].append(n)
+            elif nid.startswith('thermo_'):
+                layers['Soma_Therm'].append(n)
+            elif nid.startswith('noci_'):
+                layers['Soma_Noci'].append(n)
+            elif nid.startswith('relay_'):
+                layers['Soma_Relay'].append(n)
             elif nid.startswith('enc_') or nid.startswith('reg_'):
                 layers['L4_Enc'].append(n)
             elif nid.startswith('col_'):

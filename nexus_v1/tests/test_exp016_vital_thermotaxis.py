@@ -81,10 +81,11 @@ for step in range(STEPS):
         # DA
         da_conc = c.dopamine.concentration
 
-        # Skin temperatures
+        # Skin temperatures (from SomatosensoryChain patch_temps)
         skin_T = {}
-        for p in c.world.body.skin_patches:
-            skin_T[p.patch_id] = round(p.current_temperature, 4)
+        if hasattr(c, '_patch_temps'):
+            for pid, vals in c._patch_temps.items():
+                skin_T[pid] = round(vals[0], 4)
 
         # Shadow col calcium_rate
         shadow_cr = {}

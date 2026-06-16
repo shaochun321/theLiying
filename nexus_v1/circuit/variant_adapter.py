@@ -40,6 +40,9 @@ from ..components.world import World, Body, HeatSource
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
 from ..components.energy_store import EnergyStore
+from ..somatosensory.chain import SomatosensoryChain
+from ..components.vital_oscillator import VitalOscillator
+from ..components.langevin_noise import LangevinNoise
 from ..components.circulation_proportion import CirculationProportionCircuit
 from .bundle import SynapticBundle, BundleConfig
 from .circulation import CirculationMeter
@@ -275,6 +278,28 @@ class VariantCircuit(HebbianCircuit):
         self.thermal_membrane = ThermalMembrane()
         self.muscle_system = MuscleSystem(gain=0.1, delay=2)
 
+        # ── Variant: VitalOscillator (步骤2 — 宏观传出轨) ──
+        # Three-frequency detuned Van der Pol heart; injects into Motor membrane.
+        # BIO: sinoatrial node → hemodynamic pulsation → postural sway (Collins 1993).
+        # Energy from EnergyStore — death switch at fill < 0.05.
+        self.vital_oscillator = VitalOscillator()
+
+        # ── Variant: LangevinNoise (步骤2 — 微观传入轨) ──
+        # OU process: σ₀=0.70 anchored by FDT + stochastic resonance optimum.
+        # σ* ≈ θ_sys/√2 ≈ 0.07; T_bath≈0.01 → σ₀ = 0.07/√0.01 = 0.70.
+        # BIO: endolymph thermal fluctuation → hair cell displacement.
+        # REF: 皮层除颤与热力学大一统方案 §2.1-§2.3
+        self._langevin = LangevinNoise()
+
+        # ── Variant: SomatosensoryChain (V01) ──
+        # 4 skin patches (front/back/left/right), each with:
+        #   Thermoreceptor (tonic T) → Nociceptor (phasic dT/dt) → Relay (∇²T)
+        # Provides 12 neurons + 12 bundles visible to all entropy ledger tools.
+        # BIO: TRPV/TRPM thermoreceptors + spinal dorsal-horn relays.
+        self.somatosensory = SomatosensoryChain()
+        # Previous patch temperatures for dT/dt computation (one per patch)
+        self._soma_prev_temps: dict = {pid: 0.0 for pid in self.somatosensory.patch_ids}
+
         # ── Variant: EnergyStore (external reservoir) ──
         # Bridges World.consume_nearby() → Vascular → neuron.energy.
         # External to neural circuit; can be replaced without rewiring.
@@ -444,6 +469,8 @@ class VariantCircuit(HebbianCircuit):
         self._da_circuit_initialized = False
         self.bundles_shadow_to_da: List[SynapticBundle] = []
         self.bundles_xin_to_da: List[SynapticBundle] = []
+        # B.06: Somatosensory relay → DA (structural thermal pathway)
+        self.bundles_soma_to_da: List[SynapticBundle] = []
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step: mother + variant overlay.
@@ -592,6 +619,26 @@ class VariantCircuit(HebbianCircuit):
         therm_signal = self.thermal_membrane.sense(
             self.world, self.world.body, dt)
 
+        # ── SomatosensoryChain: 4-patch skin sensing (V01) ──
+        # Sample temperature at 4 body-surface offsets (body radius ≈ 1.0 world unit)
+        BODY_RADIUS = 1.0
+        pos = self.world.body.position
+        patch_positions = {
+            "front": [pos[0],            pos[1],            pos[2] + BODY_RADIUS],
+            "back":  [pos[0],            pos[1],            pos[2] - BODY_RADIUS],
+            "left":  [pos[0] - BODY_RADIUS, pos[1],         pos[2]],
+            "right": [pos[0] + BODY_RADIUS, pos[1],         pos[2]],
+        }
+        patch_temps = {}
+        for pid, ppos in patch_positions.items():
+            T = self.world.temperature_at(ppos)
+            dT = (T - self._soma_prev_temps[pid]) / max(dt, 1e-6)
+            self._soma_prev_temps[pid] = T
+            damage = max(0.0, T - 0.8)  # damage accumulates above 0.8 normalized T
+            patch_temps[pid] = (T, dT, damage)
+        self.somatosensory.step(patch_temps, dt)
+        self._patch_temps = patch_temps  # expose for tests/diagnostics
+
         # Inject thermal signal into mechanical_inputs for mother step
         # These get routed to extra_axes encoding neurons in HebbianCircuit
         mechanical_inputs = dict(mechanical_inputs)  # don't mutate caller's dict
@@ -605,9 +652,26 @@ class VariantCircuit(HebbianCircuit):
         # OTOLITH_GAIN scales acceleration to vestibular input range.
         OTOLITH_GAIN = 500.0
         acc = self.world.body.acceleration
-        mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + acc[0] * OTOLITH_GAIN
-        mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + acc[1] * OTOLITH_GAIN
-        mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + acc[2] * OTOLITH_GAIN
+
+        # ── Langevin OU noise → otolith afferent (步骤2 微观传入轨) ──
+        # OU: dη = -(dt/τ)η dt + σ₀√T_bath √dt N(0,1)
+        # BIO: endolymph thermal fluctuation → hair cell membrane displacement.
+        # Injected at sensor (afferent), not at Motor (efferent) — dual-track.
+        # Macro (VitalOscillator→Motor) and micro (Langevin→Otolith) are orthogonal.
+        # REF: 步骤2统一物理架构方案 §二 ECM热浴; §三 涨落耗散定理
+        import random as _random
+        import math as _math
+        T_bath = max(self.ecm_vestibular.temperature, 1e-4)
+        sigma_k = self._LANGEVIN_SIGMA0 * _math.sqrt(T_bath)
+        decay = 1.0 - dt / self._LANGEVIN_TAU
+        noise_scale = sigma_k * _math.sqrt(dt)
+        for k in range(3):
+            self._langevin_eta[k] = (decay * self._langevin_eta[k]
+                                     + noise_scale * _random.gauss(0.0, 1.0))
+        # Sensor-side addition: a_sensed = a_body + η (宏微观绝对同构，只做加法)
+        mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + self._langevin_eta[0]) * OTOLITH_GAIN
+        mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + self._langevin_eta[1]) * OTOLITH_GAIN
+        mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + self._langevin_eta[2]) * OTOLITH_GAIN
         # ── C3': Heat source consumption + ecology ──
         # Organism absorbs energy from nearby heat sources (metabolic feeding).
         # BIO: chemolithoautotrophy at hydrothermal vents.
@@ -853,6 +917,20 @@ class VariantCircuit(HebbianCircuit):
                 self.column_neurons[axis].energy = max(
                     0.001, self.column_neurons[axis].energy - attenuation)
 
+        # ── 7b. VitalOscillator → Motor membrane (步骤2 宏观传出轨) ──
+        # Three-frequency VdP heart injects basal drive into Motor membranes.
+        # BIO: hemodynamic pulsation → postural tremor → basal motility.
+        # Energy withdrawn from EnergyStore (Noether-compliant, via withdraw()).
+        # REF: vital_oscillator.py; 步骤2统一物理架构方案 §一
+        _vital_out = self.vital_oscillator.step(self.energy_store, dt)
+        _vital_axes = ['move_x', 'move_y', 'move_z']
+        for _k, _ax in enumerate(_vital_axes):
+            if _ax in self.motor_neurons:
+                self.motor_neurons[_ax]._membrane.inject(_vital_out[_k], dt)
+        # Record in MotionState for observability
+        self.motion_state.vital_pulse = _vital_out
+        self.motion_state.vital_amplitude = sum(abs(v) for v in _vital_out)
+
         # ── 8. Neuromodulator (DA) update ──
         # 8a. Motor spike tracking (used for feedback, NOT for DA release)
         # BIO: DA is released by prediction error changes (VTA), not motor activity.
@@ -898,13 +976,46 @@ class VariantCircuit(HebbianCircuit):
         # ── DA input bundles: propagate ──
         da_input_currents = {nid: 0.0 for nid in self.da_neurons}
 
+        # ── B.06: Record thermal state in MotionState (observability only) ──
+        # Actual thermal→DA coupling is structural: soma_to_da bundle propagates
+        # relay activation into DA neurons. No math hardcoding here.
+        T_p = {pid: patch_temps[pid][0] for pid in self.somatosensory.patch_ids}
+        grad_T = [
+            T_p.get("right", 0.0) - T_p.get("left", 0.0),
+            0.0,
+            T_p.get("front", 0.0) - T_p.get("back", 0.0),
+        ]
+        vel = list(self.world.body.velocity)
+        grad_dot_v = sum(grad_T[i] * vel[i] for i in range(min(3, len(vel))))
+        mean_dT = sum(abs(patch_temps[pid][1])
+                      for pid in self.somatosensory.patch_ids
+                      ) / len(self.somatosensory.patch_ids)
+        self.motion_state.thermal_potential = mean_dT
+        self.motion_state.thermal_gradient = grad_T
+        self.motion_state.thermal_gradient_dot_velocity = grad_dot_v
+
         for bundle in self.bundles_shadow_to_da:
+            currents = bundle.propagate()
+            for j, tgt in enumerate(bundle.targets):
+                if j < len(currents) and tgt.id in da_input_currents:
+                    # tanh saturation: vesicle pool + receptor conductance ceiling.
+                    # BIO: max synaptic release rate bounded by vesicle replenishment
+                    #      (Attwell & Laughlin 2001). Receptor conductance saturates.
+                    # I_MAX = 2.0: shadow pathway is secondary modulator (< xin_relay).
+                    # I_SCALE = 3.0: half-sat at I=3; shadow col Ca_rate~0.2×w~2.
+                    # CALIBRATE: both params pending EXP-shadow validation.
+                    I_MAX, I_SCALE = 2.0, 3.0
+                    import math as _math
+                    da_input_currents[tgt.id] += I_MAX * _math.tanh(currents[j] / I_SCALE)
+
+        for bundle in self.bundles_xin_to_da:
             currents = bundle.propagate()
             for j, tgt in enumerate(bundle.targets):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
 
-        for bundle in self.bundles_xin_to_da:
+        # B.06: soma relay → DA (thermal pathway, structural)
+        for bundle in self.bundles_soma_to_da:
             currents = bundle.propagate()
             for j, tgt in enumerate(bundle.targets):
                 if j < len(currents) and tgt.id in da_input_currents:
@@ -941,7 +1052,7 @@ class VariantCircuit(HebbianCircuit):
         # Don't call dopamine.step() — concentration is set structurally.
 
         # ── STDP on DA input bundles ──
-        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da:
+        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da + self.bundles_soma_to_da:
             bundle.learn(dt=dt)
             bundle.compute_xin(dt)
 
@@ -1454,39 +1565,68 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_xin_to_da.append(
             SynapticBundle(cfg_xin, [self._xin_relay], da_list))
 
+        # ── B.06: Somatosensory relay → DA (thermal pathway) ──
+        # Relay neurons compute ∇²T (Laplacian) via lateral inhibition.
+        # Front/back/left/right asymmetry in relay activation encodes
+        # temperature gradient direction relative to body orientation.
+        # When approaching heat: front relay fires more → DA↑ (structural).
+        # No explicit dot-product math — directionality emerges from relay
+        # activation differences propagating through this bundle.
+        # BIO: spinal relay → VTA pathway (thermotaxis in simple organisms).
+        # REF: AI编程自足文档 步骤1 B.06; analysis_concept_evolution §5
+        relay_neurons = [self.somatosensory.relays[pid]
+                         for pid in self.somatosensory.patch_ids]
+        cfg_soma = BundleConfig(
+            bundle_id="soma_to_da",
+            learning_rule="stdp",
+            initial_weight=0.5,
+            weight_max=2.0,
+            stdp_lr=0.002,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.001,
+        )
+        self.bundles_soma_to_da.append(
+            SynapticBundle(cfg_soma, relay_neurons, da_list))
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
         self._growth_log.append(
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
-            f"bundles=shadow_to_da+xin_to_da"
+            f"bundles=shadow_to_da+xin_to_da+soma_to_da"
         )
 
     # ── Override get_all_neurons/bundles to include DA components ──
 
     def get_all_neurons(self):
-        """Include DA neurons and Xin relay in the full neuron census.
+        """Include DA neurons, Xin relay, and SomatosensoryChain in neuron census.
 
         Noether probe, entropy ledger, and vascular energy delivery
         all enumerate neurons via this method. DA neurons must be
         included for correct energy/weight conservation checks.
+        V01: SomatosensoryChain (12 neurons) now included — no more blind spot.
         """
         neurons = super().get_all_neurons()
         neurons.extend(self.da_neurons.values())
         neurons.append(self._xin_relay)
+        neurons.extend(self.somatosensory.get_all_neurons())
         return neurons
 
     def get_all_bundles(self):
-        """Include DA input bundles in the full bundle census.
+        """Include DA bundles and SomatosensoryChain bundles in bundle census.
 
         Noether weight balance check, Xin bookkeeping, and sprout/prune
         all enumerate bundles via this method. DA bundles must be
         included for correct entropy ledger accounting.
+        V01: SomatosensoryChain bundles now included.
         """
         bundles = super().get_all_bundles()
         bundles.extend(self.bundles_shadow_to_da)
         bundles.extend(self.bundles_xin_to_da)
+        bundles.extend(self.bundles_soma_to_da)
+        bundles.extend(self.somatosensory.get_all_bundles())
         return bundles
 
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────

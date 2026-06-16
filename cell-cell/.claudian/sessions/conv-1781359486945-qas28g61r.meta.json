@@ -4,8 +4,8 @@
   "title": "Clarify directory file reading",
   "titleGenerationStatus": "success",
   "createdAt": 1781359486964,
-  "updatedAt": 1781502700283,
-  "lastResponseAt": 1781502700283,
+  "updatedAt": 1781591001392,
+  "lastResponseAt": 1781591001392,
   "sessionId": "3580c35f-9c4e-48d8-b59f-214955e65358",
   "providerState": {
     "providerSessionId": "3580c35f-9c4e-48d8-b59f-214955e65358",
@@ -8067,11 +8067,12 @@
   },
   "usage": {
     "model": "opus",
-    "inputTokens": 166,
+    "inputTokens": 215,
     "cacheCreationInputTokens": 0,
-    "cacheReadInputTokens": 359808,
-    "contextWindow": 200000,
-    "contextTokens": 359974,
-    "percentage": 100
+    "cacheReadInputTokens": 395264,
+    "contextWindow": 1000000,
+    "contextTokens": 395479,
+    "percentage": 40,
+    "contextWindowIsAuthoritative": true
   }
 }
