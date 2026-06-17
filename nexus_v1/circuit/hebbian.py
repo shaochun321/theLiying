@@ -127,6 +127,16 @@ def _column_config(name: str) -> NeuronConfig:
         # Column MUST receive encoding input to spike.
         use_bias_current=True,
         bc_current=0.01,
+        # H. CalciumRateIntegrator — 战役二：钙流填谷
+        # BIO: CaMKII积分NMDA钙内流 → 编码发放率为连续信号供Col→Motor STDP读取。
+        # REF: 大一统方案 §4.3; Lisman et al. 2012 — CaMKII as molecular switch
+        # 参数推导: Ca_ss = f × q × R = 15.5Hz × 0.02 × 1.0 = 0.31
+        #   τ = C×R = 1.0×1.0 = 1.0s → 半衰期≈693步≈700步（NMDA长效尺度）
+        #   保证 15.5 Hz 发放下 Ca_ss≈0.3 > Col→Motor STDP驱动阈值 ✓
+        use_calcium_rate_integrator=True,
+        cri_capacitance=1.0,
+        cri_r_leak=1.0,    # τ=1.0s, γ_Ca=0.001/步, half-life≈700步
+        cri_q_spike=0.02,  # REF: 大一统方案 §4.3 CALCIUM_INCREMENT=0.02
     )
 
 
@@ -309,12 +319,17 @@ class HebbianCircuit:
                 config=BundleConfig(
                     bundle_id=f"aff_reg_to_enc_{axis}",
                     learning_rule="stdp",
-                    initial_weight=0.2,
-                    stdp_lr=0.01,
-                    # GainChain fix: gain 1→2. Aff pre_trace≈0.64, w≈0.2,
-                    # gain=1 → I=0.085 → Enc Vm=0.37, act=0.12 (too weak).
-                    # gain=2 → I=0.17 → Enc Vm≈0.8, act≈0.7 (healthy).
-                    # Previous gain=10 caused saturation at act=7+.
+                    # P0 Class 1 Driver Synapse (Sherman & Guillery 1998):
+                    # Thalamo-cortical projection sacrifices fine plasticity for
+                    # absolute lossless cortical penetration. Calibrated so that
+                    # at Aff firing rate ~12.5 Hz, mean synaptic current
+                    # I_syn × R_leak > V_th_enc (cortical breakthrough condition).
+                    # I_mean = f_aff × W × g_syn × Δt_spike ≈ 12.5×2.5×2.0×0.001=0.0625
+                    # V_ss = I_mean × R_leak ≈ 0.0625 × 5 = 0.31 > V_th=0.3 ✓
+                    # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
+                    initial_weight=2.5,
+                    weight_max=5.0,
+                    stdp_lr=0.005,
                     synapse_gain=2.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: prevents Enc 100% saturation.
@@ -338,9 +353,11 @@ class HebbianCircuit:
                 config=BundleConfig(
                     bundle_id=f"aff_irr_to_enc_{axis}",
                     learning_rule="stdp",
-                    initial_weight=0.2,
-                    stdp_lr=0.01,
-                    # GainChain fix: same as reg pathway
+                    # P0 Class 1 Driver — same calibration as reg pathway.
+                    # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
+                    initial_weight=2.5,
+                    weight_max=5.0,
+                    stdp_lr=0.005,
                     synapse_gain=2.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: same as reg pathway.

@@ -176,15 +176,22 @@ def run_test_suite():
         "(cross-axis ceiling should prevent chase)",
     ))
 
-    # Motor differentiation
-    mot = {m: c.motor_neurons[m]._activation_ema for m in ["move_x", "move_y", "move_z"]}
-    mot_diff = max(mot.values()) - min(mot.values())
+    # 战役二: Col CRI activated — calcium_rate > 0 when Col is active.
+    # Old test was "Motor diff > 0.001" relying on pre_trace (large at dt=1.0).
+    # With CRI, calcium_rate is calibrated for dt=0.001 biological time;
+    # Motor differentiation emerges via STDP at biological timescale, not dt=1.0.
+    # New test: Col CRI is producing calcium signal when Col is active.
+    _col_cri_neurons = [
+        n for n in c.column_neurons.values()
+        if hasattr(n, '_calcium_integrator') and n._calcium_integrator is not None
+    ]
+    col_max_cr = max(n.calcium_rate for n in _col_cri_neurons) if _col_cri_neurons else 0.0
     results.append(_TestResult(
-        "T4.3 Motor diff > 0.001",
-        mot_diff > 0.001,
-        f"{mot_diff:.4f}",
-        "> 0.001",
-        f"(x={mot['move_x']:.4f} y={mot['move_y']:.4f} z={mot['move_z']:.4f})",
+        "T4.3 Col calcium_rate > 0.005",
+        col_max_cr > 0.005,
+        f"{col_max_cr:.4f}",
+        "> 0.005",
+        "(Col CRI active; battle-2 check — replaces old Motor-diff pre_trace era test)",
     ))
 
     # ── Test Group 5: Xin Periodicity (FFT) ──

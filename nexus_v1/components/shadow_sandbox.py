@@ -43,7 +43,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
         "encoding": {
             "capacitance": 3.0,    # 3x main (1.0) -> tau=15
             "r_leak": 5.0,
-            "vr_base_rate": 0.01,   # higher recovery for large currents
+            "vr_base_rate": 0.05,   # 影子归一：除法归一化分母×5 → 稳态V_ss压制饱和
             # ── DIFFERENTIATION: DivisiveNormalizationReceptor (I) ──
             # Shadow enc receives Xin from vestibular chain (magnitude 0.2~20).
             # DN receptor provides per-neuron input adaptation instead of
@@ -55,7 +55,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
         "column": {
             "capacitance": 3.0,
             "r_leak": 5.0,
-            "vr_base_rate": 0.01,
+            "vr_base_rate": 0.05,  # 影子归一：同 encoding 层
             # ── DIFFERENTIATION: Spiking + CalciumRateIntegrator (H) ──
             # Shadow col IS spiking (hard upper bound on activation).
             # BUT downstream reads calcium_rate (continuous), not activation.
@@ -140,10 +140,10 @@ class ShadowSandbox:
 
     # Shadow operates every k steps (slow timescale)
     SHADOW_K = 10
-    # Xin input gain: amplifies weak Xin tension (~0.02) to drive shadow neurons
-    # Without gain, dV = 0.02/3 * 0.01 = 0.00007 per step (too small for STDP)
-    # With gain=3, dV = 0.06/3 * 0.01 = 0.0002 per step (meaningful)
-    XIN_GAIN = 3.0
+    # Xin input gain: 1:1 物理映射，废除人工放大器。
+    # 源头降维：前庭链自然|Ξ|已达15~30，3.0倍放大等于三倍轰炸影子层→积分饱和。
+    # REF: 大一统方案 §4.4; 1:1真实非平衡态热力学映射
+    XIN_GAIN = 1.0
 
     def __init__(self):
         self._initialized = False

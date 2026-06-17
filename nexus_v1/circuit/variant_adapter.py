@@ -653,25 +653,15 @@ class VariantCircuit(HebbianCircuit):
         OTOLITH_GAIN = 500.0
         acc = self.world.body.acceleration
 
-        # ── Langevin OU noise → otolith afferent (步骤2 微观传入轨) ──
-        # OU: dη = -(dt/τ)η dt + σ₀√T_bath √dt N(0,1)
+        # ── LangevinNoise → otolith afferent (步骤2 微观传入轨) ──
+        # Exact OU discretization (variance-preserving), σ₀=0.70 from FDT.
         # BIO: endolymph thermal fluctuation → hair cell membrane displacement.
-        # Injected at sensor (afferent), not at Motor (efferent) — dual-track.
-        # Macro (VitalOscillator→Motor) and micro (Langevin→Otolith) are orthogonal.
-        # REF: 步骤2统一物理架构方案 §二 ECM热浴; §三 涨落耗散定理
-        import random as _random
-        import math as _math
-        T_bath = max(self.ecm_vestibular.temperature, 1e-4)
-        sigma_k = self._LANGEVIN_SIGMA0 * _math.sqrt(T_bath)
-        decay = 1.0 - dt / self._LANGEVIN_TAU
-        noise_scale = sigma_k * _math.sqrt(dt)
-        for k in range(3):
-            self._langevin_eta[k] = (decay * self._langevin_eta[k]
-                                     + noise_scale * _random.gauss(0.0, 1.0))
-        # Sensor-side addition: a_sensed = a_body + η (宏微观绝对同构，只做加法)
-        mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + self._langevin_eta[0]) * OTOLITH_GAIN
-        mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + self._langevin_eta[1]) * OTOLITH_GAIN
-        mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + self._langevin_eta[2]) * OTOLITH_GAIN
+        # REF: langevin_noise.py; 皮层除颤与热力学大一统方案 §2.1-§2.3
+        eta = self._langevin.step(self.ecm_vestibular, dt)
+        # Sensor-side addition: O_k = a_body + η (宏微观绝对同构，只做加法)
+        mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + eta[0]) * OTOLITH_GAIN
+        mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + eta[1]) * OTOLITH_GAIN
+        mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + eta[2]) * OTOLITH_GAIN
         # ── C3': Heat source consumption + ecology ──
         # Organism absorbs energy from nearby heat sources (metabolic feeding).
         # BIO: chemolithoautotrophy at hydrothermal vents.
@@ -1002,8 +992,9 @@ class VariantCircuit(HebbianCircuit):
                     # BIO: max synaptic release rate bounded by vesicle replenishment
                     #      (Attwell & Laughlin 2001). Receptor conductance saturates.
                     # I_MAX = 2.0: shadow pathway is secondary modulator (< xin_relay).
-                    # I_SCALE = 3.0: half-sat at I=3; shadow col Ca_rate~0.2×w~2.
-                    # CALIBRATE: both params pending EXP-shadow validation.
+                    # I_SCALE = 3.0: half-sat at I=3. With w=0.1 and Ca_rate~0.25,
+                    # raw I ≈ 7×0.25×0.111≈0.19 → tanh(0.19/3)≈0.063 → effectively
+                    # linear. Upper bound: I_MAX×tanh(∞)=2.0 prevents unbounded DA.
                     I_MAX, I_SCALE = 2.0, 3.0
                     import math as _math
                     da_input_currents[tgt.id] += I_MAX * _math.tanh(currents[j] / I_SCALE)
@@ -1531,15 +1522,22 @@ class VariantCircuit(HebbianCircuit):
         #              (2) unbounded activation (spiking = hard limit)
         # BIO: CaMKII concentration → synaptic input to VTA DA neurons.
         #
-        # gain=1.0: with calcium_rate ∈ [0,1],
-        # I = 7 sources × rate(≤1.0) × w(0.05) × 1.0 = 0.35
-        # V_ss = (0.35 + 0.1bc) × 1.0 = 0.45 → moderate DA ✓
-        # D2R will prevent saturation if DA > 0.3 (ec50)
+        # gain=1.0: with post-defibrillation calcium_rate ∈ [0.2, 0.6],
+        # I = 7 sources × rate(0.25) × w(0.1) × 1.0 = 0.175
+        # V_ss = (0.175 + 0.1bc) × 1.0 = 0.275 → DA gradient available ✓
+        # Peak: rate=0.58 → I=0.406 → V_ss=0.506 → D2R kicks in ✓
+        # Phase 1 fix (w=1.0) was calibrated before cortical defibrillation
+        # when Shadow Col had calcium_rate=0 (contributed nothing).
+        # Post-defibrillation calcium_rate=0.2-0.6 → must re-calibrate.
+        # D2R τ_D2=100s means at 10k steps it only provides 10% compensation;
+        # w=1.0 overwhelms it. Original design w=0.05 was for rate≈1.0 full-fire.
+        # New w=0.1 ≈ 0.05 × (1.0/0.25) × 0.5 (half-scale for D2R build-up slack).
+        # REF: 热趋性行为分析_v2.0_2026-06-16 §三 DA再饱和诊断
         cfg_shadow = BundleConfig(
             bundle_id="shadow_to_da",
             learning_rule="frozen",  # INNATE: hypothalamus→VTA phylogenetic prior
-            initial_weight=1.0,      # Phase 1 fix: 0.05 too thin → DA sleeps
-            weight_max=5.0,          # EXP-012 fix: allow thick innate cable
+            initial_weight=0.1,      # Post-defibrillation recalibration (was 1.0)
+            weight_max=5.0,          # structural upper bound
             stdp_lr=0.005,           # retained for reference but unused (frozen)
             synapse_gain=1.0,        # col activation is now bounded by spiking
             bundle_role="feedforward",
