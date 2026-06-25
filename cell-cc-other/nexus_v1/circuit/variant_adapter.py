@@ -882,6 +882,9 @@ class VariantCircuit(HebbianCircuit):
         self.agc.step(self.energy_store.fill_fraction,
                       self.dopamine.concentration, dt)
         ms.agc_gain = self.agc.gain
+        ms.yolk_level = self.yolk_sac.level
+        ms.yolk_depleted = self.yolk_sac.is_depleted
+        ms.efference_supp_ratio = self._efference_supp_ratio
 
         # ── Patch D: DA fires on energy improvement rate (VTA RPE signal) ──
         # Replaces c3_da_current (absolute deviation) with rate-of-change gate.
