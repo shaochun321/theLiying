@@ -34,7 +34,9 @@ from ..components.vascular import VascularCooling, create_brainstem_vascular
 from ..components.ndr import NDRElement, InhibitorySynapse
 from ..components.router import LiquidMetalRouter
 from ..components.modulator import Neuromodulator, create_dopamine
-from ..components.binding import BindingLayer
+from ..components.binding_temporal import TemporalBindingLayer
+from ..components.yolk_sac import YolkSac
+from ..components.da_differential_gate import DADifferentialGate
 from ..components.shadow_sandbox import ShadowSandbox
 from ..components.world import World, Body, HeatSource
 from ..components.thermal_membrane import ThermalMembrane
@@ -255,11 +257,15 @@ class VariantCircuit(HebbianCircuit):
         self._feedback_tau = 0.5     # 500ms smoothing
 
         # ── Variant: Binding Layer (§5 of math spec) ──
-        # Uses ALL axes (vestibular + thermal) for cross-modal binding
-        # C(7,2) = 21 binding cells (was C(6,2)=15 for vestibular only)
-        self.binding_layer = BindingLayer(
+        # Patch B: TemporalBindingLayer replaces BindingLayer.
+        # STF convolution on vestibular axes (tau_w=30); thermal stays instantaneous.
+        # co_activation_threshold=0.0: learning window fully open (calibration doc §1).
+        # BIO: Presynaptic Ca2+ remnant, Zucker & Regehr 2002.
+        self.binding_layer = TemporalBindingLayer(
             axes=list(self.all_axes),
-            co_activation_threshold=0.05,
+            co_activation_threshold=0.0,
+            tau_w=30,
+            thermal_axes={'therm'},
         )
 
         # Binding → Motor bundle (side channel, parallel to Col→Motor)
@@ -294,6 +300,20 @@ class VariantCircuit(HebbianCircuit):
         # External to neural circuit; can be replaced without rewiring.
         # BIO: liver glycogen + blood glucose buffer.
         self.energy_store = EnergyStore()
+
+        # ── Patch C: YolkSac (embryonic bootstrap energy) ──
+        # Non-replenishable maternal reserve; discharges at 0.002/step into EnergyStore.
+        # Provides baseline energy for STDP during cold-start before feeding.
+        # Depletes at step ~100k. BIO: Davidson 2006, The Regulatory Genome, Ch.3.
+        self.yolk_sac = YolkSac()
+
+        # ── Patch D: DADifferentialGate (VTA RPE signal) ──
+        # DA fires on positive rate-of-change of energy fill, not absolute level.
+        # Replaces c3_da_current from circulation_proportion (absolute deviation).
+        # BIO: Schultz et al. 1997, Science 275:1593-1599.
+        self.da_gate = DADifferentialGate(
+            initial_fill=self.energy_store.fill_fraction
+        )
 
         # ── Variant: VitalOscillator (basal heartbeat / tri-heart) ──
         # Three detuned VdP oscillators (2.00, 2.11, 1.93 Hz) produce
@@ -417,6 +437,15 @@ class VariantCircuit(HebbianCircuit):
         # respond (corner-stall, wall), suppress mitosis on that axis.
         self._efference_gain = {'x': 0.0, 'y': 0.0, 'z': 0.0}
         self._motor_efficacy = {'x': 1.0, 'y': 1.0, 'z': 1.0}
+
+        # ── Patch E: Efference Copy suppression ratio monitoring (INFRA) ──
+        # Tracks fraction of Binding events suppressed by low motor efficacy.
+        # Alert threshold: R_supp >= 0.9 (critation doc §五).
+        self._efference_supp_count: int = 0
+        self._efference_total_count: int = 0
+        self._efference_supp_ratio: float = 0.0
+        self._efference_monitor_window: int = 10000  # steps per reporting window
+        self._efficacy_suppress_threshold: float = 0.1  # efficacy < 0.1 = motor ineffective
 
         # ── Middle decision layer (placeholder) ──
         # Sits between Col (motion state) and Motor (muscle commands).
@@ -663,6 +692,18 @@ class VariantCircuit(HebbianCircuit):
         # OU process exact discretization, σ driven by ECM T_bath.
         # Added to body acceleration BEFORE otolith gain scaling.
         eta = self._langevin.step(self.ecm_vestibular, dt)
+        # Patch A: de-mean (zero-point purity, highest priority)
+        # OU samples have finite-window bias ~1e-6; AGC amplifies 5× at starvation.
+        # Over 1M steps this creates deterministic directional bias → breaks emergence.
+        # BIO: LC-NE increases variance, not mean (Sara 2009, NRN 10:211-223).
+        _eta_mean = sum(eta) / len(eta)
+        eta = [x - _eta_mean for x in eta]
+        # Patch A: AGC modulates exploration amplitude (LC-NE analogue)
+        # AGC.gain ∈ [1.0, 5.0]; previous step's gain used (agc.step() at L836).
+        eta = [e * self.agc.gain for e in eta]
+        # Patch A: RMS clamp — motor saturation protection
+        # At starvation: σ_eff ≈ 0.42; peak may exceed 1.0 → Motor runaway.
+        eta = [max(-1.0, min(1.0, e)) for e in eta]
         mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + eta[0]) * OTOLITH_GAIN
         mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + eta[1]) * OTOLITH_GAIN
         mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + eta[2]) * OTOLITH_GAIN
@@ -696,6 +737,9 @@ class VariantCircuit(HebbianCircuit):
         self.world.regenerate_sources()
 
         # ── Energy pipeline: World → EnergyStore ──
+        # Patch C: YolkSac discharges BEFORE deposit/tick, so it primes the
+        # store for Δfill detection by DADifferentialGate (DA RPE).
+        self.yolk_sac.step(self.energy_store, dt)
         # Consumed energy flows into the external reservoir.
         # Store handles efficiency loss (digestive efficiency ~90%).
         self.energy_store.deposit(energy_absorbed)
@@ -787,10 +831,12 @@ class VariantCircuit(HebbianCircuit):
             pid: soma_output[pid]["thermo_activation"]
             for pid in soma_output
         }
-        hunger_drives = self.spinal_reflex.process_hunger(
-            thermo_activations, self.energy_store.fill_fraction,
-            da_concentration=self.dopamine.concentration,
-            gain_multiplier=self.agc.gain, dt=dt)
+        # PHASE 1: Hardcoded thermotaxis reflex disabled — STDP cold-start experiment.
+        # Motor is now driven exclusively by Langevin noise (AGC-modulated).
+        # Thermotaxis must emerge from STDP weight learning, not hardcoded reflex.
+        # hunger_drives = self.spinal_reflex.process_hunger(...)  # [PHASE 1 DISABLED]
+        hunger_drives = {'x': 0.0, 'y': 0.0, 'z': 0.0}  # zero drives
+        # (loop below is intentionally kept — drives are all zero, no injection occurs)
         for mkey, drive in hunger_drives.items():
             if drive != 0.0 and mkey in self.motor_neurons:
                 self.motor_neurons[mkey]._membrane.inject(drive, dt)
@@ -837,14 +883,15 @@ class VariantCircuit(HebbianCircuit):
                       self.dopamine.concentration, dt)
         ms.agc_gain = self.agc.gain
 
-        # ── C3': Deviation → DA boost (structural output) ──
-        # MOSFET comparator outputs DA current when deviation > threshold.
-        # Current flows into DA neurons via membrane injection.
-        # Goes through D2R autoregulation naturally (not a bypass).
-        c3_da_current = circ['da_current']
-        if c3_da_current > 0:
+        # ── Patch D: DA fires on energy improvement rate (VTA RPE signal) ──
+        # Replaces c3_da_current (absolute deviation) with rate-of-change gate.
+        # DA = max(0, eta_da × Δfill / dt), gated by MOSFET (positive only).
+        # BIO: VTA burst on unexpected reward, silent on steady state.
+        # REF: Schultz et al. 1997, Science 275:1593-1599.
+        _da_drive = self.da_gate.step(self.energy_store.fill_fraction, dt)
+        if _da_drive > 0:
             for nid, neuron in self.da_neurons.items():
-                neuron._membrane.inject(c3_da_current, dt)
+                neuron._membrane.inject(_da_drive, dt)
 
         # ── C.04: Deviation → Motor direct activation ──
         # Spinal-level reflex: bypasses slow DA modulation.
@@ -980,6 +1027,29 @@ class VariantCircuit(HebbianCircuit):
         binding_activations = self.binding_layer.compute_all(col_act_dict)
         # Store for _do_learning() to compute sync gate
         self._binding_activations = binding_activations
+
+        # ── Patch E: Efference Copy suppression ratio monitoring (INFRA) ──
+        # Count Binding events suppressed by low motor efficacy.
+        # Alert at R_supp >= 0.9 (critation doc §五).
+        _avg_efficacy = sum(self._motor_efficacy.values()) / max(len(self._motor_efficacy), 1)
+        for _bid in binding_activations:
+            self._efference_total_count += 1
+            if _avg_efficacy < self._efficacy_suppress_threshold:
+                self._efference_supp_count += 1
+        # Report every _efference_monitor_window steps
+        _mtick = getattr(self, '_maturation_tick', 0)
+        if (_mtick > 0 and _mtick % self._efference_monitor_window == 0
+                and self._efference_total_count > 0):
+            import warnings as _warnings
+            self._efference_supp_ratio = (self._efference_supp_count
+                                          / self._efference_total_count)
+            if self._efference_supp_ratio >= 0.9:
+                _warnings.warn(
+                    f"[EXP] Efference suppression ratio {self._efference_supp_ratio:.2f}"
+                    f" >= 0.9 at step {_mtick}. Check motor efficacy.",
+                    RuntimeWarning, stacklevel=2)
+            self._efference_supp_count = 0
+            self._efference_total_count = 0
 
         # Binding → Motor side channel (§5.4: I_total = direct + binding)
         for bid, b_act in binding_activations.items():
