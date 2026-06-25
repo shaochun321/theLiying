@@ -122,7 +122,7 @@ def run():
     hdr = (f"{'Step':>8} | "
            f"{'fill':>6} {'yolk%':>6} {'DA':>6} {'AGC':>5} | "
            f"{'dist':>6} {'motor':>7} | "
-           f"{'R_supp':>6} | "
+           f"{'Nv':>3} {'H_w':>5} {'R_su':>5} | "
            f"{'sps':>6}")
     print(hdr)
     print("-" * len(hdr))
@@ -132,6 +132,7 @@ def run():
     snapshots    = []
     fill_vals    = []
     r_supp_vals  = []
+    noether_violations_prev = 0
     dx_200k      = None       # displacement by step 200k
 
     t_start  = time.time()
@@ -154,6 +155,12 @@ def run():
             rsupp  = c._efference_supp_ratio
             r_supp_vals.append(rsupp)
 
+            # ── Entropy ledger snapshot ──
+            noether_total = len(c._noether_probe._violations)
+            noether_new   = noether_total - noether_violations_prev
+            noether_violations_prev = noether_total
+            w_ent = c._entropy_probe.summary().get('total_entropy', float('nan'))
+
             t_now = time.time()
             sps   = blk_cnt / max(t_now - t_block, 1e-6)
             t_block = t_now
@@ -165,6 +172,8 @@ def run():
                 'da': da, 'agc': agc,
                 'dist': dist, 'motor': mm,
                 'rsupp': rsupp, 'sps': sps,
+                'noether_new': noether_new,
+                'weight_entropy': w_ent,
             }
             checkpoints.append(cp)
 
@@ -173,16 +182,26 @@ def run():
                 body_now = list(c.world.body.position)
                 dx_200k = body_now[0] - body_start[0]  # x-axis displacement
 
+            nv_flag = f"!{noether_new}" if noether_new > 0 else f"{noether_new:>2}"
             print(f"{step+1:>8} | "
                   f"{fill:>6.4f} {yolk_f:>6.4f} {da:>6.4f} {agc:>5.3f} | "
                   f"{dist:>6.2f} {mm:>7.5f} | "
-                  f"{rsupp:>6.4f} | "
+                  f"{nv_flag:>3} {w_ent:>5.2f} {rsupp:>5.3f} | "
                   f"{sps:>6.0f}")
+
+            # Alert on Noether violations
+            if noether_new > 0:
+                viol_detail = c._noether_probe.summary().get('violation_counts', {})
+                print(f"  [!NOETHER] +{noether_new} violations this window: {viol_detail}")
 
             if (step + 1) % SNAPSHOT_EVERY == 0:
                 bw = {bid: bundle_w_mean(b) for bid, b in bundles_cm.items()}
+                # Energy ledger per-layer
+                el = c._energy_ledger.summary()
+                se = c._structural_entropy.summary()
                 snapshots.append({**cp, 'bundle_weights': bw,
-                                  'body_pos': list(c.world.body.position)})
+                                  'body_pos': list(c.world.body.position),
+                                  'H_struct': se.get('H_struct', 0.0)})
                 print(f"  [SNAP @{(step+1)//1000}k] Bundle weights:")
                 for bid, w in sorted(bw.items()):
                     print(f"    {bid}: {w:.6f}")
@@ -190,6 +209,14 @@ def run():
                 print(f"  [SNAP] Living sources: {alive}, "
                       f"Body: {[round(p,1) for p in c.world.body.position]}, "
                       f"yolk={c.yolk_sac.level:.1f}")
+                print(f"  [LEDGER] Noether total={noether_total}  "
+                      f"H_struct={se.get('H_struct',0):.4f}  "
+                      f"weight_entropy={w_ent:.3f}")
+                # Layer-by-layer motor activity
+                mot_act = el.get('layers', {}).get('L6_Mot', {}).get('avg_activity', 0)
+                col_act = el.get('layers', {}).get('L5_Col', {}).get('avg_activity', 0)
+                print(f"  [LEDGER] L5_Col_activity={col_act:.5f}  "
+                      f"L6_Mot_activity={mot_act:.5f}")
 
     elapsed = time.time() - t_start
 
