@@ -1,0 +1,15 @@
+NOTE: Path references in this directory
+=======================================
+
+Scripts in this directory contain hardcoded paths pointing to
+Morphosphere predecessor codebase structures, e.g.:
+
+  D:\cell-cc\Morphosphere_v37_0_native_runtime_prototype_flat_complete\morphosphere_v2pp\
+
+These structures were NOT copied into cell-cc-other due to file size.
+The scripts are preserved from earlier iterations of the project and are
+NOT used by the current nexus_v1 system.
+
+Status: legacy / archival only — safe to ignore for current development.
+Do NOT modify these path strings; the scripts cannot run standalone
+without the original Morphosphere workspace present.

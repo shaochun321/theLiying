@@ -1,0 +1,462 @@
+# 蓝图 vs 实现 — 逐节交叉比对
+
+**蓝图**: MORPHOSPHERE.2026.5.10.1 (v37.4.41-blueprint-draft-1)
+**实现**: v37.4.61 codebase (hebbian_ab_engine.py, pipeline_engine.py, formula_candidate_registry.py, etc.)
+
+---
+
+## 总判定
+
+| 合规等级 | 节数 | 占比 |
+|:---:|:---:|:---:|
+| ✅ PASS | 8 | 35% |
+| 🟡 PARTIAL | 9 | 39% |
+| 🔴 GAP | 4 | 17% |
+| ⬛ BLOCKED | 2 | 9% |
+
+---
+
+## §0 一句话总判断
+
+> [!NOTE]
+> 蓝图核心纪律："不要让优美公式直接接管主线。让冻结数据、扰动实验和 baseline/ablation 对照决定机制是否晋级。"
+
+**实现合规**: ✅ PASS
+- Engine B 确实没有替代 A 作为主线默认（`render_verdict` 中 `KEEP_AS_CANDIDATE`）
+- A/B/C 三引擎同时压测
+- Engine A 从未被删除
+
+---
+
+## §1-2 工程成果与当前状态
+
+**实现合规**: ✅ PASS
+- v37.4.40 基线保留
+- HG-FHPMS 分层 PASS
+- 不宣称科学闭合
+
+---
+
+## §3 总体架构视图
+
+蓝图要求的完整链路：
+
+```
+External streams → Source Adapter → Source Event Spool → Manifest/Hash
+→ ProcessWindow → z_t → Energy Landscape → HG-FHPMS A/B/C
+→ P/R/Xin/U Boundary → RLIS Ledger → A/B Stress → Promotion Decision
+```
+
+| 链路节点 | 实现状态 | 代码位置 |
+|----------|:---:|------|
+| External streams | ✅ | `CTCRealDataAdapter` in pipeline_engine.py |
+| Source Adapter | ✅ | `source_adapters.py` |
+| Source Event Spool | 🔴 | **缺失 `source_event` 表** (D12) |
+| Immutable Manifest/Hash | 🟡 | `run_manifest` 表存在，但无 `payload_hash` |
+| ProcessWindow | ✅ | 通过 `information_fiber` 和 `spacetime_cell` 实现 |
+| z_t 非语义测度坐标 | 🔴 | **未统一** — 信号散在 fiber 表中 (D8) |
+| Energy Landscape | ✅ | `variational.py` + `variational_gmm_engine.py` |
+| HG-FHPMS A/B/C | ✅ | 三引擎完整实现 |
+| P/R/Xin/U Boundary | ✅ | `pr_confirmation_graph_record` + Markov blanket 检查 |
+| RLIS Ledger | 🟡 | `v368_free_energy_routing` 表存在但无 no-writeback 审计 |
+| A/B Stress | ✅ | `run_v37450_ab_test.py` |
+| Promotion Decision | ✅ | D11 已实现 |
+
+**实现合规**: 🟡 PARTIAL — Source Event Spool 和 z_t 统一缺失
+
+---
+
+## §4 术语定义
+
+### §4.1 Source Event
+
+蓝图要求 8 个必填字段：`source_id, event_id, event_time, payload_hash, source_url, license, split_role, raw_payload_ref`
+
+**实现合规**: 🔴 GAP
+- `CTCRealDataAdapter` 直接从文件读取，无 `source_event` 表写入
+- 无 `payload_hash`、`split_role`、`license` 字段
+
+### §4.2 ProcessWindow
+
+蓝图要求：`window_id, source_event_refs, start_time, end_time, origin_anchor, reprojection_trace, input_hash`
+
+**实现合规**: 🟡 PARTIAL
+- `information_fiber` 表有 `window_id`, `created_at`
+- 缺少 `reprojection_trace`, `input_hash`
+
+### §4.3 非语义测度坐标 z_t
+
+蓝图要求 7 维向量：`[transition_cost, drift_cost, gamma_desync_cost, xin_residual_cost, potential_displacement_cost, cross_slice_churn_cost, magnitude_disturbance_cost]`
+
+**实现合规**: 🔴 GAP
+- 各信号通道（`V_mean`, `spike_rate` 等）散在 `information_fiber` 表中
+- 未统一为 7 维 z_t 向量
+- `semantic_leakage_flag` 未实现
+
+### §4.4-4.6 运动势 Φ, d_σ, V_Φ
+
+**实现合规**: 🟡 PARTIAL
+- `cumulative_potential` 是 Φ 的简化版（只累加 xin_force + a_i·a_j）
+- 蓝图要求 Φ 包含 6 项能量：`E_motion, E_memory_distance, E_xin_residual, E_rlis_desync, E_transition_violation, E_capacity_pressure`
+- `d_sigma_t` 和 `V_Phi(t)` 未显式实现
+
+### §4.7 M_eff(t)
+
+**实现合规**: ✅ PASS (D1 已回升)
+- 7 项输入：basin_depth, external_hits, stability, xin_residual, self_activation, (rlis_desync 通过 xin_residual 代理, transition_violation 通过 exploded_count 代理)
+- 上下界 clamp: `max(1.0, min(M_max, ...))`
+- 反证削弱项存在
+
+> [!IMPORTANT]
+> 蓝图 §4.7 中 `rlis_desync` 和 `transition_violation` 是独立输入。当前实现通过 `xin_residual` 和 `exploded_count` 代理。严格来说，这仍是两个独立信号的融合代理，不是原生独立维度。
+
+---
+
+## §5 非谈判边界
+
+| 边界 | 蓝图要求 | 实现 | 状态 |
+|------|---------|------|:---:|
+| §5.1 外部数据优先 | 内部惯性不能抵抗外部连续反证 | M_eff 包含 xin_residual 和 internal_only 惩罚 | ✅ |
+| §5.2 Xin→P 禁止 | Xin 只能→R 或→U/heat-bath | Markov blanket 强制检查 | ✅ |
+| §5.3 自引用≠自证 | State_t + External → State_{t+1} | D1 区分 external/internal hits | ✅ |
+| §5.4 丑陋基线不删 | Engine A 必须保留 | A 是默认胜者 | ✅ |
+
+**实现合规**: ✅ PASS
+
+---
+
+## §6 HG-FHPMS 六层架构
+
+| 层 | 蓝图定义 | 实现 | 状态 |
+|:---:|---------|------|:---:|
+| H0 | Source Anchor Layer | `CTCRealDataAdapter` | 🟡 缺 hash |
+| H1 | Process Block Layer | `pipeline_engine.py` write_cells | ✅ |
+| H2 | Measure Coordinate Layer | ❌ 未统一为 z_t | 🔴 |
+| H3 | Energy Attractor Layer | `variational.py` + `variational_gmm_engine.py` | ✅ |
+| H4 | Stratified Memory Layer | Engine A fast/slow + Engine B weights | ✅ |
+| H5 | Audit Boundary Layer | RLIS 表 + Xin conservation 检查 | 🟡 |
+
+**实现合规**: 🟡 PARTIAL — H0 和 H2 需要补全
+
+---
+
+## §7 Baseline A
+
+**实现合规**: ✅ PASS
+- `HebbianEngine_A_ManualStrata` 完全匹配蓝图 §7：
+  - fast/slow 双层 ✅
+  - Oja-like Hebbian deepening ✅
+  - `slow = slow + alpha * (fast - slow)` 在 `maybe_absorb_slow_layer()` ✅
+  - 无 prior 层 — 蓝图提到 `prior_state_c` 但标注为"允许是固定或半固定参数"
+
+> [!WARNING]
+> **prior 层缺失**：蓝图 §7.2 定义了 `prior_state_c` 和 `prior_{t+1} = prior_t + alpha_prior * (slow_t - prior_t)`，但当前 Engine A 只有 fast/slow 两层，没有 prior。这是一个实质性偏差——基线指标 §7.6 中的 `mean_delta_prior = 0.000898` 表明蓝图预期三层结构。
+
+---
+
+## §8 Candidate B
+
+### §8.2 更新公式
+
+蓝图要求：
+```
+ΔW = A_t/M_eff * [η * G_t * ExternalAssimilation - λ*W - κ*Contradiction]
+```
+
+当前实现：
+```python
+force = η * a_i * a_j * gamma * freeze_bonus
+decay = λ * w
+delta_w = (force - decay) / M_phi
+```
+
+| 公式项 | 蓝图 | 实现 | 状态 |
+|--------|------|------|:---:|
+| η * Hebbian | ✅ | `eta * a_i * a_j` | ✅ |
+| G_t gate | gamma + no-writeback + transition | `gamma * freeze_bonus` | 🟡 |
+| A_t 外部可信度 | split 合法性门控 | ❌ 未实现 | 🔴 |
+| M_eff divisor | 7 项输入 | 7 项输入 (D1) | ✅ |
+| -λ*W decay | ✅ | `oja_lambda * w` | ✅ |
+| -κ*Contradiction | 外部反证惩罚 | ❌ 未实现 | 🔴 |
+
+**实现合规**: 🟡 PARTIAL — 缺少 `A_t` 门控和 `Contradiction_t` 惩罚项
+
+### §8.3 M_eff 设计
+
+**实现合规**: ✅ PASS (D1 已回升)
+
+### §8.4 失败防护
+
+| 防护 | 蓝图 | 实现 | 状态 |
+|------|------|------|:---:|
+| 质量奇点 | M_max 上界 | `min(M_max, ...)` + singularity 审计 | ✅ |
+| 质量坍缩 | M_min 下界 | `max(1.0, ...)` + collapse 审计 | ✅ |
+| false attractor lock-in | 须审计 | 🟡 有 dead_node 检查但无 false-attractor stream | 🟡 |
+| internal self-reinforcement | external hit gating | D1 区分 ext/int hits | ✅ |
+| compute overhead explosion | ≤20% 规则 | 有计时但阈值未硬编码为 20% | 🟡 |
+
+**实现合规**: 🟡 PARTIAL
+
+---
+
+## §9 Candidate C
+
+**实现合规**: ✅ PASS (D2 已实现)
+- `HebbianEngine_C_GuardedHybrid` 完全匹配蓝图 §9：
+  - 保留 A 的 fast/slow 结构 ✅
+  - `alpha_modulation = clamp(1.0/M_proxy, 0.5, 1.5)` ✅
+  - singularity 时回退到 A ✅ (`fallback_count`)
+
+---
+
+## §10 A/B Stress Benchmark
+
+### §10.2 三套引擎
+**实现合规**: ✅ PASS — A/B/C 同吃数据
+
+### §10.3 六种数据流
+
+| 流 | 蓝图 | 实现 | 状态 |
+|---|---|---|:---:|
+| Public replay stream | 真实 replay | CTC 数据 in v37460 | ✅ |
+| Chaos Xin storm | Phase 3 | 30 ticks 随机 Xin | ✅ |
+| Novelty shift stream | Phase 4 | 20 ticks regime shift | ✅ |
+| Contradiction stream | Phase ❌ | **未实现** | 🔴 |
+| Staleness stream | Phase ❌ | **未实现** | 🔴 |
+| Compute stress stream | 有计时 | 无渐进压力 | 🟡 |
+
+**实现合规**: 🟡 PARTIAL — 4/6 流
+
+---
+
+## §11 验收指标
+
+### 完整验收矩阵
+
+| 指标 | 蓝图节 | 实现 | 状态 |
+|------|:---:|------|:---:|
+| `p_core_survival_rate` | §11.1 | `measure_survival()` | ✅ |
+| `prior_strata_drift` | §11.1 | ❌ | 🔴 |
+| `noise_to_heat_bath_rate` | §11.1 | ❌ | 🔴 |
+| `false_p_rate_under_noise` | §11.1 | ❌ | 🔴 |
+| `adaptation_latency` | §11.2 | `measure_adaptation_latency()` | ✅ |
+| `r_band_activation_delay` | §11.2 | ❌ | 🔴 |
+| `false_attractor_escape_rate` | §11.3 | ❌ | 🔴 |
+| `supported_basin_retention` | §11.4 | ❌ | 🔴 |
+| `runtime_seconds` | §11.5 | 有计时 | ✅ |
+| `memory_peak_mb` | §11.5 | ❌ | 🔴 |
+| `holdout_accuracy` | §11.6 | ❌ | 🔴 |
+| `holdout_nll` | §11.6 | ❌ | 🔴 |
+
+**实现合规**: 🟡 PARTIAL — 3/12 核心指标
+
+---
+
+## §12 Promotion Decision
+
+**实现合规**: ✅ PASS (D11)
+- `PROMOTE / KEEP_AS_CANDIDATE / REJECT` 三级决策 ✅
+- 打平规则 → 保留 A ✅
+- compute overhead 检查 ✅
+- singularity/collapse flag ✅
+
+---
+
+## §13 自引用递归约束
+
+| 约束 | 蓝图 | 实现 | 状态 |
+|------|------|------|:---:|
+| 允许使用 prior strata | ✅ | Engine A slow layer | ✅ |
+| 允许使用 basin depths | ✅ | `cumulative_potential` | ✅ |
+| 禁止内部循环自激活增加 M_eff | ✅ | D1 `internal_only_penalty` | ✅ |
+| 每次自引用记录审计字段 | 需记录 7 个字段 | 🟡 只记录 ext/int 计数 | 🟡 |
+
+**实现合规**: 🟡 PARTIAL
+
+---
+
+## §14 数据纪律
+
+| 要求 | 实现 | 状态 |
+|------|------|:---:|
+| fixture 可调参，不可最终宣称 | ✅ 合成数据明确标注 | ✅ |
+| frozen holdout 不可调参 | ⬛ 无冻结 holdout 机制 | ⬛ BLOCKED |
+| 必须记录 source_url, payload_hash | 🔴 未记录 | 🔴 |
+
+**实现合规**: 🟡 PARTIAL
+
+---
+
+## §15 变分数学
+
+| 要求 | 实现 | 状态 |
+|------|------|:---:|
+| F(q) = KL + β·risk 有限维 | `variational_gmm_engine.py` ELBO | ✅ |
+| 存在性/唯一性/KKT | GMM 闭式 E-step + ELBO 单调 | ✅ |
+| 完整连续变分：PARTIAL | 正确标注 | ✅ |
+| 不宣称真实物理势场 | Engine B 明确标注 "candidate" | ✅ |
+
+**实现合规**: ✅ PASS
+
+---
+
+## §16 数据库表设计
+
+| 蓝图要求表 | 实现 | 状态 |
+|-----------|------|:---:|
+| §16.1 `source_event` | ❌ 不存在 | 🔴 (D12) |
+| §16.2 `process_window` | 🟡 通过 `information_fiber` 间接实现 | 🟡 |
+| §16.3 `measure_coordinate` | ❌ 不存在 | 🔴 (D8) |
+| §16.4 `engine_state` | 🟡 通过 `v37450_ab_metric_log` 实现 | 🟡 |
+| §16.5 `topological_inertia_event` | 🟡 D7 在内存中追踪，未逐事件写 DB | 🟡 |
+| §16.6 `ab_stress_metrics` | 🟡 通过 `v37450_ab_metric_log` 实现 | 🟡 |
+| §16.7 `promotion_decision` | ✅ D11 通过 verdict 表实现 | ✅ |
+
+**实现合规**: 🟡 PARTIAL — 7 表中 1 个 PASS，4 个 PARTIAL，2 个 GAP
+
+---
+
+## §17 文件结构
+
+蓝图建议独立文件：`engine_a_manual_strata.py`, `engine_b_topological_inertia.py`, `engine_c_guarded_hybrid.py`
+
+当前实现：三引擎集中在 `hebbian_ab_engine.py`（~780 行）。
+
+**实现合规**: 🟡 PARTIAL — 功能完整但结构不同
+
+---
+
+## §18 伪代码对照
+
+### §18.1 总入口
+
+蓝图：
+```python
+for stream in streams:
+    for event in stream.events:
+        z = build_nonsemantic_measure_coordinate(event)
+        ledger = build_rlis_context(event)
+        for engine in engines:
+            engine.step(event, z, ledger)
+            audit_engine_state(engine, event)
+```
+
+当前实现：三引擎通过 `harness.feed_update()` 接收相同输入，但：
+- ❌ 没有 `z = build_nonsemantic_measure_coordinate()` 步骤
+- ❌ 没有 `ledger = build_rlis_context()` 步骤
+- ✅ `audit_engine_state` 通过 `log_metrics` 实现
+
+### §18.2 Candidate B step
+
+蓝图：
+```python
+phi = compute_motion_potential(z, landscape, ledger)
+m_eff = compute_effective_inertia(7 inputs)
+delta_w = gate * (eta*external - decay*w - contradiction) / m_eff
+audit_m_eff(phi, m_eff, delta_w)
+```
+
+当前实现：
+- ✅ `m_eff = compute` (7 inputs via D1)
+- 🔴 `phi` 仅用 `cumulative_potential`，非 `compute_motion_potential(z, landscape, ledger)`
+- 🔴 缺少 `contradiction` 惩罚项
+- 🟡 审计在内存中（D7），非逐事件写 DB
+
+### §18.3 Promotion decision
+
+蓝图伪代码与实现完全对齐 ✅
+
+---
+
+## §19 v37.5 解锁条件
+
+10 项中当前满足情况：
+
+| # | 条件 | 状态 |
+|:---:|------|:---:|
+| 1 | 真实外部数据足够大 | 🟡 CTC 23 tracks |
+| 2 | holdout ≥ 15 | ⬛ BLOCKED |
+| 3 | class_diversity ≥ 3 | 🟡 2 (CTC + synthetic) |
+| 4 | motion regime diversity ≥ 5 | ❌ |
+| 5 | finite variational core PASS | ✅ |
+| 6 | project-level proof obligations | 🟡 |
+| 7 | HG-FHPMS no-writeback PASS | ✅ |
+| 8 | Xin conservation PASS | ✅ |
+| 9 | A/B benchmark 决策明确 | ✅ |
+| 10 | external scientific closure | ⬛ BLOCKED |
+
+**结论**: v37.5 仍然 BLOCKED ✅（与蓝图一致）
+
+---
+
+## §20-23 路线图、降级策略、风险、最终判词
+
+**实现合规**: ✅ PASS — 降级策略完全执行中（B 保留为 CANDIDATE，A 为默认）
+
+---
+
+## 附录 A: 推荐配置 vs 实际配置
+
+| 参数 | 蓝图推荐 | 当前实现 | 偏差 |
+|------|:---:|:---:|:---:|
+| M_min | 0.5 | 1.0 (hardcoded floor) | ⚠️ 蓝图允许 <1.0 |
+| M_max | 8.0 | **100.0** | ⚠️ **偏差很大** |
+| eta | 0.18 | 0.3 | ⚠️ 67% 偏差 |
+| decay | 0.025 | 0.02 | ≈ |
+| contradiction_penalty | 0.15 | **0** (未实现) | 🔴 |
+| external_hit_weight | 0.4 | 0.3 | ≈ |
+| internal_only_penalty | 0.6 | 0.5 | ≈ |
+| C.alpha_mod_min | 0.5 | 0.5 | ✅ |
+| C.alpha_mod_max | 1.5 | 1.5 | ✅ |
+| C.fallback_on_singularity | true | true | ✅ |
+
+> [!WARNING]
+> **M_max = 100 vs 蓝图推荐 8.0** — 这是最大的参数偏差。当前 M_max=100 意味着惯性质量可以增长到 100 倍，而蓝图只允许 8 倍。这可能解释为什么当前测试中没有 singularity 事件（阈值太高，质量永远不会触及 95%）。
+
+---
+
+## 附录 B: 10 问清单
+
+蓝图 §附录B 的 10 个必答问题：
+
+| # | 问题 | 当前答案 | 数据支持 |
+|:---:|------|---------|:---:|
+| 1 | B 更抗噪？ | **是** (94.8% vs 82.9%) | ✅ |
+| 2 | B 更快适应？ | **是** (8 vs 16 ticks) | ✅ |
+| 3 | B 更少 false lock-in？ | **未测试** | 🔴 |
+| 4 | B 不忘重要结构？ | **未测试** | 🔴 |
+| 5 | B 开销 ≤ 20%？ | **DRAW** (18% 波动) | 🟡 |
+| 6 | C 比 B 更适合 staged default？ | **否** (C 存活 76.1% < A 82.9%) | ✅ |
+| 7 | Xin→R→P 边界？ | **ENFORCED** | ✅ |
+| 8 | RLIS no-writeback？ | **PASS** | ✅ |
+| 9 | semantic leakage = 0？ | **未显式审计** | 🟡 |
+| 10 | v37.5 BLOCKED？ | **是** | ✅ |
+
+---
+
+## 优先级排序的差距清单
+
+### P0 — 配置修正（立即）
+1. **M_max 100→8** — 蓝图明确推荐 8.0
+2. **eta 0.3→0.18** — 蓝图推荐
+3. **M_min 1.0→0.5** — 蓝图允许
+
+### P1 — 更新公式缺失项（小工作量）
+4. **Contradiction_t 惩罚项** — `kappa * Contradiction` 未实现
+5. **A_t 外部可信度门控** — split 合法性检查未实现
+
+### P2 — 测试流扩展（中工作量）
+6. **Contradiction stream** (Phase 5)
+7. **Staleness stream** (Phase 6)
+
+### P3 — 数据基建（中工作量）
+8. **source_event 表** (D12)
+9. **measure_coordinate 表 / z_t 统一** (D8)
+10. **topological_inertia_event 逐事件写 DB** (D7 升级)
+11. **Engine A 增加 prior 层** — 蓝图 §7.2 明确要求
+
+### P4 — 科学闭合前提（大工作量/外部依赖）
+12. **Frozen holdout 机制**
+13. **Holdout 指标**
+14. **False attractor escape stream + 指标**
+15. **semantic_leakage 审计**

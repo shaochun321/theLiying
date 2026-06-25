@@ -1,0 +1,104 @@
+# v37.4.93 Walkthrough — Multi-Pipeline Isolation
+
+## What Was Done
+
+### 1. External Data Acquisition
+
+Downloaded and integrated 2 new data sources (all free, public, no registration):
+
+| Data Source | Events | Download | Adapter |
+|-------------|:------:|---------|---------|
+| **USGS Earthquakes** | 9,127 | FDSN API → `usgs_earthquakes_2026.csv` (1.7 MB) | `usgs_source_adapter.py` |
+| **CTC PhC-C2DH-U373** | 1,457 | CTC website ZIP → mask extraction → `phc_u373_centroids.csv` | `phc_source_adapter.py` |
+
+Extraction script: `scripts/extract_phc_centroids.py` — reads TIFF tracking masks, computes centroids, outputs CSV in same schema as existing CTC data.
+
+---
+
+### 2. Pipeline Isolation Architecture
+
+#### [NEW] `pipeline_isolator.py`
+
+Three core classes:
+
+**`IsolatedPipeline`** — Owns an independent `DualBlindABHarness` instance:
+- Creates namespaced DB tables: `pipe_{ns}_hebbian_weight`, `pipe_{ns}_metric_log`, `pipe_{ns}_prx_decomp`, `pipe_{ns}_convergence`
+- Receives regime labels from oracle via `feed_regime_labels()` (one-way, read-only)
+- All Hebbian weights stay within the pipeline's own namespace
+
+**`MotionRegimeOracle`** — Read-only regime classifier:
+- Reads displacement data from ALL pipelines
+- Classifies each (adapter, window_k) into 6 regimes: stationary, slow_drift, fast_drift, oscillation, jump, diffusion
+- Writes ONLY to `motion_regime_oracle_log` and `motion_regime_class_diversity`
+- `written_by` column is always `'oracle'` — enforced at DB level
+
+**`run_isolated_multi_pipeline()`** — Orchestrator:
+1. Phase 1: Each pipeline ingests independently
+2. Phase 2: Oracle classifies regimes (read-only)
+3. Phase 3: Regime labels injected → each pipeline runs isolated Hebbian A/B
+4. Phase 4: Each pipeline runs isolated PRX convergence
+
+```mermaid
+graph LR
+    O["MotionRegimeOracle"] -->|"read-only labels"| A["pipe_fluo"]
+    O -->|"read-only labels"| B["pipe_phc"]
+    O -->|"read-only labels"| C["pipe_usgs"]
+    A -.->|"displacement data"| O
+    B -.->|"displacement data"| O
+    C -.->|"displacement data"| O
+```
+
+---
+
+### 3. Verification Results
+
+#### Multi-Pipeline Test (20/20 ALL PASS)
+
+| Check | Result |
+|-------|:------:|
+| pipe_fluo Hebbian weights > 0 | ✅ 1035 |
+| pipe_phc Hebbian weights > 0 | ✅ 288 |
+| pipe_usgs Hebbian weights > 0 | ✅ 2073 |
+| pipe_fluo isolation (no leaks) | ✅ 0 |
+| pipe_phc isolation (no leaks) | ✅ 0 |
+| pipe_usgs isolation (no leaks) | ✅ 0 |
+| Oracle regime labels > 0 | ✅ 40 |
+| Oracle written_by = 'oracle' | ✅ 0 violations |
+| Regime diversity ≥ 3 | ✅ 4 regimes |
+| **Class diversity ≥ 3 (R16)** | ✅ **3 sources** |
+| All 3 pipelines converged | ✅ |
+| PRX records per pipeline | ✅ |
+| Metric logs per pipeline | ✅ |
+| DB tables > 100 | ✅ 155 |
+
+#### Regression (unchanged)
+- AB Stress Tests: **46/46 ALL PASS**
+- Integrated Pipeline: **8/8 ALL PASS**
+
+**Total: 74/74 ALL PASS**
+
+---
+
+### 4. v37.5 Unlock Status Update
+
+| Condition | Before | After |
+|-----------|:------:|:-----:|
+| R15 holdout ≥ 15 frames | ✅ | ✅ |
+| R16 class_diversity ≥ 3 | ❌ (2) | ✅ **3** (fluo + phc + usgs) |
+| R17 motion_regime ≥ 5 | ❌ (2) | 🟡 4 regimes detected (stationary, slow_drift, fast_drift, jump) |
+| R18 external closure | ❌ | 🟡 needs holdout validation |
+
+---
+
+### 5. Files Changed
+
+| File | Action |
+|------|--------|
+| `pipeline_isolator.py` | **NEW** — Core isolation module |
+| `usgs_source_adapter.py` | **NEW** — USGS earthquake adapter |
+| `phc_source_adapter.py` | **NEW** — PhC-C2DH-U373 adapter |
+| `scripts/extract_phc_centroids.py` | **NEW** — TIFF mask → centroid CSV |
+| `runners/run_v37493_multi_pipeline.py` | **NEW** — 20-check integration test |
+| `data/usgs_earthquakes_2026.csv` | **NEW** — 9,127 earthquake events |
+| `data/phc_u373_centroids.csv` | **NEW** — 1,457 cell centroids |
+| `data/PhC-C2DH-U373/` | **NEW** — Raw CTC training data |
