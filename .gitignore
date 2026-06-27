@@ -1,0 +1,16 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Archives
+*.zip
+
+# Independent experimental copy (separate git repo)
+cell-cc-other/
+
+# Miscellaneous backup folder
+x/
