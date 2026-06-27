@@ -438,8 +438,12 @@ class HebbianCircuit:
                     learning_rule="stdp",
                     initial_weight=0.4,   # C2: strong topological bias (VOR hardwire)
                     weight_max=0.5,
-                    stdp_lr=0.005,
-                    synapse_gain=5.0,
+                    # 战役四：脊髓扩音（贝兹细胞扩音器）
+                    # BIO: Betz cells → corticospinal tract, highest gain pyramidal projection
+                    # gain: 5.0→10.0; lr: 0.005→0.05（关键期高可塑性）
+                    # REF: 大一统方案 §4.5
+                    stdp_lr=0.05,
+                    synapse_gain=10.0,
                     bundle_role="feedforward",
                     coupler_capacitance=1.0,
                     coupler_r_leak=2.0,

@@ -290,6 +290,11 @@ class VariantCircuit(HebbianCircuit):
         # BIO: endolymph thermal fluctuation → hair cell displacement.
         # REF: 皮层除颤与热力学大一统方案 §2.1-§2.3
         self._langevin = LangevinNoise()
+        # ── V8战术一: LangevinNoise → 半规管（angular axes） ──
+        # BIO: 半规管内淋巴液布朗运动 → 椭圆囊毛细胞底噪（与耳石相同 FDT 机制）。
+        # 激活 Col[yaw/pitch/roll] → axis-specific 束（gain=10.0）→ STDP 成长。
+        # REF: V8方案 §三 战术一; same σ₀=0.70 from FDT (symmetric sensor)
+        self._langevin_angular = LangevinNoise()
 
         # ── Variant: SomatosensoryChain (V01) ──
         # 4 skin patches (front/back/left/right), each with:
@@ -662,6 +667,27 @@ class VariantCircuit(HebbianCircuit):
         mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + eta[0]) * OTOLITH_GAIN
         mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + eta[1]) * OTOLITH_GAIN
         mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + eta[2]) * OTOLITH_GAIN
+
+        # ── V8战术一: LangevinNoise → 半规管（yaw/pitch/roll） ──
+        # BIO: endolymph thermal fluctuation → cupula deflection → angular VN discharge.
+        # Activates Col[yaw/pitch/roll] → axis-specific bundles (gain=10) → STDP growth.
+        # ANGULAR_GAIN=50: σ_k=0.07 × 50 ≈ 3.5 mech-units (gentle bottom noise).
+        # REF: V8方案 §三 战术一
+        ANGULAR_GAIN = 50.0
+        eta_ang = self._langevin_angular.step(self.ecm_vestibular, dt)
+        mechanical_inputs['yaw']   = mechanical_inputs.get('yaw',   0.0) + eta_ang[0] * ANGULAR_GAIN
+        mechanical_inputs['pitch'] = mechanical_inputs.get('pitch', 0.0) + eta_ang[1] * ANGULAR_GAIN
+        mechanical_inputs['roll']  = mechanical_inputs.get('roll',  0.0) + eta_ang[2] * ANGULAR_GAIN
+
+        # ── V8战术二: 皮肤热梯度 → yaw 趋向反射 ──
+        # BIO: 左右皮肤温差 → 转向反射（类 C. elegans AFD 热趋性）。
+        # T_right > T_left → 热源在右 → 正 yaw（右转朝向热源）。
+        # G_ORIENT=200: ΔT_lr≈0.25（体型几何决定）× 200 = 50 mech-units（¼ × oto_x）。
+        # REF: V8方案 §三 战术二; SpinalReflexArc 对称性设计
+        G_ORIENT = 200.0
+        if 'left' in self._patch_temps and 'right' in self._patch_temps:
+            delta_T_orient = self._patch_temps['right'][0] - self._patch_temps['left'][0]
+            mechanical_inputs['yaw'] = mechanical_inputs.get('yaw', 0.0) + delta_T_orient * G_ORIENT
         # ── C3': Heat source consumption + ecology ──
         # Organism absorbs energy from nearby heat sources (metabolic feeding).
         # BIO: chemolithoautotrophy at hydrothermal vents.
