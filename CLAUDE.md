@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Bash 分类器设置：** Claude Code 默认权限模式为 `auto`，每条 bash 命令均需调用 Anthropic 安全分类器服务，服务器故障时命令全部阻断。已将全局设置 `C:\Users\shaoc\.claude\settings.json` 中的 `permissions.defaultMode` 改为 `acceptEdits`——bash 命令直接放行，仅文件写入时弹确认。如需恢复分类器保护，删除该字段即可。
 - **知识库搜索：** `cell-cell/00_Dashboard/` 下的文档提供设计决策、分析报告和阶段方案的聚合搜索入口。查找项目背景、规范定义、历史报告时优先查阅该目录。
 - **报告写法：** 直接写报告，无需询问确认。篇幅超出单文件合理范围时，自行拆分为 Part 1/2/3 分别存档，不需要事先征得同意。报告存档位置：`cell-cell/工作报告/`。
+- **实施方案存档：** Claude Code 撰写的实施方案（可行性分析后、动手写代码前）存档在 `J:\cell-cc\cell-cell\claudecode方案\`。命名格式：`{主题}_{日期}.md`，例如 `World2.0-Phase1-实施方案_2026-06-27.md`。
 
 ## What this is
 
@@ -19,7 +20,7 @@ Three co-existing top-level systems:
 - **`governance/`** — a *co-equal parallel* auditor (NOT subordinate): `Fuse` (physics-law circuit breaker), `Adjudicator`, `Validator`, `Modeler`, `MathCandidate`, `GovernanceLedger`. Instantiated inside `VariantCircuit.__init__` and run every step.
 - **`experiments/`** — older "Morphosphere" experiment scripts (mostly hardcode `D:\cell-cc\Morphosphere_*` paths; predecessor codebase, not the current system).
 
-`cell-cell/` is an Obsidian knowledge vault (design docs, AI logs, analysis reports — Markdown only, no code). `docs/` is an older Morphosphere version archive. Generated reports go in `cell-cell/报告/`.
+`cell-cell/` is an Obsidian knowledge vault (design docs, AI logs, analysis reports — Markdown only, no code). `docs/` is an older Morphosphere version archive. Generated reports go in `cell-cell/工作报告/`. (`cell-cell/报告/` is legacy archive — do not use for new reports.)
 
 ## Running tests & entry points
 

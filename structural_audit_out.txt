@@ -1,0 +1,429 @@
+================================================================================
+  STRUCTURAL SIGNAL PATH AUDIT — VariantCircuit + Thermal World
+  30,000 steps, DT=0.001, snapshot every 5,000
+================================================================================
+
+  AUDIT-NOTE (2026-06-28): Surfaces ledger data that runs internally
+  but never prints during normal simulation. Also adds SignalPathAudit
+  for non-bundle injection points invisible to standard ledger.
+
+  Circuit: 73 neurons, 58 bundles
+  Front bundle: therm_therm_front_to_move_x
+  Brake bundle: therm_therm_back_to_move_x
+
+    step | d_surf |  yaw° |  fill |  w_frt |  w_brk | ratio | DA_dir |   dev | mot_x
+  --------------------------------------------------------------------------------
+   5,000 |   9.30 |   0.6 | 0.513 | 0.0797 | 0.1187 | 0.671 |  1.000 | 0.186 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 5,000 ─────────────────────────────────
+  TOPRXin  T=0.0051  O=3.6492  P=37.2407  R=0.004803  Xin=126.2132  n_bundles=60
+  Noether  violations=41  energy_balance_avg=0.000669
+  Entropy  spikes=2  efficiency=0.4260
+  Layers   L4_Enc=0.0303  L5_Col=0.0000  L6_Mot=0.3300
+           L1_MET      : act=0.0167  E=0.5066
+           L2_HC       : act=0.1287  E=1.0000
+           L3_Aff      : act=0.0000  E=1.0000
+           DA          : act=0.0041  E=1.0000
+           Soma_Therm  : act=0.2795  E=1.0000
+  10,000 |   8.60 |   2.8 | 0.556 | 0.0774 | 0.1137 | 0.681 |  1.000 | 0.041 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 10,000 ─────────────────────────────────
+  TOPRXin  T=0.0073  O=0.7543  P=36.4436  R=0.004414  Xin=320.9978  n_bundles=63
+  Noether  violations=91  energy_balance_avg=0.000659
+  Entropy  spikes=2  efficiency=0.2130
+  Layers   L4_Enc=0.0564  L5_Col=0.0003  L6_Mot=0.1926
+           L1_MET      : act=0.0153  E=0.5058
+           L2_HC       : act=0.1322  E=1.0000
+           L3_Aff      : act=0.0002  E=0.9857
+           DA          : act=0.0074  E=1.0000
+           Soma_Therm  : act=0.9474  E=1.0000
+  15,000 |   8.03 |   6.4 | 0.605 | 0.0750 | 0.1087 | 0.691 |  1.000 | 0.081 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 15,000 ─────────────────────────────────
+  TOPRXin  T=0.0115  O=0.6958  P=34.1325  R=0.004325  Xin=512.9533  n_bundles=63
+  Noether  violations=141  energy_balance_avg=0.000798
+  Entropy  spikes=2  efficiency=0.1420
+  Layers   L4_Enc=0.0659  L5_Col=0.0003  L6_Mot=0.1284
+           L1_MET      : act=0.0114  E=0.5044
+           L2_HC       : act=0.1178  E=1.0000
+           L3_Aff      : act=0.0001  E=0.9905
+           DA          : act=0.0425  E=1.0000
+           Soma_Therm  : act=1.5417  E=1.0000
+  20,000 |   7.85 |   8.7 | 0.648 | 0.0719 | 0.1021 | 0.704 |  0.000 | 0.137 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 20,000 ─────────────────────────────────
+  TOPRXin  T=0.0161  O=2.7474  P=35.4429  R=0.004359  Xin=764.3959  n_bundles=66
+  Noether  violations=191  energy_balance_avg=0.000980
+  Entropy  spikes=2  efficiency=0.1065
+  Layers   L4_Enc=0.0794  L5_Col=0.0007  L6_Mot=0.1294
+           L1_MET      : act=0.0141  E=0.5052
+           L2_HC       : act=0.1034  E=1.0000
+           L3_Aff      : act=0.0001  E=0.9929
+           DA          : act=0.1450  E=1.0000
+           Soma_Therm  : act=2.0553  E=1.0000
+  25,000 |   7.27 |   8.1 | 0.677 | 0.0691 | 0.0963 | 0.718 |  0.000 | 0.188 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 25,000 ─────────────────────────────────
+  TOPRXin  T=0.0202  O=3.3989  P=33.1076  R=0.004915  Xin=1095.2102  n_bundles=66
+  Noether  violations=241  energy_balance_avg=0.001133
+  Entropy  spikes=14  efficiency=0.2291
+  Layers   L4_Enc=0.0939  L5_Col=0.0011  L6_Mot=0.2045
+           L1_MET      : act=0.0189  E=0.5064
+           L2_HC       : act=0.1111  E=1.0000
+           L3_Aff      : act=0.0004  E=0.9785
+           DA          : act=0.2285  E=1.0000
+           Soma_Therm  : act=2.4582  E=1.0000
+
+
+================================================================================
+  END OF SIMULATION — FULL LEDGER REPORTS
+================================================================================
+
+============================================================
+  Noether Conservation Verification (T4)
+============================================================
+  Checks: 299  Violations: 290
+  Status: FAIL
+
+  [1] Energy Conservation (time symmetry):
+      Balance error avg: 0.001250
+      Balance error max: 0.001887
+      Q dissipated: 31409.5436
+
+  [2] Weight Stability (gauge invariance):
+      Avg drift/step: 0.00338397
+      Total |ΔW|: 1.008424
+
+  [3] Landauer Bound (info-entropy):
+      Bits erased: 0.22108923452453544
+      Q/bit: 142067.268161
+      Landauer OK: True
+
+  Violation breakdown:
+      kcl_charge: 290
+
+  [5] Structural Entropy (topology):
+      H_struct: 4.8907
+      H_flow:   3.9329
+      Ω (scale): 43164
+
+  [6] P_ν × H_flow (数理基因候选):
+      avg: 2.7132  std: 0.5065
+      CV:  0.1867  ~const PASS
+============================================================
+======================================================================
+熵 账 本 (Entropy Ledger)
+======================================================================
+  模拟时间: 0.0s (30 steps)
+  总 spike: 30
+  总热耗散: 0.0719
+  平均 spike 率: 1000.0 spk/s
+  熵产生率 dS/dt: 2.395478
+  能效 (spk/heat): 0.3508
+
+  Layer            Avg E  Avg Heat   Avg Act   E trend
+  DA              1.0000  0.039541    0.2824   +0.0000
+  L1_MET          0.5055  0.005736    0.0162   -0.0059
+  L2_HC           1.0000  0.000352    0.1093   +0.0000
+  L3_Aff          0.9614  0.004144    0.0006   -0.0682
+  L4_Enc          0.9970  0.001881    0.1074   -0.0300
+  L5_Col          0.9997  0.002290    0.0014   -0.0002
+  L6_Mot          0.9763  0.005060    0.2871   -0.1429
+  S_Col           0.1850  0.010275    0.0027   -0.9884
+  S_Enc           0.9944  0.023336    0.9025   -0.0000
+  S_Mot           0.9706  0.336459    2.1523   +0.0000
+  Soma_Noci       0.1365  0.052724    0.0248   -0.9500
+  Soma_Relay      0.9689  0.048701    3.2810   +0.9232
+  Soma_Therm      1.0000  0.029041    2.7432   +0.0000
+
+  ISI Entropy (bits):
+    motor_move_z             : 0.000 bits (10 spikes)
+    move_x_m10000            : 0.000 bits (7 spikes)
+    move_z_m20000            : 0.000 bits (10 spikes)
+
+  Layer Transfer (correlation):
+    L1_MET → L2_HC:  0.258  █████
+    L2_HC → L3_Aff:  0.361  ███████
+    L3_Aff → L4_Enc:  0.600  ████████████
+    L4_Enc → L5_Col:  0.886  █████████████████
+    L5_Col → L6_Mot:  0.696  █████████████
+    S_Enc → S_Col:  0.664  █████████████
+    S_Col → S_Mot:  0.288  █████
+    DA → L6_Mot:  0.636  ████████████
+
+
+  TOPRXin — Per-Bundle Phase Intensities (last snapshot)
+  Bundle                                         T       O       P         R       Xin
+  aff_irr_to_enc_oto_x                      0.0000  0.0000  0.9993  0.000225    0.0007
+  aff_irr_to_enc_oto_y                      0.0000  0.0000  0.9983  0.000000    0.0017
+  aff_irr_to_enc_oto_z                      0.0000  0.0000  0.9973  0.000000    0.0027
+  aff_irr_to_enc_pitch                      0.0000  0.0000  0.9982  0.000000    0.0018
+  aff_irr_to_enc_roll                       0.0000  0.0000  0.9978  0.000000    0.0022
+  aff_irr_to_enc_yaw                        0.0000  0.0000  0.9986  0.000000    0.0014
+  aff_reg_to_enc_oto_x                      0.0000  0.0015  0.9897  0.000000    0.0104
+  aff_reg_to_enc_oto_y                      0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_oto_z                      0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_pitch                      0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_roll                       0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_yaw                        0.0000  0.0000  1.0000  0.000000    0.0000
+  col_pitch_to_move_y                       0.0000  0.4975  0.1424  0.000147    6.0223
+  col_roll_to_move_z                        0.0000  0.0000  0.0787  0.000070   11.7110
+  col_to_motor_cross                        0.0002  0.2758  0.1191  0.000001    7.3955
+  col_yaw_to_move_x                         0.0000  0.0000  0.0857  0.000079   10.6714
+  enc_to_col_oto_x                          0.0000  0.0000  0.9955  0.000000    0.0045
+  enc_to_col_oto_y                          0.0000  0.0000  1.0000  0.000000    0.0000
+  enc_to_col_oto_z                          0.0000  0.0000  0.9998  0.000000    0.0002
+  enc_to_col_pitch                          0.0000  0.0025  0.9450  0.000000    0.0582
+  enc_to_col_roll                           0.0000  0.0000  1.0000  0.000000    0.0000
+  enc_to_col_therm_back                     0.0004  0.0074  0.3940  0.000115    1.5378
+  enc_to_col_therm_back_s10000              0.0003  0.0085  0.9232  0.000147    0.0831
+  enc_to_col_therm_back_s20000              0.0003  0.0074  0.9731  0.000137    0.0276
+  enc_to_col_therm_front                    0.0005  0.0085  0.3270  0.000124    2.0579
+  enc_to_col_therm_front_s10000             0.0004  0.0025  0.8915  0.000108    0.1217
+  enc_to_col_therm_front_s20000             0.0004  0.0085  0.9439  0.000149    0.0595
+  enc_to_col_therm_left                     0.0004  0.0096  0.3954  0.000103    1.5289
+  enc_to_col_therm_left_s10000              0.0003  0.0096  0.9327  0.000122    0.0721
+  enc_to_col_therm_left_s20000              0.0003  0.0096  0.9732  0.000123    0.0275
+  enc_to_col_therm_right                    0.0005  0.0103  0.2644  0.000152    2.7818
+  enc_to_col_yaw                            0.0000  0.0000  1.0000  0.000000    0.0000
+  hc_to_aff_oto_x                           0.0006  0.0000  0.1530  0.000000    5.5355
+  hc_to_aff_oto_y                           0.0000  0.0000  0.5383  0.000000    0.8579
+  hc_to_aff_oto_z                           0.0000  0.0000  0.1445  0.000000    5.9208
+  hc_to_aff_pitch                           0.0000  0.0000  0.5890  0.000000    0.6979
+  hc_to_aff_roll                            0.0000  0.0000  0.6615  0.000000    0.5116
+  hc_to_aff_yaw                             0.0000  0.0000  0.6292  0.000000    0.5893
+  lateral_back_to_left                      0.0005  0.0024  0.0128  0.000000   77.1665
+  lateral_back_to_right                     0.0005  0.0080  0.0107  0.000000   92.2755
+  lateral_front_to_left                     0.0006  0.0024  0.0131  0.000000   75.2275
+  lateral_front_to_right                    0.0006  0.0080  0.0109  0.000000   90.3365
+  lateral_left_to_back                      0.0005  0.0038  0.0128  0.000000   77.0319
+  lateral_left_to_front                     0.0005  0.0078  0.0102  0.000000   96.8857
+  lateral_right_to_back                     0.0006  0.0038  0.0131  0.000000   75.5573
+  lateral_right_to_front                    0.0006  0.0078  0.0104  0.000000   95.4111
+  met_to_hc_oto_x                           0.0000  0.2825  0.1154  0.000617    7.6643
+  met_to_hc_oto_y                           0.0000  0.0148  0.5161  0.000577    0.9376
+  met_to_hc_oto_z                           0.0000  0.0896  0.1256  0.000686    6.9634
+  met_to_hc_pitch                           0.0000  0.0122  0.5469  0.000000    0.8285
+  met_to_hc_roll                            0.0000  0.0122  0.5469  0.000000    0.8285
+  met_to_hc_yaw                             0.0000  0.0122  0.5469  0.000001    0.8285
+  noci_to_relay_back                        0.0000  0.0038  0.0116  0.000186   85.2806
+  noci_to_relay_front                       0.0000  0.0078  0.0094  0.000252  105.0825
+  noci_to_relay_left                        0.0000  0.0024  0.0116  0.000179   85.4086
+  noci_to_relay_right                       0.0000  0.0080  0.0099  0.000237  100.4732
+  shadow_to_da                              0.0025  0.0003  0.0589  0.000062   15.9794
+  therm_therm_back_to_move_x                0.0001  0.3300  0.1822  0.000046    4.4891
+  therm_therm_front_to_move_x               0.0001  0.3300  0.1821  0.000025    4.4906
+  therm_therm_left_to_move_y                0.0004  0.4975  0.1418  0.000061    6.0500
+  therm_therm_right_to_move_y               0.0002  0.4975  0.1422  0.000110    6.0303
+  thermo_to_relay_back                      0.0017  0.0038  0.0149  0.000005   66.1799
+  thermo_to_relay_front                     0.0019  0.0078  0.0127  0.000009   77.6924
+  thermo_to_relay_left                      0.0017  0.0024  0.0151  0.000003   65.1867
+  thermo_to_relay_right                     0.0019  0.0080  0.0134  0.000009   73.7308
+  xin_to_da                                 0.0000  0.0003  0.0587  0.000000   16.0401
+
+
+  Weight Entropy Probe (existing)
+  No snapshots accumulated.
+
+
+  ComponentRegistry: no scan data.
+
+════════════════════════════════════════════════════════════════════════
+  SIGNAL PATH STRUCTURAL AUDIT
+  (Non-bundle injections invisible to NoetherProbe / TOPRXin)
+════════════════════════════════════════════════════════════════════════
+
+  [1] MOTOR NEURON SATURATION (act > 0.95)
+    move_x          0.0%  [                    ]
+    move_x_m10000   31.4%  [██████              ]  ← WARNING
+    move_x_m30000    0.0%  [                    ]
+    move_y          0.0%  [                    ]
+    move_y_m10000    0.0%  [                    ]
+    move_z         28.1%  [█████               ]
+    move_z_m20000   28.2%  [█████               ]
+
+  [2] SIGNAL MAGNITUDE HIERARCHY AT MOTOR NEURONS
+    DEVIATION_MOTOR_GAIN  (dt-invariant: gain=1/dt=1000)
+      mean inject:        117.73  [V/step]
+      max inject:         145.25  [V/step]
+      active frac:        100.0%  (when deviation>0.1)
+    VitalOscillator (VdP tri-heart, amplitude~0.01)
+      mean |amp|:         0.0003  [V/step]
+    STDP bundles → Motor (w × pre_activation)
+      mean signal:        0.0042  [V/step]
+      max signal:         0.3401  [V/step]
+    EnergyStore fill
+      mean fill:          0.6886
+      min fill:           0.6774
+
+    ┌─ RATIO: DEVIATION ÷ STDP = 27733× ─────────────────────────────────
+    │  STDP contributes 0.004% of DEVIATION injection
+    │  STDP is DROWNED — learning has no influence on Motor behavior
+    └─────────────────────────────────────────────────────────────────────
+
+  [3] VESTIBULAR COLUMN CHANNEL ACTIVITY
+    oto_x       mean=0.000000  max=0.0000  [SILENT   ← NOT REACHING COLUMN LAYER]
+    oto_y       mean=0.000000  max=0.0000  [SILENT   ← NOT REACHING COLUMN LAYER]
+    oto_z       mean=0.000000  max=0.0000  [SILENT   ← NOT REACHING COLUMN LAYER]
+    pitch       mean=0.003933  max=1.0000  [minimal]
+    roll        mean=0.000000  max=0.0000  [SILENT   ← NOT REACHING COLUMN LAYER]
+    therm_back  mean=0.002833  max=1.0000  [minimal]
+    therm_front  mean=0.002733  max=1.0000  [minimal]
+    therm_left  mean=0.002367  max=1.0000  [minimal]
+    therm_right  mean=0.003800  max=1.0000  [minimal]
+    yaw         mean=0.000000  max=0.0000  [SILENT   ← NOT REACHING COLUMN LAYER]
+
+  [4] XIN TENSION SIGN QUALITY (signed, not |ξ|)
+    Bundle                                      mean       min    neg%  note
+    aff_irr_to_enc_oto_x                       0.001    -0.001   10.0%  
+    aff_irr_to_enc_oto_y                       0.001     0.000    0.0%  
+    aff_irr_to_enc_oto_z                       0.002     0.000    0.0%  
+    aff_irr_to_enc_pitch                       0.001     0.000    0.0%  
+    aff_irr_to_enc_roll                        0.001     0.000    0.0%  
+    aff_irr_to_enc_yaw                         0.001     0.000    0.0%  
+    aff_reg_to_enc_oto_x                      -0.000    -0.011   12.2%  
+    aff_reg_to_enc_oto_y                       0.000     0.000    0.0%  
+    aff_reg_to_enc_oto_z                       0.000     0.000    0.0%  
+    aff_reg_to_enc_pitch                       0.000     0.000    0.0%  
+    aff_reg_to_enc_roll                        0.000     0.000    0.0%  
+    aff_reg_to_enc_yaw                         0.000     0.000    0.0%  
+    col_pitch_to_move_y                       -2.124    -6.071  100.0%  ← INVERTED (actual >> predicted)
+    col_roll_to_move_z                        -4.104   -11.810  100.0%  ← INVERTED (actual >> predicted)
+    col_to_motor_cross                        -2.693    -7.456  100.0%  ← INVERTED (actual >> predicted)
+    col_yaw_to_move_x                         -2.927   -10.770  100.0%  ← INVERTED (actual >> predicted)
+    enc_to_col_oto_x                           0.001     0.000    0.0%  
+    enc_to_col_oto_y                           0.000     0.000    0.0%  
+    enc_to_col_oto_z                           0.000     0.000    0.0%  
+    enc_to_col_pitch                          -0.017    -0.059   65.0%  ← mixed sign
+    enc_to_col_roll                            0.000     0.000    0.0%  
+    enc_to_col_therm_back                      0.506     0.000    0.0%  
+    enc_to_col_therm_back_s10000               0.006    -0.012   67.5%  ← mixed sign
+    enc_to_col_therm_back_s20000               0.001    -0.008   67.0%  ← mixed sign
+    enc_to_col_therm_back_s30000               0.000     0.000    0.0%  
+    enc_to_col_therm_front                     0.674     0.000    0.0%  
+    enc_to_col_therm_front_s10000              0.020    -0.007   51.8%  ← mixed sign
+    enc_to_col_therm_front_s20000              0.009    -0.007   53.1%  ← mixed sign
+    enc_to_col_therm_front_s30000             -0.000    -0.000  100.0%  ← INVERTED (actual >> predicted)
+    enc_to_col_therm_left                      0.501     0.000    0.0%  
+    enc_to_col_therm_left_s10000               0.006    -0.010   67.5%  ← mixed sign
+    enc_to_col_therm_left_s20000               0.001    -0.008   66.5%  ← mixed sign
+    enc_to_col_therm_left_s30000              -0.000    -0.000  100.0%  ← INVERTED (actual >> predicted)
+    enc_to_col_therm_right                     0.984     0.000    0.0%  
+    enc_to_col_yaw                             0.000     0.000    0.0%  
+    hc_to_aff_oto_x                            2.020     0.000    0.0%  
+    hc_to_aff_oto_y                            0.592     0.000    0.0%  
+    hc_to_aff_oto_z                            3.664     0.000    0.0%  
+    hc_to_aff_pitch                            0.491     0.000    0.0%  
+    hc_to_aff_roll                             0.360     0.000    0.0%  
+    hc_to_aff_yaw                              0.415     0.000    0.0%  
+    lateral_back_to_left                     -31.337   -77.554   98.8%  ← INVERTED (actual >> predicted)
+    lateral_back_to_right                    -36.276   -92.778   98.8%  ← INVERTED (actual >> predicted)
+    lateral_front_to_left                    -30.704   -75.601   98.8%  ← INVERTED (actual >> predicted)
+    lateral_front_to_right                   -35.642   -90.826   98.8%  ← INVERTED (actual >> predicted)
+    lateral_left_to_back                     -31.411   -77.422   98.8%  ← INVERTED (actual >> predicted)
+    lateral_left_to_front                    -37.907   -97.414   98.8%  ← INVERTED (actual >> predicted)
+    lateral_right_to_back                    -30.930   -75.936   98.8%  ← INVERTED (actual >> predicted)
+    lateral_right_to_front                   -37.425   -95.928   98.8%  ← INVERTED (actual >> predicted)
+    met_to_hc_oto_x                           -2.731    -7.696  100.0%  ← INVERTED (actual >> predicted)
+    met_to_hc_oto_y                           -0.647    -0.939  100.0%  ← INVERTED (actual >> predicted)
+    met_to_hc_oto_z                           -4.240    -6.971  100.0%  ← INVERTED (actual >> predicted)
+    met_to_hc_pitch                           -0.583    -0.830  100.0%  ← INVERTED (actual >> predicted)
+    met_to_hc_roll                            -0.583    -0.830  100.0%  ← INVERTED (actual >> predicted)
+    met_to_hc_yaw                             -0.583    -0.830  100.0%  ← INVERTED (actual >> predicted)
+    noci_to_relay_back                       -34.692   -85.712   97.0%  ← INVERTED (actual >> predicted)
+    noci_to_relay_front                      -41.140  -105.653   96.9%  ← INVERTED (actual >> predicted)
+    noci_to_relay_left                       -34.629   -85.838   97.0%  ← INVERTED (actual >> predicted)
+    noci_to_relay_right                      -39.528  -101.018   96.9%  ← INVERTED (actual >> predicted)
+    shadow_to_da                              -4.105   -16.085   99.3%  ← INVERTED (actual >> predicted)
+    therm_therm_back_to_move_x                -1.862    -4.522  100.0%  ← INVERTED (actual >> predicted)
+    therm_therm_front_to_move_x               -1.862    -4.523  100.0%  ← INVERTED (actual >> predicted)
+    therm_therm_left_to_move_y                -2.134    -6.099  100.0%  ← INVERTED (actual >> predicted)
+    therm_therm_right_to_move_y               -2.126    -6.079  100.0%  ← INVERTED (actual >> predicted)
+    thermo_to_relay_back                     -28.055   -66.512   98.8%  ← INVERTED (actual >> predicted)
+    thermo_to_relay_front                    -31.657   -78.119   98.8%  ← INVERTED (actual >> predicted)
+    thermo_to_relay_left                     -27.570   -65.512   98.8%  ← INVERTED (actual >> predicted)
+    thermo_to_relay_right                    -30.296   -74.134   98.8%  ← INVERTED (actual >> predicted)
+    xin_to_da                                 -4.130   -16.146   99.3%  ← INVERTED (actual >> predicted)
+
+  [5] DA DIRECTION FACTOR STATISTICS (v·∇T gate)
+    mean factor:  0.5713
+    at zero:      40.3%  (DA fully blocked)
+    at one:       54.6%  (DA fully open)
+    mean v·∇T:    0.005238
+    receding frac:40.3%  (moving away, DA should gate=0)
+
+════════════════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════════════════════════
+  ANOMALY SUMMARY
+════════════════════════════════════════════════════════════════════════════════
+  [01] CRITICAL: DEVIATION_MOTOR_GAIN/27733× stronger than STDP — learning cannot influence Motor behavior
+  [02] STRUCTURAL: Vestibular axis 'yaw' mean activation = 0.000000 — 6-layer signal chain silent, Motor driven by bypass only
+  [03] STRUCTURAL: Vestibular axis 'roll' mean activation = 0.000000 — 6-layer signal chain silent, Motor driven by bypass only
+  [04] STRUCTURAL: Vestibular axis 'oto_x' mean activation = 0.000000 — 6-layer signal chain silent, Motor driven by bypass only
+  [05] STRUCTURAL: Vestibular axis 'oto_y' mean activation = 0.000000 — 6-layer signal chain silent, Motor driven by bypass only
+  [06] STRUCTURAL: Vestibular axis 'oto_z' mean activation = 0.000000 — 6-layer signal chain silent, Motor driven by bypass only
+  [07] SIGNAL QUALITY: Bundle 'met_to_hc_yaw' Xin tension -0.58 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [08] SIGNAL QUALITY: Bundle 'met_to_hc_pitch' Xin tension -0.58 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [09] SIGNAL QUALITY: Bundle 'met_to_hc_roll' Xin tension -0.58 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [10] SIGNAL QUALITY: Bundle 'met_to_hc_oto_x' Xin tension -2.73 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [11] SIGNAL QUALITY: Bundle 'met_to_hc_oto_y' Xin tension -0.65 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [12] SIGNAL QUALITY: Bundle 'met_to_hc_oto_z' Xin tension -4.24 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [13] SIGNAL QUALITY: Bundle 'col_yaw_to_move_x' Xin tension -2.93 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [14] SIGNAL QUALITY: Bundle 'col_pitch_to_move_y' Xin tension -2.12 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [15] SIGNAL QUALITY: Bundle 'col_roll_to_move_z' Xin tension -4.10 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [16] SIGNAL QUALITY: Bundle 'therm_therm_front_to_move_x' Xin tension -1.86 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [17] SIGNAL QUALITY: Bundle 'therm_therm_back_to_move_x' Xin tension -1.86 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [18] SIGNAL QUALITY: Bundle 'therm_therm_left_to_move_y' Xin tension -2.13 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [19] SIGNAL QUALITY: Bundle 'therm_therm_right_to_move_y' Xin tension -2.13 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [20] SIGNAL QUALITY: Bundle 'col_to_motor_cross' Xin tension -2.69 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [21] SIGNAL QUALITY: Bundle 'thermo_to_relay_front' Xin tension -31.66 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [22] SIGNAL QUALITY: Bundle 'thermo_to_relay_back' Xin tension -28.05 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [23] SIGNAL QUALITY: Bundle 'thermo_to_relay_left' Xin tension -27.57 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [24] SIGNAL QUALITY: Bundle 'thermo_to_relay_right' Xin tension -30.30 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [25] SIGNAL QUALITY: Bundle 'noci_to_relay_front' Xin tension -41.14 (97% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [26] SIGNAL QUALITY: Bundle 'noci_to_relay_back' Xin tension -34.69 (97% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [27] SIGNAL QUALITY: Bundle 'noci_to_relay_left' Xin tension -34.63 (97% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [28] SIGNAL QUALITY: Bundle 'noci_to_relay_right' Xin tension -39.53 (97% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [29] SIGNAL QUALITY: Bundle 'lateral_front_to_left' Xin tension -30.70 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [30] SIGNAL QUALITY: Bundle 'lateral_left_to_front' Xin tension -37.91 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [31] SIGNAL QUALITY: Bundle 'lateral_front_to_right' Xin tension -35.64 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [32] SIGNAL QUALITY: Bundle 'lateral_right_to_front' Xin tension -37.43 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [33] SIGNAL QUALITY: Bundle 'lateral_back_to_left' Xin tension -31.34 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [34] SIGNAL QUALITY: Bundle 'lateral_left_to_back' Xin tension -31.41 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [35] SIGNAL QUALITY: Bundle 'lateral_back_to_right' Xin tension -36.28 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [36] SIGNAL QUALITY: Bundle 'lateral_right_to_back' Xin tension -30.93 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [37] SIGNAL QUALITY: Bundle 'shadow_to_da' Xin tension -4.11 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [38] SIGNAL QUALITY: Bundle 'xin_to_da' Xin tension -4.13 (99% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [39] SIGNAL QUALITY: Bundle 'enc_to_col_therm_front_s30000' Xin tension -0.00 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [40] SIGNAL QUALITY: Bundle 'enc_to_col_therm_left_s30000' Xin tension -0.00 (100% negative) — actual >> predicted, TOPRXin uses |ξ| so this sign inversion is INVISIBLE to ledger
+  [41] PHYSICS: 290 Noether violations detected: {'kcl_charge': 290}
+════════════════════════════════════════════════════════════════════════════════
+
+  LEDGER COVERAGE ANALYSIS
+  ────────────────────────────────────────────────────────────────────
+  What the EXISTING ledger CAN detect:
+    ✓ Noether conservation violations (energy, KCL, Xin bookkeeping, Landauer)
+    ✓ Weight entropy (Shannon bits of weight distribution)
+    ✓ T/O/P/R/Xin per bundle (|ξ|, transport_cost, weight change rate)
+    ✓ Per-layer energy/heat/activity (EntropyLedger)
+    ✓ Component TYPE tags and census visibility
+
+  What the EXISTING ledger CANNOT detect (blind spots):
+    ✗ DEVIATION_MOTOR_GAIN injection (bypasses all bundles)
+    ✗ VitalOscillator injection (bypasses all bundles)
+    ✗ Spinal reflex / noci injection (bypasses all bundles)
+    ✗ DA direct membrane injection (bypasses all bundles)
+    ✗ Column lateral inhibition direct injection
+    ✗ Motor saturation statistics (not a physics violation)
+    ✗ Vestibular silence (not a physics violation)
+    ✗ Xin tension SIGN (TOPRXin uses |ξ|, sign inversion invisible)
+    ✗ DA direction factor (entirely outside bundle framework)
+    ✗ fill=0 triggering injection-dominated behavior
+
+  Root cause of 'ledger not working': the 24 non-bundle injection points
+  operate outside the T/O/P/R/Xin framework, making their effects
+  structurally invisible. The ledger reports 'no violations' while
+  Motor neurons are 100% injection-saturated.
+════════════════════════════════════════════════════════════════════════════════

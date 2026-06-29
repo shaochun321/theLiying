@@ -1,0 +1,281 @@
+================================================================================
+  STRUCTURAL SIGNAL PATH AUDIT — VariantCircuit + Thermal World
+  30,000 steps, DT=0.001, snapshot every 5,000
+================================================================================
+
+  AUDIT-NOTE (2026-06-28): Surfaces ledger data that runs internally
+  but never prints during normal simulation. Also adds SignalPathAudit
+  for non-bundle injection points invisible to standard ledger.
+
+  Circuit: 73 neurons, 58 bundles
+  Front bundle: therm_therm_front_to_move_x
+  Brake bundle: therm_therm_back_to_move_x
+
+    step | d_surf |  yaw° |  fill |  w_frt |  w_brk | ratio | DA_dir |   dev | mot_x
+  --------------------------------------------------------------------------------
+   5,000 |   9.29 |   0.6 | 0.520 | 0.1077 | 0.0972 | 1.107 |  1.000 | 0.175 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 5,000 ─────────────────────────────────
+  TOPRXin  T=0.0263  O=4.4842  P=35.5178  R=0.004614  Xin=137.9186  n_bundles=60
+  Noether  violations=41  energy_balance_avg=0.000186
+  Entropy  spikes=2  efficiency=0.2422
+  Layers   L4_Enc=0.0307  L5_Col=0.0001  L6_Mot=0.2969
+           L1_MET      : act=0.2790  E=0.5809
+           L2_HC       : act=0.4679  E=1.0000
+           L3_Aff      : act=0.0063  E=0.7802
+           DA          : act=0.0042  E=1.0000
+           Soma_Therm  : act=0.2804  E=1.0000
+  10,000 |   8.77 |   2.0 | 0.524 | 0.1035 | 0.0938 | 1.103 |  1.000 | 0.140 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 10,000 ─────────────────────────────────
+  TOPRXin  T=0.0262  O=2.3289  P=34.2819  R=0.005511  Xin=350.5029  n_bundles=63
+  Noether  violations=91  energy_balance_avg=0.000317
+  Entropy  spikes=3  efficiency=0.1682
+  Layers   L4_Enc=0.0570  L5_Col=0.0007  L6_Mot=0.2209
+           L1_MET      : act=0.1823  E=0.5533
+           L2_HC       : act=0.4529  E=1.0000
+           L3_Aff      : act=0.0080  E=0.6956
+           DA          : act=0.0093  E=1.0000
+           Soma_Therm  : act=0.9324  E=1.0000
+  15,000 |   8.17 |   3.6 | 0.523 | 0.0990 | 0.0901 | 1.099 |  1.000 | 0.103 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 15,000 ─────────────────────────────────
+  TOPRXin  T=0.0227  O=1.6380  P=31.3790  R=0.005802  Xin=554.7441  n_bundles=63
+  Noether  violations=141  energy_balance_avg=0.000433
+  Entropy  spikes=3  efficiency=0.1121
+  Layers   L4_Enc=0.0657  L5_Col=0.0009  L6_Mot=0.1770
+           L1_MET      : act=0.1333  E=0.5391
+           L2_HC       : act=0.4049  E=1.0000
+           L3_Aff      : act=0.0088  E=0.6398
+           DA          : act=0.0602  E=1.0000
+           Soma_Therm  : act=1.4394  E=1.0000
+  20,000 |   7.99 |   5.3 | 0.517 | 0.0937 | 0.0857 | 1.094 |  1.000 | 0.077 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 20,000 ─────────────────────────────────
+  TOPRXin  T=0.0171  O=1.0895  P=33.3204  R=0.005355  Xin=788.6849  n_bundles=66
+  Noether  violations=191  energy_balance_avg=0.000569
+  Entropy  spikes=3  efficiency=0.0841
+  Layers   L4_Enc=0.0763  L5_Col=0.0013  L6_Mot=0.1329
+           L1_MET      : act=0.1017  E=0.5299
+           L2_HC       : act=0.3510  E=1.0000
+           L3_Aff      : act=0.0078  E=0.6431
+           DA          : act=0.1675  E=1.0000
+           Soma_Therm  : act=1.8152  E=1.0000
+  25,000 |   7.94 |   7.0 | 0.507 | 0.0888 | 0.0815 | 1.089 |  1.000 | 0.052 | 0.000
+
+  ─── LEDGER SNAPSHOT @ step 25,000 ─────────────────────────────────
+  TOPRXin  T=0.0161  O=0.8081  P=32.2166  R=0.004918  Xin=1057.6716  n_bundles=66
+  Noether  violations=241  energy_balance_avg=0.000709
+  Entropy  spikes=4  efficiency=0.0798
+  Layers   L4_Enc=0.0864  L5_Col=0.0016  L6_Mot=0.1068
+           L1_MET      : act=0.0833  E=0.5245
+           L2_HC       : act=0.3052  E=1.0000
+           L3_Aff      : act=0.0062  E=0.6860
+           DA          : act=0.2490  E=1.0000
+           Soma_Therm  : act=2.0911  E=1.0000
+
+
+================================================================================
+  END OF SIMULATION — FULL LEDGER REPORTS
+================================================================================
+
+============================================================
+  Noether Conservation Verification (T4)
+============================================================
+  Checks: 299  Violations: 290
+  Status: FAIL
+
+  [1] Energy Conservation (time symmetry):
+      Balance error avg: 0.000838
+      Balance error max: 0.001578
+      Q dissipated: 39461.9335
+
+  [2] Weight Stability (gauge invariance):
+      Avg drift/step: 0.00377797
+      Total |ΔW|: 1.125834
+
+  [3] Landauer Bound (info-entropy):
+      Bits erased: 0.22638939910559008
+      Q/bit: 174309.988181
+      Landauer OK: True
+
+  Violation breakdown:
+      kcl_charge: 290
+
+  [5] Structural Entropy (topology):
+      H_struct: 4.8907
+      H_flow:   4.2623
+      Ω (scale): 43164
+
+  [6] P_ν × H_flow (数理基因候选):
+      avg: 2.7592  std: 0.5549
+      CV:  0.2011  variable
+============================================================
+======================================================================
+熵 账 本 (Entropy Ledger)
+======================================================================
+  模拟时间: 0.0s (30 steps)
+  总 spike: 4
+  总热耗散: 0.0862
+  平均 spike 率: 133.3 spk/s
+  熵产生率 dS/dt: 2.874752
+  能效 (spk/heat): 0.0665
+
+  Layer            Avg E  Avg Heat   Avg Act   E trend
+  DA              1.0000  0.042247    0.3013   +0.0000
+  L1_MET          0.5206  0.020705    0.0697   -0.0660
+  L2_HC           1.0000  0.002436    0.2662   +0.0000
+  L3_Aff          0.7373  0.018190    0.0053   +0.0000
+  L4_Enc          0.9583  0.004329    0.0954   -0.0300
+  L5_Col          0.9997  0.002011    0.0018   -0.0002
+  L6_Mot          0.7506  0.005865    0.0892   -0.7991
+  S_Col           0.1724  0.010677    0.0028   -0.9886
+  S_Enc           0.9890  0.031055    1.0095   -0.0000
+  S_Mot           0.9765  0.354750    2.3724   +0.0000
+  Soma_Noci       0.1355  0.052641    0.0244   -0.9500
+  Soma_Relay      0.9689  0.042579    2.9334   +0.9238
+  Soma_Therm      1.0000  0.019339    2.2968   +0.0000
+
+  ISI Entropy (bits):
+
+  Layer Transfer (correlation):
+    L1_MET → L2_HC:  0.740  ██████████████
+    L2_HC → L3_Aff:  0.753  ███████████████
+    L3_Aff → L4_Enc: -0.486  
+    L4_Enc → L5_Col:  0.835  ████████████████
+    L5_Col → L6_Mot: -0.836  
+    S_Enc → S_Col:  0.684  █████████████
+    S_Col → S_Mot:  0.273  █████
+    DA → L6_Mot: -0.848  
+
+
+  TOPRXin — Per-Bundle Phase Intensities (last snapshot)
+  Bundle                                         T       O       P         R       Xin
+  aff_irr_to_enc_oto_x                      0.0000  0.0000  0.9979  0.000000    0.0021
+  aff_irr_to_enc_oto_y                      0.0000  0.0000  0.9844  0.000000    0.0158
+  aff_irr_to_enc_oto_z                      0.0000  0.0000  0.9769  0.000000    0.0237
+  aff_irr_to_enc_pitch                      0.0000  0.0000  0.9985  0.000000    0.0015
+  aff_irr_to_enc_roll                       0.0000  0.0000  0.9986  0.000000    0.0014
+  aff_irr_to_enc_yaw                        0.0000  0.0000  0.9982  0.000000    0.0018
+  aff_reg_to_enc_oto_x                      0.0000  0.0000  0.9794  0.000000    0.0210
+  aff_reg_to_enc_oto_y                      0.0000  0.0000  0.9127  0.000000    0.0956
+  aff_reg_to_enc_oto_z                      0.0000  0.0000  0.8992  0.000000    0.1121
+  aff_reg_to_enc_pitch                      0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_roll                       0.0000  0.0000  1.0000  0.000000    0.0000
+  aff_reg_to_enc_yaw                        0.0000  0.0000  1.0000  0.000000    0.0000
+  col_pitch_to_move_y                       0.0000  0.0000  0.2997  0.000064    2.3364
+  col_roll_to_move_z                        0.0000  0.0005  0.1971  0.000113    4.0737
+  col_to_motor_cross                        0.0000  0.0021  0.2547  0.000000    2.9256
+  col_yaw_to_move_x                         0.0000  0.0034  0.2962  0.000101    2.3764
+  enc_to_col_oto_x                          0.0000  0.0000  0.9984  0.000000    0.0016
+  enc_to_col_oto_y                          0.0000  0.0025  0.9441  0.000000    0.0592
+  enc_to_col_oto_z                          0.0000  0.0000  0.9957  0.000000    0.0043
+  enc_to_col_pitch                          0.0000  0.0000  1.0000  0.000000    0.0000
+  enc_to_col_roll                           0.0000  0.0000  1.0000  0.000000    0.0000
+  enc_to_col_therm_back                     0.0005  0.0046  0.3440  0.000094    1.9072
+  enc_to_col_therm_back_s10000              0.0004  0.0025  0.8839  0.000109    0.1313
+  enc_to_col_therm_back_s20000              0.0004  0.0046  0.9573  0.000115    0.0446
+  enc_to_col_therm_front                    0.0005  0.0050  0.3199  0.000115    2.1259
+  enc_to_col_therm_front_s10000             0.0004  0.0050  0.8891  0.000142    0.1247
+  enc_to_col_therm_front_s20000             0.0004  0.0050  0.9574  0.000143    0.0445
+  enc_to_col_therm_left                     0.0002  0.0020  0.5239  0.000084    0.9087
+  enc_to_col_therm_left_s10000              0.0002  0.0020  0.9856  0.000097    0.0147
+  enc_to_col_therm_left_s20000              0.0002  0.0025  0.9997  0.000097    0.0003
+  enc_to_col_therm_right                    0.0003  0.0070  0.2918  0.000159    2.4275
+  enc_to_col_yaw                            0.0000  0.0025  0.9729  0.000000    0.0279
+  hc_to_aff_oto_x                           0.0000  0.0000  0.1047  0.000000    8.5481
+  hc_to_aff_oto_y                           0.0000  0.0000  0.0626  0.000000   14.9647
+  hc_to_aff_oto_z                           0.0000  0.0000  0.0822  0.000000   11.1692
+  hc_to_aff_pitch                           0.0000  0.0000  0.6242  0.000000    0.6021
+  hc_to_aff_roll                            0.0000  0.0000  0.5766  0.000000    0.7343
+  hc_to_aff_yaw                             0.0000  0.0000  0.6145  0.000000    0.6275
+  lateral_back_to_left                      0.0006  0.0063  0.0163  0.000000   60.3670
+  lateral_back_to_right                     0.0006  0.0052  0.0140  0.000000   70.3901
+  lateral_front_to_left                     0.0006  0.0063  0.0164  0.000000   60.1000
+  lateral_front_to_right                    0.0006  0.0052  0.0141  0.000000   70.1231
+  lateral_left_to_back                      0.0003  0.0155  0.0115  0.000000   86.1403
+  lateral_left_to_front                     0.0003  0.0147  0.0111  0.000000   88.9468
+  lateral_right_to_back                     0.0003  0.0155  0.0116  0.000000   85.1605
+  lateral_right_to_front                    0.0003  0.0147  0.0112  0.000000   87.9670
+  met_to_hc_oto_x                           0.0000  0.1679  0.0797  0.000632   11.5532
+  met_to_hc_oto_y                           0.0000  0.0448  0.0603  0.000573   15.5781
+  met_to_hc_oto_z                           0.0000  0.0700  0.0801  0.000575   11.4894
+  met_to_hc_pitch                           0.0000  0.0122  0.5469  0.000000    0.8285
+  met_to_hc_roll                            0.0000  0.0122  0.5469  0.000001    0.8285
+  met_to_hc_yaw                             0.0000  0.0122  0.5469  0.000000    0.8285
+  noci_to_relay_back                        0.0000  0.0155  0.0107  0.000167   92.8296
+  noci_to_relay_front                       0.0000  0.0147  0.0104  0.000231   95.5867
+  noci_to_relay_left                        0.0000  0.0063  0.0142  0.000188   69.3409
+  noci_to_relay_right                       0.0000  0.0052  0.0125  0.000256   79.3111
+  shadow_to_da                              0.0025  0.0004  0.0553  0.000060   17.0772
+  therm_therm_back_to_move_x                0.0000  0.0000  0.3001  0.000069    2.3321
+  therm_therm_front_to_move_x               0.0000  0.0000  0.3002  0.000081    2.3312
+  therm_therm_left_to_move_y                0.0000  0.0024  0.2953  0.000067    2.3862
+  therm_therm_right_to_move_y               0.0001  0.0000  0.3002  0.000042    2.3306
+  thermo_to_relay_back                      0.0016  0.0155  0.0141  0.000019   70.1014
+  thermo_to_relay_front                     0.0015  0.0147  0.0135  0.000017   72.8463
+  thermo_to_relay_left                      0.0013  0.0063  0.0184  0.000009   53.3321
+  thermo_to_relay_right                     0.0014  0.0052  0.0164  0.000006   60.0144
+  xin_to_da                                 0.0000  0.0004  0.0551  0.000000   17.1394
+
+
+  Weight Entropy Probe (existing)
+  No snapshots accumulated.
+
+
+  ComponentRegistry: no scan data.
+
+════════════════════════════════════════════════════════════════════════
+  SIGNAL PATH STRUCTURAL AUDIT
+  (Non-bundle injections invisible to NoetherProbe / TOPRXin)
+════════════════════════════════════════════════════════════════════════
+
+  [1] MOTOR NEURON SATURATION (act > 0.95)
+    move_x          0.1%  [                    ]
+    move_x_m10000    0.0%  [                    ]
+    move_x_m30000    0.0%  [                    ]
+    move_y          0.0%  [                    ]
+    move_y_m10000    0.1%  [                    ]
+    move_y_m10000_m30000    0.0%  [                    ]
+    move_z          0.1%  [                    ]
+    move_z_m20000    0.0%  [                    ]
+
+  [2] SIGNAL MAGNITUDE HIERARCHY AT MOTOR NEURONS
+  NOTE: DEVIATION_MOTOR_GAIN = 1.0 in code (not 1/dt).
+  NOTE: STDP signals pass through neuron.step() (inertia=0.5 for Motor)
+  NOTE: → STDP effective current = 2× (w × pre_act) before membrane inject
+    DEVIATION_MOTOR_GAIN  (DEVIATION_MOTOR_GAIN=1.0 in code)
+      motor_drive = (deviation-0.1) × 1.0, injected to ALL Motor membranes
+      mean drive:         0.0000  [A, passed to inject(drive, dt)]
+      max drive:          0.0000
+      active frac:          0.0%  (when deviation>0.1)
+    Circulation Proportion: rho_homeo (thermal / total amplitude)
+      mean rho_h:         0.7407  (set point = 0.70)
+      mean offset:       -0.0407  (mean_deviation = |0.7 - rho_h|)
+      V_ss(DEVIATION)= 0.0000 V  (R_leak=5.0, v_peak=0.2)
+      → V_ss < v_peak — DEVIATION insufficient alone
+    VitalOscillator (VdP tri-heart, amplitude~0.01)
+      mean |amp|:         0.0005  [pre-neuron current]
+    STDP bundles → Motor (w × pre_act, BEFORE inertia=0.5 scaling)
+      mean signal:        0.0037  [w×pre_act per top bundle]
+      max signal:         0.4256
+      eff current:        0.0075  [after inertia=0.5: ×2]
+    EnergyStore fill
+      mean fill:          0.5033
+      min fill:           0.4995
+
+    ┌─ RATIO: DEVIATION ÷ STDP (pre-inertia) = 0.0× ───────────────────
+    │  (post-inertia: DEVIATION bypasses, STDP÷0.5=2× → ratio = 0.0×)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "J:\cell-cc\cell-cc-other\nexus_v1\tests\run_structural_audit.py", line 438, in <module>
+    run()
+    ~~~^^
+  File "J:\cell-cc\cell-cc-other\nexus_v1\tests\run_structural_audit.py", line 312, in run
+    spa.print_report(DT)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "J:\cell-cc\cell-cc-other\nexus_v1\ledger\signal_path_audit.py", line 246, in print_report
+    print(f"    │  STDP contributes {100/ratio_eff:.1f}% of effective DEVIATION injection at membrane")
+                                     ~~~^~~~~~~~~~
+ZeroDivisionError: division by zero
