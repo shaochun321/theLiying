@@ -70,7 +70,7 @@ except ImportError:
 # "V1_ONLY"          – current default, v2 not instantiated
 # "V2_PARALLEL_LOG"  – Phase 1: v2 runs in parallel, logs state, no motor contribution
 # "V2_ACTIVE_DRIVE"  – Phase 2: pass VestibularChainV2 to HebbianCircuit at init time
-VESTIBULAR_MODE: str = "V1_ONLY"
+VESTIBULAR_MODE: str = "V2_ACTIVE_DRIVE"
 
 
 # ── A3: Thermal delay buffer for finite heat propagation ──
