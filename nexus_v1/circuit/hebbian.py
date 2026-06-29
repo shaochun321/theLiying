@@ -140,6 +140,21 @@ def _column_config(name: str) -> NeuronConfig:
     )
 
 
+def _thermal_column_config(name: str) -> NeuronConfig:
+    """TYPE:SEMI — Thermal column: lower threshold for sparse thermal drive.
+
+    BIO: Thermoregulatory column neurons have lower activation threshold
+    than vestibular columns because thermal drive is typically weaker
+    (ThermalMembrane dT/dt signal is small relative to vestibular input).
+    Phase 5: v_peak lowered 0.25→0.20 to match thermal signal amplitude.
+    All other parameters identical to _column_config.
+    """
+    cfg = _column_config(name)
+    cfg.neuron_id = f"col_{name}"
+    cfg.v_peak = 0.20    # Phase 5: lower threshold for thermal drive
+    return cfg
+
+
 def _motor_config(name: str) -> NeuronConfig:
     """TYPE:SEMI — Motor layer: spiking output for motor commands.
 
@@ -288,7 +303,9 @@ class HebbianCircuit:
         # ── Column layer: 1 neuron per axis ──
         self.column_neurons: Dict[str, Neuron] = {}
         for axis in self.all_axes:
-            self.column_neurons[axis] = Neuron(_column_config(axis))
+            # Thermal axis uses lower v_peak (Phase 5: thermal drive is weaker)
+            cfg_fn = _thermal_column_config if axis == 'therm' else _column_config
+            self.column_neurons[axis] = Neuron(cfg_fn(axis))
 
         # ── Motor layer: 3 neurons (x, y, z) ──
         self.motor_neurons: Dict[str, Neuron] = {}
@@ -388,7 +405,11 @@ class HebbianCircuit:
                     # gain=1 → I=0.07 → Col Vm=0.03 (starved).
                     # gain=3 → I=0.21 → Col Vm≈1.0, act≈0.8 (healthy).
                     # Previous gain=5 + old high Enc caused saturation.
-                    synapse_gain=3.0,
+                    # Phase 5: therm axis uses 4.5 (thermal drive is weaker
+                    # than vestibular, needs higher amplification to reach
+                    # col_therm v_peak=0.20). BIO: compensates for smaller
+                    # thermal input amplitude vs otolith/canal signals.
+                    synapse_gain=4.5 if axis == 'therm' else 3.0,
                     bundle_role="feedforward",  # C-001.3: encoding pathway
                     # Temporal coupler: bridges fast Enc spikes (τ=0.5) to
                     # slow Col membrane (τ=0.25) across dt=1.0.

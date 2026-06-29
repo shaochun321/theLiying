@@ -57,7 +57,7 @@ There is no build step and no linter configured. `dt=0.001` (1 ms) is the simula
 ```
 MET(L1) → HC(L2) → Aff_reg/Aff_irr(L3) → Encoding(L4) → Column(L5) → Motor(L6) → Muscle → Body → World → back
 ```
-Axes: `yaw, pitch, roll` (canals) + `oto_x, oto_y, oto_z` (otoliths) + `therm`. Built in `vestibular/chain.py`; thermal sensing is currently the abstract single `therm` axis via `ThermalMembrane` (note: `SomatosensoryChain` in `somatosensory/chain.py` exists as a class but is **not instantiated** in `VariantCircuit` — there is no `circuit.somatosensory` attribute).
+Axes: `yaw, pitch, roll` (canals) + `oto_x, oto_y, oto_z` (otoliths) + `therm`. Built in `vestibular/chain.py`; thermal sensing uses two parallel pathways: (1) `ThermalMembrane` scalar sensor → `mechanical_inputs['therm']` → enc/col_therm → motor (temporal/klinokinesis pathway), and (2) `SomatosensoryChain` (`somatosensory/chain.py`) — 4 directional skin patches (front/back/left/right) with nociceptors and relay neurons. **Both are instantiated**: `self.somatosensory = SomatosensoryChain()` at `variant_adapter.py:320`, `circuit.somatosensory` IS a valid attribute, relays connect to DA via `bundles_soma_to_da`. `get_all_neurons()` and `get_all_bundles()` include SomatosensoryChain components for observability.
 
 **Class layering (inheritance, not modification):**
 - `HebbianCircuit` (`circuit/hebbian.py`) — base: layers, bundles, structural growth (sprout/prune/mitosis).
