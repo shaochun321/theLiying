@@ -124,11 +124,15 @@ class VariantCircuit(HebbianCircuit):
     3. No risk of corrupting the mother codebase
     """
 
-    def __init__(self):
+    def __init__(self, vestibular_mode: Optional[str] = None):
+        # Resolve mode: per-instance override > module constant.
+        # Tests pass vestibular_mode="V2_PARALLEL_LOG" directly without editing the constant.
+        _mode = vestibular_mode if vestibular_mode is not None else VESTIBULAR_MODE
+
         # ── Mother initialization with thermal extra axis ──
         # Phase 2 (V2_ACTIVE_DRIVE): pass VestibularChainV2 as the primary chain.
         # HebbianCircuit.bundles are then wired to v2 neurons — cannot be hot-swapped.
-        if VESTIBULAR_MODE == "V2_ACTIVE_DRIVE":
+        if _mode == "V2_ACTIVE_DRIVE":
             super().__init__(vestibular=VestibularChainV2(), extra_axes=["therm"])
         else:
             super().__init__(extra_axes=["therm"])
@@ -329,7 +333,7 @@ class VariantCircuit(HebbianCircuit):
         self._v2_p_avail: list = [1.0]  # mutable slot updated each step from energy_store.fill
         self._vestibular_v2: Optional[VestibularChainV2] = None
         self._v2_last_state: dict = {}
-        if VESTIBULAR_MODE == "V2_PARALLEL_LOG":
+        if _mode == "V2_PARALLEL_LOG":
             self._vestibular_v2 = VestibularChainV2(p_avail_ref=self._v2_p_avail)
 
         # ── Variant: CirculationProportionCircuit (C3' structural carrier) ──
@@ -821,7 +825,7 @@ class VariantCircuit(HebbianCircuit):
 
         # ── 1b. VestibularChainV2 parallel observer (Phase 1 only) ──
         if self._vestibular_v2 is not None:
-            self._v2_p_avail[0] = self.energy_store.fill  # 1-step lag P_avail
+            self._v2_p_avail[0] = self.energy_store.fill_fraction  # 1-step lag P_avail
             self._vestibular_v2.step(mechanical_inputs, dt)
             self._v2_last_state = {
                 'last_gain': self._vestibular_v2.last_gain,
