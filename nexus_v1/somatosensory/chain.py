@@ -62,11 +62,17 @@ def _thermoreceptor_config(patch_id: str) -> NeuronConfig:
     """Thermoreceptor: DC/tonic temperature sensor.
 
     RC time constant calibrated for dt=0.001 (1ms per step):
-      τ_th = C × R = 1.0 × 5.0 = 5.0 time-units = 5000 steps = 5s biological
-      V_ss = I × R = T_skin × 5.0.  For T_skin=0.2: V_ss=1.0.
-      Reaches 63% in ~5000 steps (5s), 95% in ~15000 steps (15s).
+      τ_th = C × R = 1.0 × 1.0 = 1.0 time-units = 1000 steps = 1s biological
+      V_ss = I × R = T_skin × 1.0.  For T_skin=1.0: V_ss=1.0 (in [0,1]).
+      Reaches 63% in ~1000 steps (1s), 95% in ~3000 steps (3s).
     BIO: TRPV3/TRPM8 channels — thermal integration τ ≈ 1-10s for tonic response.
     Previous τ=100 was 20× too slow (never reached steady state in typical runs).
+
+    FIX-P1 (2026-06-29): r_leak 5.0→1.0.
+      Old calibration assumed T_skin≤0.2 (V_ss=0.2×5=1.0). In CylindricalHeatSource
+      experiment T_skin reaches ~0.55 near heat source → V_ss=2.75, exceeds [0,1].
+      New r_leak=1.0: V_ss=T_skin×1.0 ≤ 1.0 for any T_skin≤1.0.
+      NORM: τ drops from 5s→1s, still within TRPV3 adaptation range (1-10s).
 
     Uses single-channel mode (activation = MOSFET(V_m)) with low threshold
     because skin temperatures are small (0.1-0.3 normalized). Default
@@ -76,7 +82,7 @@ def _thermoreceptor_config(patch_id: str) -> NeuronConfig:
     return NeuronConfig(
         neuron_id=f"thermo_{patch_id}",
         capacitance=1.0,        # reduced from 5.0 → 5× faster equilibration
-        r_leak=5.0,             # reduced from 20.0 → τ=5.0, V_ss=T_skin×5.0
+        r_leak=1.0,             # FIX-P1: 5.0→1.0, V_ss=T_skin×1.0 ≤ 1.0 (was 5.0 → overflow)
         inertia=1.0,
         vdd=1.0,
         r_supply=0.05,

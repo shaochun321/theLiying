@@ -163,6 +163,11 @@ def _afferent_regular_config(axis: str) -> NeuronConfig:
     FIX-017: Added tonic discharge (bc_current=0.05) per Goldberg 2000.
       Real vestibular afferents fire at 50-100 Hz even at rest.
       VR rate increased 0.001→0.05 to prevent energy depletion.
+    NOTE (2026-06-29): P2 structural audit found Aff at ~2 Hz in World sim.
+      Root cause: v_peak=0.23 calibrated for weak HC inputs in World physics.
+      All single-neuron fixes (v_peak, fatigue_k) break T5.1: increasing baseline
+      Aff rate causes Xin to fire on both half-cycles → second harmonic at 1 Hz.
+      Fix requires Aff→Enc synapse recalibration (hebbian.py) for 2 Hz operation.
     """
     return NeuronConfig(
         neuron_id=f"aff_reg_{axis}",
