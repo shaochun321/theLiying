@@ -320,17 +320,16 @@ class HebbianCircuit:
                     bundle_id=f"aff_reg_to_enc_{axis}",
                     learning_rule="stdp",
                     # P0 Class 1 Driver Synapse (Sherman & Guillery 1998):
-                    # Thalamo-cortical projection sacrifices fine plasticity for
-                    # absolute lossless cortical penetration. Calibrated so that
-                    # at Aff firing rate ~12.5 Hz, mean synaptic current
-                    # I_syn × R_leak > V_th_enc (cortical breakthrough condition).
-                    # I_mean = f_aff × W × g_syn × Δt_spike ≈ 12.5×2.5×2.0×0.001=0.0625
-                    # V_ss = I_mean × R_leak ≈ 0.0625 × 5 = 0.31 > V_th=0.3 ✓
+                    # Thalamo-cortical projection calibrated for World physics:
+                    # Aff fires at ~2 Hz (not design-doc 12.5 Hz) in VariantCircuit.
+                    # FIX-P2: synapse_gain 2.0→16.0 to close calibration gap.
+                    # I_mean = f_aff × W × g_syn × Δt_spike ≈ 2×2.5×16×0.001=0.08
+                    # V_ss = I_mean × R_leak ≈ 0.08 × 5 = 0.40 > V_th=0.30 ✓ (22% margin)
                     # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
                     initial_weight=2.5,
                     weight_max=5.0,
                     stdp_lr=0.005,
-                    synapse_gain=2.0,
+                    synapse_gain=16.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: prevents Enc 100% saturation.
                     # Enc v_peak=0.35, adapt_vth=0.2 (target ~20% duty).
@@ -353,12 +352,13 @@ class HebbianCircuit:
                 config=BundleConfig(
                     bundle_id=f"aff_irr_to_enc_{axis}",
                     learning_rule="stdp",
-                    # P0 Class 1 Driver — same calibration as reg pathway.
+                    # P0 Class 1 Driver — same FIX-P2 calibration as reg pathway.
+                    # synapse_gain 2.0→16.0 to match 2 Hz World physics (see reg above).
                     # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
                     initial_weight=2.5,
                     weight_max=5.0,
                     stdp_lr=0.005,
-                    synapse_gain=2.0,
+                    synapse_gain=16.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: same as reg pathway.
                     coupler_capacitance=1.0,
