@@ -70,6 +70,15 @@ Axes: `yaw, pitch, roll` (canals) + `oto_x, oto_y, oto_z` (otoliths) + `therm`. 
 
 **T/O/P/R/Xin loop** is the core information-processing concept: `Xin = |ξ|`, the accumulated `|predicted − actual|` prediction residual on each bundle — the only force that drives physical structural growth (sprout/fruit/mitosis).
 
+**VestibularChain signal path (critical — proposals often get this wrong):** `VestibularChain.step()` returns `None`. Neurons fire inside the chain; signals propagate via `SynapticBundle.propagate()` in `HebbianCircuit.step()` through the full Enc→Col→Motor cascade — there is no direct "motor output" from the vestibular chain. Tests access motor activity by reading `Motor` neuron states after `circuit.step()`.
+
+**VestibularChainV2** (`vestibular/chain_v2.py`, TYPE:HYBRID): extends `VestibularChain` with FIFO axonal delays (MET→HC=2 steps, HC→Aff=2 steps) and soft saturation `I/(1+I×r_supply)`. 12 FIFOs total (2 per axis × 6 axes). Key methods: `spike_cost()` (Aff energy cost), `fifo_signal_rms()` (diagnostic; replaces fill_rate which is always 1.0), `last_gain` (G_eff after each step). `VestibularNetworkLayer` provides 36-address topology, `l_total()` distance, and `gain_coeff()` returning G_eff=14.7 at full energy for Aff→Enc.
+
+**Phase 1/2 integration** (`VESTIBULAR_MODE` constant in `circuit/variant_adapter.py`):
+- `"V1_ONLY"` (default): only v1 chain, `self._vestibular_v2 = None`
+- `"V2_PARALLEL_LOG"`: Phase 1 — `VestibularChainV2` runs as `self._vestibular_v2` in shadow, no motor contribution; `self._v2_last_state` records `last_gain/spike_cost/fifo_rms` each step
+- `"V2_ACTIVE_DRIVE"`: Phase 2 — `VestibularChainV2()` passed to `HebbianCircuit.__init__(vestibular=...)` at startup; this is an init-time decision, **not a runtime hot-swap** (bundles wire to neurons at construction, cannot change sources after init)
+
 ## Working norms (from RULES.md — the project charter)
 
 `nexus_v1/RULES.md` defines 11 enforced principles. The ones that change how you should work:

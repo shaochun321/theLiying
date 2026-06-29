@@ -56,13 +56,27 @@ class VestibularChainV2(VestibularChain):
         self.fifo_met_to_hc:  Dict[str, FIFODelayBuffer] = {}
         self.fifo_hc_to_aff:  Dict[str, FIFODelayBuffer] = {}
 
+        # _cached_gain_addrs: for fast last_gain computation in step()
+        self._gain_addrs: list = []
+
         for axis in self.axes:
             addr_met = self.network.register(f"met_{axis}")
             addr_hc  = self.network.register(f"hc_{axis}")
             addr_aff = self.network.register(f"aff_reg_{axis}")
+            addr_enc = self.network.register(f"enc_{axis}")
 
             self.fifo_met_to_hc[axis]  = self.network.make_fifo(addr_met, addr_hc)
             self.fifo_hc_to_aff[axis]  = self.network.make_fifo(addr_hc, addr_aff)
+            self._gain_addrs.append((addr_aff, addr_enc))
+
+        # Flat list of all FIFOs for diagnostics (12 total: 2 per axis × 6 axes)
+        self._all_fifos: List[FIFODelayBuffer] = (
+            list(self.fifo_met_to_hc.values()) +
+            list(self.fifo_hc_to_aff.values())
+        )
+
+        # last_gain: G_eff value from most recent step() (0.0 before first step)
+        self.last_gain: float = 0.0
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """One simulation step with FIFO delays and soft saturation.
@@ -124,6 +138,38 @@ class VestibularChainV2(VestibularChain):
         for axis in self.axes:
             self.bundles_met_to_hc[axis].learn(dt)
             self.bundles_hc_to_aff[axis].learn(dt)
+
+        # Update last_gain: G_eff for first axis (representative; all axes share P_avail)
+        if self._gain_addrs:
+            self.last_gain = self.network.gain_coeff(*self._gain_addrs[0])
+
+    def spike_cost(self) -> float:
+        """Energy cost of all Aff spikes this step (for EnergyStore accounting).
+
+        Counts _spiked_this_step on 12 Aff neurons (reg×6 + irr×6).
+        Uses SPIKE_ENERGY_COST=0.005 matching nexus_v1/components/neuron.py:480.
+        BIO: Na+/K+ pump cost per action potential (Harris et al. 2012).
+        """
+        SPIKE_ENERGY_COST = 0.005
+        cost = 0.0
+        for axis in self.axes:
+            if self.afferent_regular[axis]._spiked_this_step:
+                cost += SPIKE_ENERGY_COST
+            if self.afferent_irregular[axis]._spiked_this_step:
+                cost += SPIKE_ENERGY_COST
+        return cost
+
+    def fifo_signal_rms(self) -> float:
+        """RMS of signal values across all FIFO buffers (diagnostic).
+
+        Replaces fill_rate (always 1.0 for fixed-size deques — meaningless).
+        Healthy range: 0.001–0.5. Near-zero = no signal in transit.
+        Sudden spike = hard stimulus onset; gradual decay = signal fading.
+        """
+        vals = [v for buf in self._all_fifos for v in buf._buf]
+        if not vals:
+            return 0.0
+        return (sum(v * v for v in vals) / len(vals)) ** 0.5
 
     def network_summary(self) -> dict:
         """Report network layer topology (V-N6 verification helper)."""

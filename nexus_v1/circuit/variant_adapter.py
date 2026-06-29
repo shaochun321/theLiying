@@ -20,9 +20,10 @@ Variant components added:
    12. MuscleSystem: Motor neuron → physical force → body movement
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
+from ..vestibular.chain_v2 import VestibularChainV2
 
 import math
 
@@ -64,6 +65,12 @@ try:
     _GOVERNANCE_AVAILABLE = True
 except ImportError:
     _GOVERNANCE_AVAILABLE = False
+
+# ── Vestibular v2.0 feature flag ──
+# "V1_ONLY"          – current default, v2 not instantiated
+# "V2_PARALLEL_LOG"  – Phase 1: v2 runs in parallel, logs state, no motor contribution
+# "V2_ACTIVE_DRIVE"  – Phase 2: pass VestibularChainV2 to HebbianCircuit at init time
+VESTIBULAR_MODE: str = "V1_ONLY"
 
 
 # ── A3: Thermal delay buffer for finite heat propagation ──
@@ -119,7 +126,12 @@ class VariantCircuit(HebbianCircuit):
 
     def __init__(self):
         # ── Mother initialization with thermal extra axis ──
-        super().__init__(extra_axes=["therm"])
+        # Phase 2 (V2_ACTIVE_DRIVE): pass VestibularChainV2 as the primary chain.
+        # HebbianCircuit.bundles are then wired to v2 neurons — cannot be hot-swapped.
+        if VESTIBULAR_MODE == "V2_ACTIVE_DRIVE":
+            super().__init__(vestibular=VestibularChainV2(), extra_axes=["therm"])
+        else:
+            super().__init__(extra_axes=["therm"])
 
         # ── Variant: Oscillators for afferent ISI synchronization ──
         # REF: Vestibular nucleus tonic oscillation
@@ -310,6 +322,15 @@ class VariantCircuit(HebbianCircuit):
         # External to neural circuit; can be replaced without rewiring.
         # BIO: liver glycogen + blood glucose buffer.
         self.energy_store = EnergyStore()
+
+        # ── Variant: VestibularChainV2 Phase 1 parallel observer ──
+        # Phase 1 (V2_PARALLEL_LOG): v2 runs in shadow, zero motor contribution.
+        # Phase 2 uses the primary chain (self.vestibular); no shadow needed.
+        self._v2_p_avail: list = [1.0]  # mutable slot updated each step from energy_store.fill
+        self._vestibular_v2: Optional[VestibularChainV2] = None
+        self._v2_last_state: dict = {}
+        if VESTIBULAR_MODE == "V2_PARALLEL_LOG":
+            self._vestibular_v2 = VestibularChainV2(p_avail_ref=self._v2_p_avail)
 
         # ── Variant: CirculationProportionCircuit (C3' structural carrier) ──
         # Three capacitors integrate amplitude signals → voltages = ratios.
@@ -797,6 +818,16 @@ class VariantCircuit(HebbianCircuit):
         for key in list(mechanical_inputs.keys()):
             if key not in ('therm', 'dtherm'):
                 mechanical_inputs[key] *= T_impedance
+
+        # ── 1b. VestibularChainV2 parallel observer (Phase 1 only) ──
+        if self._vestibular_v2 is not None:
+            self._v2_p_avail[0] = self.energy_store.fill  # 1-step lag P_avail
+            self._vestibular_v2.step(mechanical_inputs, dt)
+            self._v2_last_state = {
+                'last_gain': self._vestibular_v2.last_gain,
+                'spike_cost': self._vestibular_v2.spike_cost(),
+                'fifo_rms': self._vestibular_v2.fifo_signal_rms(),
+            }
 
         # ── 2. Mother step (UNCHANGED) ──
         super().step(mechanical_inputs, dt)
