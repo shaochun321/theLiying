@@ -7,8 +7,8 @@ Extends VestibularChain (all neurons and bundles unchanged) with:
   4. p_avail reference slot for future dynamic G_eff integration
 
 Signal latency budget (same-axis, v_cond=1000, dt=0.001):
-  MET→HC:  L=2 → 2 steps (2 ms)
-  HC→Aff:  L=2 → 2 steps (2 ms)
+  MET→HC:  L=2 → 2 steps (2 ms)  # BIO: ribbon synapse + vesicle fusion ~1ms; AP onset ~1ms
+  HC→Aff:  L=2 → 2 steps (2 ms)  # BIO: Parsons & Sterling 2003 J Neurosci: HC→afferent ~1-3ms
   Aff→Enc: L=2.5 → 3 steps (handled by hebbian.py synapse_gain=16.0 + G_eff)
   Enc→Col: L=2 → 2 steps
   Total chain latency: 9 steps ≈ 9 ms, within VOR window (5–15 ms) ✓
