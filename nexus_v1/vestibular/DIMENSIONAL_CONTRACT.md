@@ -44,53 +44,66 @@ Domain chain:
 
 ---
 
-## Physical Unit Anchoring (EXP-vest-scan-2026-06-30)
+## Physical Unit Anchoring
 
-### Canal axes (semicircular canals — angular velocity)
+**Two scans performed** — use P0 (frozen) data as authoritative source:
 
-Reference: Lasker et al. 2008, J Neurophysiol 99:1222 (C57BL/6 mouse, 2 Hz sinusoidal)  
-Literature sensitivity: 1.0 spikes/s per deg/s (regular afferents)
+| Scan | Date | STDP during measure | Status |
+|------|------|---------------------|--------|
+| Phase 1 (EXP-vest-scan-2026-06-30) | 2026-06-30 | ACTIVE | ⚠️ Inflated by LTP — SUPERSEDED |
+| **P0 (exp_vest_calibration_scan_frozen.py)** | **2026-06-30** | **FROZEN** | **✅ Authoritative** |
 
-| Axis | Slope (Hz/unit) | 1 model unit (deg/s) | Chain sens. (Hz/(deg/s)) |
-|------|----------------|---------------------|--------------------------|
-| yaw | 8.479 | 8.5 | 1.00 |
-| pitch | 4.913 | 4.9 | 1.00 |
-| roll | 3.084 | 3.1 | 1.00 |
-| **mean** | **5.492** | **5.5** | **1.00** |
+### Canal axes — P0 frozen (authoritative)
 
-> NOTE: slope variation (54%) likely due to STDP weight evolution during measurement.
-> P0 (freeze-STDP re-scan) will confirm. If slopes converge to <5%, unified anchor 5.5 deg/s applies.
+Reference: Lasker et al. 2008, J Neurophysiol 99:1222 (C57BL/6 mouse, 2 Hz)  
+Literature sensitivity: 1.0 spikes/s per deg/s
 
-### Otolith axes (utricular/saccular maculae — linear acceleration)
+| Axis | P0 slope (Hz/unit) | 1 unit (deg/s) | w_met_hc after warmup |
+|------|-------------------|---------------|----------------------|
+| yaw | 1.213 | 1.21 | 0.5195 |
+| pitch | 2.252 | 2.25 | 0.5579 |
+| roll | 1.930 | 1.93 | 0.4415 |
+| **mean** | **1.798** | **1.80** | — |
 
-Reference: Goldberg 2000, Physiol Rev 80:1–18 (sensitivity 35 spikes/s per g = 3.57 Hz/(m/s²))
+Canal max deviation: **32.5%** → **NON-ISOMORPHIC** (structural, not measurement artifact)
 
-| Axis | Slope (Hz/unit) | 1 model unit (m/s²) | 1 model unit (g) |
-|------|----------------|---------------------|-----------------|
-| oto_x | 5.780 | 1.62 | 0.165 |
-| oto_y | 0.846 | 0.24 | 0.024 |
-| oto_z | 3.059 | 0.86 | 0.088 |
-| **mean** | **3.228** | **0.90** | **0.092** |
+### Otolith axes — P0 frozen (authoritative)
 
-> NOTE: oto_y slope is 6× lower than oto_x. P0 + entropy audit (P3) will determine if this is
-> measurement contamination or true signal attenuation in the oto_y pathway.
+Reference: Goldberg 2000, Physiol Rev 80:1–18 (3.57 Hz/(m/s²))
 
-### Working point physical values (amp = 6.0, Phase 5/6 default)
+| Axis | P0 slope (Hz/unit) | 1 unit (m/s²) | 1 unit (g) | w_met_hc after warmup |
+|------|-------------------|-------------|-----------|----------------------|
+| oto_x | 1.633 | 0.457 | 0.047 | 0.5559 |
+| oto_y | 3.227 | 0.904 | 0.092 | 0.4155 |
+| oto_z | 2.549 | 0.714 | 0.073 | 0.3852 |
+| **mean** | **2.470** | **0.692** | **0.071** | — |
 
-| Axis | f_reg (Hz) | Physical amplitude |
-|------|-----------|-------------------|
-| yaw | ~47.5 | 6 × 5.5 = 33 deg/s |
-| pitch | ~32.5 | 6 × 4.9 = 29 deg/s |
-| roll | ~23.0 | 6 × 3.1 = 19 deg/s |
-| oto_x | ~36.5 | 6 × 1.62 = 9.7 m/s² ≈ 1g |
-| oto_y | ~7.0 | 6 × 0.24 = 1.4 m/s² |
-| oto_z | ~19.5 | 6 × 0.86 = 5.2 m/s² |
+Otolith max deviation: **33.9%** → **NON-ISOMORPHIC** (structural, weight-driven)
+
+> **Key finding from P0**: oto_y had apparent 0.85 Hz/unit in Phase 1 (looked "dead").
+> After freezing STDP, oto_y is actually the STRONGEST otolith axis at 3.23 Hz/unit.
+> The Phase 1 oto_y weakness was 100% STDP measurement contamination (LTD during measure).
+
+### Working point physical values (amp=6.0, P0 frozen data)
+
+| Axis | f_reg P0 (Hz) | Physical amplitude |
+|------|-------------|-------------------|
+| yaw | 9.0 | 6 × 1.21 = 7.3 deg/s |
+| pitch | 15.0 | 6 × 2.25 = 13.5 deg/s |
+| roll | 14.5 | 6 × 1.93 = 11.6 deg/s |
+| oto_x | 11.5 | 6 × 0.46 = 2.7 m/s² (0.28g) |
+| oto_y | 23.5 | 6 × 0.90 = 5.4 m/s² (0.55g) |
+| oto_z | 19.5 | 6 × 0.71 = 4.3 m/s² (0.44g) |
+
+Phase 1 WP rates (47.5 Hz for yaw) were inflated by STDP LTP during measurement.
+True rates (P0): 9–23.5 Hz. More biologically reasonable.
 
 ---
 
 ## Dead Zone Architecture Note
 
-**Observed**: all axes f_reg = 1.0 Hz (spontaneous) for amp < 3.5, regardless of input.  
+**Observed**: all axes f_reg = 1.0 Hz (spontaneous) for amp < ~4.0, regardless of input.  
+**P0 finding**: dead zone boundary is similar between axes (3.5–4.5 amplitude).  
 **Interpretation**: NOT a defect to fix. With N=1 afferent and synapse_gain=33× bio target,
 dead zone acts as hardware noise gate preventing Langevin noise from being amplified 33× 
 into Enc spurious firing. Required consequence of N=1 high-gain architecture (DEG-016).
