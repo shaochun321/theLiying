@@ -344,11 +344,11 @@ class HebbianCircuit:
                     # V_ss = I_mean × R_leak ≈ 0.08 × 5 = 0.40 > V_th=0.30 ✓ (22% margin)
                     # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
                     # CROSS-MODAL [V·s]: Aff firing rate (Hz) → Enc membrane voltage (V)
-                    # EXP-vest-scan-2026-06-30 scan calibration:
-                    #   WP(amp=6): f_reg = 7–48 Hz (6 axes); V_ss = 0.35–3.5 V >> V_th=0.30 ✓
-                    #   Min WP (oto_y, 7 Hz): V_ss = 7×2.5×16×0.001×5 = 1.40 V >> V_th ✓
-                    # Bio target (N_conv=10 Aff, DEG-016): g_syn_bio = 0.30/(50×2.5×0.001×5) ≈ 0.48
-                    #   → current g_syn=16 is 33× bio → inflated to compensate N=1 single Aff (DEG-016)
+                    # EXP-vest-scan-P0-2026-06-30 (STDP-frozen, authoritative):
+                    #   WP(amp=6) f_reg: yaw=9, pitch=15, roll=14.5, oto_x=11.5, oto_y=23.5, oto_z=19.5 Hz
+                    #   [Phase 1 values 7–48 Hz were inflated by STDP LTP during measurement]
+                    #   V_ss range: 9×0.2=1.8V (yaw) to 23.5×0.2=4.7V (oto_y) >> V_th=0.30V ✓
+                    # Bio target (N_conv=10 Aff, DEG-016): g_syn_bio ≈ 0.48 → current 33× bio
                     initial_weight=2.5,
                     weight_max=5.0,
                     stdp_lr=0.005,
