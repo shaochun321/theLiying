@@ -40,7 +40,12 @@ init_dist = math.sqrt(sum((p - h)**2 for p, h in zip(body.position, heat.positio
 
 c = VariantCircuit()
 c.world = world
+# BIO: lateral inhibition gain — dorsal horn A-β→C-fibre inhibition, 20–40%
+# of excitatory drive (Melzack & Wall 1965 gate control; Koch & Poggio 1983
+# Proc. R. Soc. B 298:227). 0.3 = mid-range.
 c.somatosensory.LATERAL_GAIN = 0.3
+# BIO: Hill (1938) muscle force model; gain=0.3 ≈ moderate fast-twitch fibre,
+# ~50% F_max at full activation (Zajac 1989 Crit. Rev. Biomed. Eng. 17:359).
 for m in c.muscle_system.muscles:
     m.gain = 0.3
 
@@ -72,6 +77,8 @@ for step in range(STEPS):
 
     if not _stdp_applied and step >= 1 and c.bundles_soma_to_da:
         for b in c.bundles_soma_to_da:
+            # BIO: STDP lr=0.005 — Bi & Poo (1998 J. Neurosci.; 2001 ARN) report
+            # 0.001–0.01 per spike pair; 0.005 is median.
             b.config.stdp_lr = 0.005
         _stdp_applied = True
 

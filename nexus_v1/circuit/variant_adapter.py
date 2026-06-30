@@ -716,9 +716,15 @@ class VariantCircuit(HebbianCircuit):
         # ── C3': Heat source consumption + ecology ──
         # Organism absorbs energy from nearby heat sources (metabolic feeding).
         # BIO: chemolithoautotrophy at hydrothermal vents.
-        CONSUME_RATE = 9.75  # EXP-P5RouteA: ×65 recalibration — neural drain (0.0324/10k) exceeds
-                              # world deposit by 65× at d=20,r=30,rate=0.15; proximity×rate×dt now
-                              # balances drain (9.75×0.333×0.001≈0.00325 ≈ drain 0.00324/step)
+        # BIO: Thiomicrospira/Beggiatoa chemolithoautotrophs at hydrothermal vents sustain
+        # metabolic rates 2–3 orders of magnitude above abyssal background (Jannasch &
+        # Mottl 1985, Science 229:717). Proximity-weighted intake models the steep energy
+        # gradient at the vent margin; organisms at the plume edge extract proportionally
+        # less than those at the source face (Childress & Fisher 1992, OMBAR 30:337).
+        # EXP-P5RouteA: empirical balance — neural drain 65× world deposit at rate=0.15;
+        # rate=9.75 restores deposit≈drain at equilibrium distance d=20, r=30
+        # (9.75 × 0.333 × 0.001 ≈ 0.00325 ≈ measured drain 0.00324/step).
+        CONSUME_RATE = 9.75
         energy_absorbed = self.world.consume_nearby(
             self.world.body.position, CONSUME_RATE, dt)
         # Regenerate depleted sources (deep-sea vent ecology)
