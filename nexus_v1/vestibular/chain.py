@@ -71,7 +71,10 @@ def _met_config(axis: str) -> NeuronConfig:
             ChannelConfig(
                 name="default",
                 v_threshold=0.001,   # BIO: mechanically-gated, NO voltage barrier
-                gm=2.0,              # BIO: high sensitivity
+                gm=2.0,              # CROSS-MODAL [A·s/rad]: mechanoelectric transduction (MET channel)
+                                     # EXP-vest-scan-2026-06-30: amp=1 unit → Δf_Aff ≈ 3.1–8.5 Hz/unit (axis-dependent)
+                                     # Anchor (Lasker 2008, 2 Hz, C57BL/6): 1 unit ≈ 5.5 deg/s (canal mean)
+                                     # Chain sensitivity: 0.56–1.54 Hz/(deg/s) vs lit 1.0 Hz/(deg/s) ✓(2×)
                 tau_gate=0.0,        # BIO: < 0.1 ms = instantaneous
                 reversal=0.615,      # NORM: E_MET = 0 mV
                 sign=1.0,

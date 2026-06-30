@@ -292,6 +292,10 @@ class VariantCircuit(HebbianCircuit):
         # Heat source at [70,50,50], body starts at [50,50,50]
         self.world = World()
         self.thermal_membrane = ThermalMembrane()
+        # CROSS-MODAL [N/V]: Motor voltage → muscle contractile force
+        # gain=0.1 default; EXP-RouteA: 0.1→0.3 gives body speed 0.001→0.01 (10×)
+        # BIO: Hill (1938) — force ∝ activation; fast-twitch peak ~0.3 N per mV at V_th
+        # DEG-017: value engineering-backfit; no direct force calibration available
         self.muscle_system = MuscleSystem(gain=0.1, delay=2)
 
         # ── Variant: VitalOscillator (步骤2 — 宏观传出轨) ──

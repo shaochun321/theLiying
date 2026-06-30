@@ -343,6 +343,12 @@ class HebbianCircuit:
                     # I_mean = f_aff × W × g_syn × Δt_spike ≈ 2×2.5×16×0.001=0.08
                     # V_ss = I_mean × R_leak ≈ 0.08 × 5 = 0.40 > V_th=0.30 ✓ (22% margin)
                     # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
+                    # CROSS-MODAL [V·s]: Aff firing rate (Hz) → Enc membrane voltage (V)
+                    # EXP-vest-scan-2026-06-30 scan calibration:
+                    #   WP(amp=6): f_reg = 7–48 Hz (6 axes); V_ss = 0.35–3.5 V >> V_th=0.30 ✓
+                    #   Min WP (oto_y, 7 Hz): V_ss = 7×2.5×16×0.001×5 = 1.40 V >> V_th ✓
+                    # Bio target (N_conv=10 Aff, DEG-016): g_syn_bio = 0.30/(50×2.5×0.001×5) ≈ 0.48
+                    #   → current g_syn=16 is 33× bio → inflated to compensate N=1 single Aff (DEG-016)
                     initial_weight=2.5,
                     weight_max=5.0,
                     stdp_lr=0.005,
@@ -372,6 +378,8 @@ class HebbianCircuit:
                     # P0 Class 1 Driver — same FIX-P2 calibration as reg pathway.
                     # synapse_gain 2.0→16.0 to match 2 Hz World physics (see reg above).
                     # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
+                    # CROSS-MODAL [V·s]: same calibration as reg pathway (see above);
+                    # irr Aff has irregular discharge (no spontaneous tonic), spike-driven gain required
                     initial_weight=2.5,
                     weight_max=5.0,
                     stdp_lr=0.005,
