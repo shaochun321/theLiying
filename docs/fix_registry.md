@@ -41,12 +41,24 @@
 
 ---
 
-### FIX-004: （待实施）slow_relay τ 生物推导修正
+### FIX-004: slow_relay τ 生物推导修正 ❌ ABANDONED on V1 (2026-07-01)
 
-- **日期**: 待定
-- **关联降级**: DEG-002
-- **修改文件**: `nexus_v1/circuit/variant_adapter.py`（slow_relay capacitance 参数）
-- **修改内容**: 依据 SA-II 纤维生物文献推导 τ_norm，替换当前 τ=300k
-- **推导依据**: 待查（Duclaux & Kenshalo 1980 Fig.4；目标：SA-II τ_bio ≈ 5–30 s → τ_norm = 5000–30000 steps）
-- **验证**: 待实施后运行 regression + Phase 8 长程实验
-- **副作用**: 待评估（τ 变化影响 slow_relay 充电速度，可能影响 DA phasic 信号强度）
+- **日期**: 2026-07-01
+- **关联降级**: DEG-002（RECLASSIFIED，见下）
+- **尝试记录**:
+  - Round 1: `capacitance 300.0 → 15.0`（τ=15k步，SA-II 中值 15s）→ FAIL
+    - 比率 7.70× @100k（>3×），wR-wL=-0.018（反向）
+    - step 30k 时 slow_relay 已超调 4.5×，体运动向左，热梯度信号被破坏
+  - Round 2: `capacitance=30.0`（τ=30k步，SA-II 上限 30s）→ FAIL
+    - step 10k 时 sr_R/rl_R=0.030×（slow_relay 极小），但 wR-wL=-0.034（比 Round1 更负）
+    - **方向错误在 slow_relay 产生任何影响之前就已建立**
+- **根因（修正）**: 不是 τ 值问题，而是 HC-002（全对全 soma_to_da 拓扑）：
+  前 10k 步前庭信号短暂驱动 left relay.act > right relay.act，
+  STDP 锁定 wL>wR，体运动向左，relay_right.act 下降，热梯度本身被污染。
+  τ=300k 之所以能工作，是因为在学习关键期（前 200k 步）slow_relay 保持足够小，
+  热梯度长期优势（src1 持续在右）最终覆盖前庭短暂偏压。
+- **ABANDONED 原因**: SA-II τ=15-30s 在 V1 全对全架构下不可行。
+  需 V2.0 地址化连接（patch-specific soma→DA，HC-002 根治）后才能正确实现。
+- **capacitance 恢复**: 300.0（已验证有效值；重新分类为"导航背景减除 τ≈5min"而非"无依据"）
+- **DEG-002**: RECLASSIFIED（真正根因是 HC-002，等待 V2.0）
+- **分析报告**: `cell-cell/工作报告/FIX004_analysis_2026-07-01.md`

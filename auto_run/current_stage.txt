@@ -1,2 +1,6 @@
-STOPPED — phase_v2_trigger_assessment: NOT_SATISFIED
-Awaiting human decision. See checkpoints/AUTO_CHECKPOINT_v2_trigger_NOT_SATISFIED_2026-07-01.json
+STOPPED — fix004_tau_anchoring: ABANDONED
+Two rounds failed (C=15, C=30). Root cause: HC-002 all-to-all topology, not τ value.
+capacitance restored to 300.0. 21/21 regression PASS.
+Awaiting human decision:
+  Q: Remove FIX-004 prerequisite for World 2.0 Phase 3?
+  Analysis: cell-cell/工作报告/FIX004_analysis_2026-07-01.md

@@ -21,14 +21,18 @@
 
 ## 当前已知硬编码清单
 
-### HC-001: slow_relay τ=300k 无生物依据
+### HC-001: slow_relay τ=300k 生物依据重新分类 ⚠️ RECLASSIFIED (2026-07-01)
 - **位置**: `nexus_v1/circuit/variant_adapter.py`，`_init_da_circuit()` 的 slow_relay NeuronConfig
-- **问题**: `capacitance=300.0`（τ=300k steps）按实验时长选定，非 SA-II 纤维生物文献推导
-- **代码标注**: `# UNGROUNDED`（已加）
-- **影响**: slow_relay 充电速度不匹配真实 SA 纤维；在不同时长实验中 phasic DA 效果会变化
-- **重构目标**: 查 Duclaux & Kenshalo 1980 Fig.4，推导 SA-II τ_bio；转化为 τ_norm = τ_bio / dt
-- **DEG 关联**: DEG-002
-- **优先级**: 中（功能正确，但参数非生物来源）
+- **原始问题**: τ=300k 步（300s）被认为无生物依据，启动 FIX-004 尝试改为 SA-II τ=15-30s
+- **FIX-004 结果**: ABANDONED — C=15.0 和 C=30.0 均导致方向学习反转（wR-wL<0，从 step 10k 即建立）
+- **根因分析**: 方向错误在 slow_relay 产生任何影响之前就已建立（C=30 时 step 10k sr_R/rl_R=0.030×），
+  真正根因是 HC-002（全对全拓扑）：前庭信号在前 10k 步创造 wL>wR 偏压，体运动向左，
+  热梯度信号本身被污染，无法恢复。
+- **重新分类**: τ=300k 对应导航背景减除机制（哺乳动物热导航积分时间尺度，分钟级），
+  SA-II τ=15-30s 是感觉纤维适应，是错误的生物类比。τ=300k 保留为已验证值。
+- **V2.0 行动**: 在地址化连接（patch-specific soma→DA）中，才能正确实现 SA-II τ（不受前庭污染）
+- **DEG 关联**: DEG-002（重新开启），FIX-004（ABANDONED）
+- **分析报告**: `cell-cell/工作报告/FIX004_analysis_2026-07-01.md`
 
 ### HC-002: soma_to_da 全对全拓扑（结构性语义硬编码）
 - **位置**: `nexus_v1/circuit/variant_adapter.py`，`_init_da_circuit()`

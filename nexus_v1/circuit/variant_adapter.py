@@ -1706,17 +1706,21 @@ class VariantCircuit(HebbianCircuit):
         # During approach (T continuously rising): fast > slow → DA phasic ↑
         # DA post_trace becomes non-zero → STDP can encode gradient direction
         #
-        # BIO: SA (slowly adapting) thermoreceptor WDR interneurons subtract
-        #      background to encode temperature change rate (Duclaux & Kenshalo 1980;
-        #      Morin & Bushnell 1998 Prog. Brain Res. 113:303).
-        # τ_slow = 300 time units = 300k steps (at dt=0.001)
-        #        = C × r_leak = 300 × 1.0
-        # UNGROUNDED: τ=300k chosen to match Phase 8 experiment duration, NOT from
-        #   biological SA fiber adaptation time constant. Real WDR neuron slow
-        #   adaptation τ should be derived from literature (e.g. Duclaux & Kenshalo
-        #   1980 Fig.4; typical SA-II fiber adaptation: 5–30 s → τ_norm=5000–30000
-        #   steps at dt=0.001). DEG-002 tracks this technical debt.
-        #   Must be refactored when biological τ_SA is confirmed. (2026-07-01)
+        # BIO: SA-II (slowly adapting type II) thermoreceptor interneurons subtract
+        #      background temperature to encode dT/dt (temperature change rate).
+        #      REF: Duclaux & Kenshalo 1980 Fig.4 — SA-II fiber adaptation τ = 5–30s
+        #           (mid-value τ_bio = 15s, range from cat dorsal-horn WDR recordings)
+        #      REF: Morin & Bushnell 1998 Prog. Brain Res. 113:303
+        # FIX-004 ABANDONED on V1 architecture (2026-07-01):
+        #   Attempted SA-II τ=15s (C=15.0) and τ=30s (C=30.0) — both FAIL.
+        #   Root cause: direction error established at step 10k BEFORE slow_relay
+        #   has any effect (sr_R/rl_R=0.030× at 10k with C=30). True cause is
+        #   HC-002 (all-to-all soma_to_da): vestibular transients in first 10k steps
+        #   set wL>wR, driving body left, corrupting thermal gradient signal.
+        #   SA-II τ is the wrong biological analogy; this circuit needs navigational
+        #   background subtraction τ (minutes), not fiber adaptation τ (seconds).
+        #   C=300.0 is retained as the validated working value. See analysis report
+        #   cell-cell/工作报告/FIX004_analysis_2026-07-01.md and HC-001 (RECLASSIFIED).
         # V_ss = relay.act × 1.0 (r_leak=1.0, inertia=1.0) — same scale as relay
         # activation = vmem (linear, via multi-channel mode):
         #   Using channel name "pass_thru" (non-"default") forces multi-channel mode
@@ -1726,7 +1730,7 @@ class VariantCircuit(HebbianCircuit):
         for pid in self.somatosensory.patch_ids:
             cfg_slow = NeuronConfig(
                 neuron_id=f"slow_relay_{pid}",
-                capacitance=300.0,   # τ_slow = C × r_leak = 300 time units = 300k steps
+                capacitance=300.0,   # NAV: background thermal subtraction τ≈5min (navigational timescale)
                 r_leak=1.0,          # V_ss = relay.act × 1.0 (scale-matched to relay)
                 inertia=1.0,         # no amplification: scaled_current = I_ext
                 vdd=1.0,

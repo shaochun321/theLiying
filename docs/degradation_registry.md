@@ -16,14 +16,20 @@
 
 ---
 
-### DEG-002: slow_relay τ=300k 无生物来源（RC-4 技术债）
+### DEG-002: slow_relay τ=300k 生物依据分类（HC-002 根因）
 
 - **发现时间**: 2026-07-01
-- **现象**: RC-4 引入的 slow_relay 神经元（`nexus_v1/circuit/variant_adapter.py`）的时间常数 τ=300k steps（C=300, r_leak=1.0）是按照 Phase 8 实验时长设定的，**没有生物学依据**。代码已标注 `# UNGROUNDED`。
-- **影响层**: slow_relay 神经元，slow_to_da bundle，phasic DA 信号质量
-- **根因**: 参数工程驱动而非生物推导。真实 SA-II 纤维适应时间常数应从文献推导（Duclaux & Kenshalo 1980 Fig.4；典型 SA-II τ ≈ 5–30 s → τ_norm = 5000–30000 steps at dt=0.001）
-- **状态**: OPEN
-- **修复**: 待查文献后实施 FIX-004（重新推导 τ_SA）
+- **现象**: RC-4 引入的 slow_relay 的 τ=300k 步（C=300）被认为无生物依据，尝试改为 SA-II τ=15-30s。
+- **FIX-004 尝试结果 (2026-07-01)**:
+  - C=15（τ=15k）→ FAIL: wR-wL=-0.018，ratio 7.7×@100k
+  - C=30（τ=30k）→ FAIL: wR-wL=-0.034（step 10k 时 slow_relay 仅 0.030×，方向错误不是 slow_relay 所致）
+- **根因重新分类**: 方向学习失败的真正原因是 **HC-002（全对全拓扑）**，而非 τ 值。
+  前 10k 步前庭信号造成短暂 wL>wR，体运动向左破坏热梯度信号。任何短 τ 都无法在 V1 架构下通过。
+  τ=300k 对应导航背景减除机制（整体导航时间尺度，分钟级），不是 SA-II 纤维适应。
+- **影响层**: slow_relay 神经元（保留 C=300），根本问题在 soma_to_da 拓扑（HC-002）
+- **状态**: RECLASSIFIED → 依赖 DEG-001（HC-002 全对全拓扑），在 V2.0 重构前无法独立修复
+- **修复路径**: V2.0 地址化连接（patch-specific soma→DA）实现后，可以在正确拓扑中重新实现 SA-II τ
+- **分析报告**: `cell-cell/工作报告/FIX004_analysis_2026-07-01.md`
 
 ---
 
