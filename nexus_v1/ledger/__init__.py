@@ -10,6 +10,7 @@ Architecture:
                         StructuralBridge, GuidedConstructionAuditor
   - energy_ledger.py:   EntropyLedger (global energy/heat/spike accounting)
   - noether_probe.py:   NoetherProbe (conservation law verification)
+  - nu_probe.py:        NuProbe (ν power flux: ξ|O-P| − ξ²/R_ξ per bundle)
 
 REF: Jaynes 1957 (MaxEnt), Landauer 1961 (erasure bound)
 REF: Attwell & Laughlin 2001 (energy budget for cortical signaling)
@@ -22,6 +23,7 @@ from .structural import (RecursionTracker, RecursionCycle,
                          SerialModificationLog, GuidedConstructionAuditor)
 from .energy_ledger import EntropyLedger
 from .noether_probe import NoetherProbe
+from .nu_probe import NuProbe, NuSnapshot, NuReport
 
 __all__ = [
     'WeightEntropyProbe', 'EntropySnapshot',
@@ -31,4 +33,5 @@ __all__ = [
     'SerialModificationLog', 'GuidedConstructionAuditor',
     'EntropyLedger',
     'NoetherProbe',
+    'NuProbe', 'NuSnapshot', 'NuReport',
 ]

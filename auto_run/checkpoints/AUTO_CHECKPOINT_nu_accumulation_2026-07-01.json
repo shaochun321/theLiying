@@ -1,0 +1,27 @@
+{
+  "stage": "phase_nu_accumulation",
+  "status": "PASSED",
+  "timestamp": "2026-07-01",
+  "checks": {
+    "system_nu_ema_positive": true,
+    "system_nu_ema_value": 20.98,
+    "charging_fraction_gt_50pct": true,
+    "charging_fraction_value": 0.9762,
+    "n_bundles_tracked": 62,
+    "no_nan_in_ema": true,
+    "regression_21_21_pass": true,
+    "nu_stable_5k_steps": true
+  },
+  "top_bundles": [
+    {"bundle_id": "shadow_to_da", "nu_ema": 2.334, "xi": -2.985},
+    {"bundle_id": "xin_to_da", "nu_ema": 2.334, "xi": -2.985},
+    {"bundle_id": "soma_to_da", "nu_ema": 2.334, "xi": -2.985},
+    {"bundle_id": "thermo_to_relay_right", "nu_ema": 0.642, "xi": 1.671},
+    {"bundle_id": "slow_to_da_front", "nu_ema": 0.585, "xi": -1.494}
+  ],
+  "files": {
+    "probe": "nexus_v1/ledger/nu_probe.py",
+    "smoke_test": "nexus_v1/tests/exp_nu_probe_smoke.py",
+    "report": "cell-cell/工作报告/ν探针实现报告_2026-07-01.md"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "auto_run_version": "1.0",
+  "protocol_file": "cell-cell/交叉方案/自动运行协议.md",
+  "start_state": "RC-4 verified, 500k PASS, nu_probe 6/6 PASS, 21/21 PASS",
+  "stages": {
+    "phase_nu_accumulation": {
+      "status": "PASSED",
+      "timestamp": "2026-07-01",
+      "commit": "pending-after-this-commit",
+      "metrics": {
+        "system_nu_ema": 20.98,
+        "charging_fraction": 0.9762,
+        "n_bundles_tracked": 62,
+        "regression_21_21": true,
+        "nan_detected": false
+      }
+    },
+    "phase_dual_source_long": {
+      "status": "RUNNING",
+      "timestamp": "2026-07-01",
+      "task_id": "bpxcubc07",
+      "script": "nexus_v1/tests/exp_dual_source_long_run.py",
+      "steps": 300000
+    },
+    "phase_v2_trigger_assessment": {"status": "PENDING"},
+    "phase_v2_address_build": {"status": "PENDING"},
+    "phase_node_budget_expansion": {"status": "PENDING"},
+    "phase_scale_n1_to_3": {"status": "PENDING"}
+  }
+}
