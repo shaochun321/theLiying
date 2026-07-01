@@ -1673,6 +1673,11 @@ class VariantCircuit(HebbianCircuit):
         # activation differences propagating through this bundle.
         # BIO: spinal relay → VTA pathway (thermotaxis in simple organisms).
         # REF: AI编程自足文档 步骤1 B.06; analysis_concept_evolution §5
+        # STRUCTURAL-DEBT HC-002: all-to-all topology suppresses directional gradient.
+        # relay_neurons = all 4 patches → all 3 DA (全对全). When body moves,
+        # one side's +ΔT cancels another's -ΔT → DA tonic. RC-4 slow_relay
+        # is a workaround; root fix requires V2.0 address-based sub-circuits.
+        # See docs/technical_debt_hardcoding.md HC-002, DEG-001.
         relay_neurons = [self.somatosensory.relays[pid]
                          for pid in self.somatosensory.patch_ids]
         cfg_soma = BundleConfig(
@@ -1705,7 +1710,13 @@ class VariantCircuit(HebbianCircuit):
         #      background to encode temperature change rate (Duclaux & Kenshalo 1980;
         #      Morin & Bushnell 1998 Prog. Brain Res. 113:303).
         # τ_slow = 300 time units = 300k steps (at dt=0.001)
-        #        = C × r_leak = 300 × 1.0 — matched to Phase 8 experiment duration
+        #        = C × r_leak = 300 × 1.0
+        # UNGROUNDED: τ=300k chosen to match Phase 8 experiment duration, NOT from
+        #   biological SA fiber adaptation time constant. Real WDR neuron slow
+        #   adaptation τ should be derived from literature (e.g. Duclaux & Kenshalo
+        #   1980 Fig.4; typical SA-II fiber adaptation: 5–30 s → τ_norm=5000–30000
+        #   steps at dt=0.001). DEG-002 tracks this technical debt.
+        #   Must be refactored when biological τ_SA is confirmed. (2026-07-01)
         # V_ss = relay.act × 1.0 (r_leak=1.0, inertia=1.0) — same scale as relay
         # activation = vmem (linear, via multi-channel mode):
         #   Using channel name "pass_thru" (non-"default") forces multi-channel mode
