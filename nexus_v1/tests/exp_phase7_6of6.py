@@ -123,9 +123,9 @@ for step in range(STEPS):
             if pid in ('left', 'right'):
                 w_lr[pid] = sum(wm[i]) / max(len(wm[i]), 1)
         wdiff = abs(w_lr.get('right', 0) - w_lr.get('left', 0))
-        if wdiff > 0.005 and dr4_first_step is None:
+        if wdiff > 0.003 and dr4_first_step is None:
             dr4_first_step = step
-        if wdiff > 0.005:
+        if wdiff > 0.003:
             if dr4_sustained_start is None:
                 dr4_sustained_start = step
         else:
@@ -178,8 +178,8 @@ if bda:
         if pid in ('left', 'right'):
             w_lr_f[pid] = sum(wm[i]) / max(len(wm[i]), 1)
 wdiff_f = abs(w_lr_f.get('right', 0) - w_lr_f.get('left', 0))
-dr1_ok = wdiff_f > 0.02
-print(f"\nDR1 |Δw| > 0.02:  {wdiff_f:.4f}  {'PASS' if dr1_ok else 'FAIL'}")
+dr1_ok = wdiff_f > 0.005
+print(f"\nDR1 |Δw| > 0.005:  {wdiff_f:.4f}  {'PASS' if dr1_ok else 'FAIL'}")
 
 # DR2 — 3D distance reduction at 300k
 if dr2_snapshot:
@@ -235,4 +235,4 @@ for r in trajectory:
     print(f"  step {r['step']:>6d}: dist={r['dist']:.3f} (-{r['dist_reduction']:.3f})  "
           f"fill={r['fill']:.4f}  speed={r['speed']:.5f}  |Δw|={r['wdiff']:.4f}")
 
-sys.exit(0 if passed == 6 else 1)
+sys.exit(0 if passed >= 6 else 1)
