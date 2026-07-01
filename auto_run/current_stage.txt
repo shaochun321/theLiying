@@ -1,1 +1,2 @@
-phase_dual_source_long
+STOPPED — phase_v2_trigger_assessment: NOT_SATISFIED
+Awaiting human decision. See checkpoints/AUTO_CHECKPOINT_v2_trigger_NOT_SATISFIED_2026-07-01.json

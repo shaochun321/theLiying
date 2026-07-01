@@ -1,0 +1,34 @@
+{
+  "stage": "phase_v2_trigger_assessment",
+  "status": "NOT_SATISFIED",
+  "timestamp": "2026-07-01",
+  "evaluation": {
+    "nu_confusion": {
+      "value": 0.150,
+      "threshold": 0.30,
+      "met": false,
+      "source": "exp_dual_source_long_run.py step=300k, charging_fraction=85%"
+    },
+    "tsi_fill_drop": {
+      "value": null,
+      "threshold": 0.20,
+      "met": false,
+      "source": "not tracked in current experiment (static heat sources)"
+    },
+    "trigger_status": "NOT_SATISFIED",
+    "logic": "nu_confusion(15%) < 30% AND tsi_fill_drop not evaluated"
+  },
+  "auto_run_action": "STOP — awaiting human evaluation per protocol §4.1",
+  "human_decision_options": [
+    "A: Continue optimizing current architecture (e.g., FIX-004 tau derivation) before V2.0",
+    "B: Manually trigger V2.0 build despite trigger not met (human override)",
+    "C: Run longer experiment (500k+) to check if nu_confusion eventually exceeds 30%",
+    "D: Proceed to World 2.0 Phase 3 (multi-source exploration scenario)"
+  ],
+  "context": {
+    "system_state": "strongly charging (system_nu_ema=+2315, all key bundles charging)",
+    "meaning": "System is in deep exploration/learning phase; consolidation (nu<0) has not started. V2.0 is not yet needed to resolve information bottlenecks.",
+    "main_learning_bundles": ["hc_to_aff_pitch", "met_to_hc_pitch", "noci_to_relay_right"],
+    "vestibular_still_dominant": true
+  }
+}

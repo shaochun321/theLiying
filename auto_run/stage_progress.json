@@ -6,7 +6,7 @@
     "phase_nu_accumulation": {
       "status": "PASSED",
       "timestamp": "2026-07-01",
-      "commit": "pending-after-this-commit",
+      "commit": "01eb425",
       "metrics": {
         "system_nu_ema": 20.98,
         "charging_fraction": 0.9762,
@@ -16,15 +16,35 @@
       }
     },
     "phase_dual_source_long": {
-      "status": "RUNNING",
+      "status": "PASSED",
       "timestamp": "2026-07-01",
-      "task_id": "bpxcubc07",
-      "script": "nexus_v1/tests/exp_dual_source_long_run.py",
-      "steps": 300000
+      "commit": "pending",
+      "metrics": {
+        "wR_minus_wL": 0.0921,
+        "wB_minus_wF": 0.0244,
+        "dist_reduction": 2.977,
+        "DR3_first_step": 390,
+        "da_saturation": 0.0,
+        "regression_21_21": true,
+        "system_nu_ema_final": 2315.88,
+        "charging_fraction_final": 0.850,
+        "nu_confusion": 0.150
+      }
     },
-    "phase_v2_trigger_assessment": {"status": "PENDING"},
-    "phase_v2_address_build": {"status": "PENDING"},
-    "phase_node_budget_expansion": {"status": "PENDING"},
-    "phase_scale_n1_to_3": {"status": "PENDING"}
+    "phase_v2_trigger_assessment": {
+      "status": "NOT_SATISFIED",
+      "timestamp": "2026-07-01",
+      "commit": "pending",
+      "evaluation": {
+        "nu_confusion": 0.150,
+        "nu_confusion_threshold": 0.30,
+        "tsi_fill_drop": null,
+        "trigger_status": "NOT_SATISFIED"
+      },
+      "action": "AUTO_STOP — awaiting human decision"
+    },
+    "phase_v2_address_build": {"status": "BLOCKED_BY_TRIGGER"},
+    "phase_node_budget_expansion": {"status": "BLOCKED_BY_TRIGGER"},
+    "phase_scale_n1_to_3": {"status": "BLOCKED_BY_TRIGGER"}
   }
 }

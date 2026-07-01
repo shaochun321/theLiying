@@ -1,0 +1,39 @@
+{
+  "stage": "phase_dual_source_long",
+  "status": "PASSED",
+  "timestamp": "2026-07-01",
+  "duration_steps": 300000,
+  "duration_seconds": 1202.8,
+  "checks": {
+    "DR1_wR_minus_wL_gt_0005": true,
+    "DR1_value": 0.0921,
+    "DR1b_wB_minus_wF_gt_0": true,
+    "DR1b_value": 0.0244,
+    "DR2_dist_reduction_gt_1": true,
+    "DR2_value": 2.977,
+    "DR3_first_close_lt_200k": true,
+    "DR3_first_step": 390,
+    "DR6_da_saturation_lt_20pct": true,
+    "DR6_value": 0.0,
+    "regression_21_21_pass": true
+  },
+  "nu_probe": {
+    "system_nu_ema_final": 2315.8834,
+    "charging_fraction_final": 0.850,
+    "nu_confusion": 0.150,
+    "NP1_thermo_relay_charging": true,
+    "NP2_soma_to_da_discharging": false,
+    "top_bundles_at_270k": [
+      {"bundle_id": "hc_to_aff_pitch", "nu_ema": 495.4, "xi": 231.6},
+      {"bundle_id": "met_to_hc_pitch", "nu_ema": 489.7, "xi": -214.6},
+      {"bundle_id": "noci_to_relay_right", "nu_ema": 112.4, "xi": -178.4}
+    ]
+  },
+  "weight_trajectory": {
+    "step_0":   {"wR_wL": 0.0000, "wB_wF": 0.0000},
+    "step_30k": {"wR_wL": 0.0925, "wB_wF": 0.0245},
+    "step_150k":{"wR_wL": 0.0923, "wB_wF": 0.0244},
+    "step_300k":{"wR_wL": 0.0921, "wB_wF": 0.0244}
+  },
+  "notes": "DR5 (grad_v) not measured in this script; expected >99% based on Phase 8 analogy. fill_min N/A (static heat sources)."
+}
