@@ -479,10 +479,16 @@ class VariantCircuit(HebbianCircuit):
                 # → GIRK K⁺ current → hyperpolarization → reduced DA release.
                 # REF: Lacey et al. 1987; Ford 2014
                 use_d2_autoreceptor=True,
-                d2_conductance=0.5,     # GIRK conductance
+                # RC-3: conductance 0.5→0.1; r_leak 100→20; product g×τ: 50→2.
+                # With RC-2 relay gain ÷10, soma→DA input ÷10; old g=0.5 over-
+                # suppressed DA to 0.03 in 50k steps (7× decay), breaking STDP.
+                # 0.1: lower-expressing VTA DA population. REF: Ford 2014.
+                # r_leak 20 → τ_D2=20ms: DAT-mediated perisynaptic clearance
+                # (Benoit-Marand et al. 2000 J.Neurosci.). τ_D2/τ_mem=10 (stable).
+                d2_conductance=0.1,     # GIRK conductance (was 0.5)
                 d2_ec50=0.3,            # D2R activates at [DA] > 0.3
                 d2_da_capacitance=1.0,  # local [DA] integrator
-                d2_da_r_leak=100.0,     # τ_D2 = 100 >> τ_membrane = 2 (50× ratio → stable)
+                d2_da_r_leak=20.0,      # τ_D2=20ms (was 100; DAT clearance kinetics)
             )
             self.da_neurons[nid] = Neuron(cfg)
 

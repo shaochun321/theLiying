@@ -218,7 +218,11 @@ class SomatosensoryChain:
                     learning_rule="stdp",
                     initial_weight=0.3,
                     stdp_lr=0.005,
-                    synapse_gain=3.0,
+                    # RC-2: 0.3 keeps relay activation ~0.37 (below VDD=1.0 and
+                    # pre_trace clamp=10). gain=3.0 caused relay~3.7 → all patch
+                    # pre_traces saturated at 10 → STDP lost gradient direction.
+                    # BIO: Aδ→WDR gain ~1.5-3mV EPSP/spike (Craig&Dostrovsky 1999)
+                    synapse_gain=0.3,
                     bundle_role="feedforward",
                     # TemporalCoupler: bridge slow thermo (τ=100ms) to relay
                     coupler_capacitance=50.0,
