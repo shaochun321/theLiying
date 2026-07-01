@@ -511,6 +511,10 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_xin_to_da: List[SynapticBundle] = []
         # B.06: Somatosensory relay → DA (structural thermal pathway)
         self.bundles_soma_to_da: List[SynapticBundle] = []
+        # RC-4: Slow relay neurons for thermal derivative detection (phasic DA)
+        self._slow_relays: Dict[str, Neuron] = {}
+        self._bundles_relay_to_slow: List[SynapticBundle] = []
+        self._bundles_slow_to_da: List[SynapticBundle] = []
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step: mother + variant overlay.
@@ -1091,6 +1095,24 @@ class VariantCircuit(HebbianCircuit):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
 
+        # RC-4: slow relay step + inhibitory baseline subtraction
+        # Step each slow relay with its fast relay's output current,
+        # then subtract slow_relay contribution from DA input (phasic signal).
+        if self._bundles_relay_to_slow:
+            slow_in: Dict[str, float] = {}
+            for b in self._bundles_relay_to_slow:
+                c_vec = b.propagate()
+                for j, tgt in enumerate(b.targets):
+                    if j < len(c_vec):
+                        slow_in[tgt.id] = slow_in.get(tgt.id, 0.0) + c_vec[j]
+            for pid, sn in self._slow_relays.items():
+                sn.step(slow_in.get(sn.id, 0.0), dt)
+            for b in self._bundles_slow_to_da:
+                c_vec = b.propagate()
+                for j, tgt in enumerate(b.targets):
+                    if j < len(c_vec) and tgt.id in da_input_currents:
+                        da_input_currents[tgt.id] += c_vec[j]
+
         # ── Step DA neurons ──
         # DA neuron energy: withdraw from EnergyStore (not magic refill).
         # Rate-limited: max 0.01 per step per neuron (prevents store drain).
@@ -1666,6 +1688,84 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_soma_to_da.append(
             SynapticBundle(cfg_soma, relay_neurons, da_list))
 
+        # ── RC-4: Slow relay neurons — thermal derivative (phasic DA) ──
+        # Problem: soma_to_da is all-to-all; sum of all patch temps is ~constant
+        # as body moves → DA stays TONIC (0.24) → DA post_trace ≈ 0 →
+        # STDP ltp ≈ 0 → weights frozen at hash initialization values.
+        #
+        # Fix: subtract slowly-adapting thermal baseline from fast relay signal.
+        #   fast relay (τ=20) tracks temperature level T
+        #   slow relay (τ = C×R = 50×10 = 500 sim-units ≈ 500k steps at dt=0.001)
+        #              tracks background temperature T_avg
+        #   Net DA input ≈ fast - slow ∝ dT/dt (derivative signal)
+        # During approach (T continuously rising): fast > slow → DA phasic ↑
+        # DA post_trace becomes non-zero → STDP can encode gradient direction
+        #
+        # BIO: SA (slowly adapting) thermoreceptor WDR interneurons subtract
+        #      background to encode temperature change rate (Duclaux & Kenshalo 1980;
+        #      Morin & Bushnell 1998 Prog. Brain Res. 113:303).
+        # τ_slow = 300 time units = 300k steps (at dt=0.001)
+        #        = C × r_leak = 300 × 1.0 — matched to Phase 8 experiment duration
+        # V_ss = relay.act × 1.0 (r_leak=1.0, inertia=1.0) — same scale as relay
+        # activation = vmem (linear, via multi-channel mode):
+        #   Using channel name "pass_thru" (non-"default") forces multi-channel mode
+        #   where activation = raw vmem, bypassing the quadratic MOSFET formula.
+        #   This is critical: default simple mode gives activation=(vmem-v_th)² (tiny),
+        #   which would never exceed the threshold in the slow_to_da inhibitory path.
+        for pid in self.somatosensory.patch_ids:
+            cfg_slow = NeuronConfig(
+                neuron_id=f"slow_relay_{pid}",
+                capacitance=300.0,   # τ_slow = C × r_leak = 300 time units = 300k steps
+                r_leak=1.0,          # V_ss = relay.act × 1.0 (scale-matched to relay)
+                inertia=1.0,         # no amplification: scaled_current = I_ext
+                vdd=1.0,
+                r_supply=0.1,
+                spiking=False,
+                channels=[ChannelConfig(  # multi-channel mode: activation = vmem (linear)
+                    name="pass_thru",     # non-"default" name triggers multi-channel path
+                    v_threshold=0.0,
+                    gm=0.001,             # near-zero: negligible ionic current drain
+                    tau_gate=0.0,
+                    reversal=0.0,
+                    sign=1.0,
+                )],
+                leak_conductance=0.0,     # disable double-leak in multi-channel mode
+                use_voltage_regulator=False,
+            )
+            self._slow_relays[pid] = Neuron(cfg_slow)
+
+        # relay → slow_relay (fixed pass-through, no STDP)
+        for pid in self.somatosensory.patch_ids:
+            b = SynapticBundle(
+                BundleConfig(
+                    bundle_id=f"relay_to_slow_{pid}",
+                    learning_rule="frozen",
+                    initial_weight=1.0,
+                    synapse_gain=1.0,
+                    bundle_role="feedforward",
+                ),
+                sources=[self.somatosensory.relays[pid]],
+                targets=[self._slow_relays[pid]],
+            )
+            self._bundles_relay_to_slow.append(b)
+
+        # slow_relay → DA (fixed inhibitory: subtract thermal baseline)
+        # synapse_gain=-1.0 × initial_weight=0.5 → net: -0.5 × slow_relay per patch
+        # Cancels tonic component; residual = dT/dt signal → phasic DA
+        for pid in self.somatosensory.patch_ids:
+            b = SynapticBundle(
+                BundleConfig(
+                    bundle_id=f"slow_to_da_{pid}",
+                    learning_rule="frozen",     # fixed: structural baseline subtraction
+                    initial_weight=0.5,          # symmetric to soma_to_da fast excitation
+                    synapse_gain=-1.0,           # INHIBITORY: subtract baseline
+                    bundle_role="feedforward",
+                ),
+                sources=[self._slow_relays[pid]],
+                targets=da_list,
+            )
+            self._bundles_slow_to_da.append(b)
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -1673,6 +1773,7 @@ class VariantCircuit(HebbianCircuit):
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
             f"bundles=shadow_to_da+xin_to_da+soma_to_da"
+            f"+slow_relay×{len(self._slow_relays)}+relay_to_slow+slow_to_da (RC-4)"
         )
 
     # ── Override get_all_neurons/bundles to include DA components ──
@@ -1689,6 +1790,7 @@ class VariantCircuit(HebbianCircuit):
         neurons.extend(self.da_neurons.values())
         neurons.append(self._xin_relay)
         neurons.extend(self.somatosensory.get_all_neurons())
+        neurons.extend(self._slow_relays.values())  # RC-4: slow relay census
         return neurons
 
     def get_all_bundles(self):
@@ -1704,6 +1806,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.bundles_xin_to_da)
         bundles.extend(self.bundles_soma_to_da)
         bundles.extend(self.somatosensory.get_all_bundles())
+        bundles.extend(self._bundles_relay_to_slow)  # RC-4: slow relay bundles
+        bundles.extend(self._bundles_slow_to_da)
         return bundles
 
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────
