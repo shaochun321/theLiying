@@ -55,6 +55,33 @@ ADJACENCY = {
 
 
 # ─────────────────────────────────────────────────────────────────────
+# V2.0 Spatial scaffold: body-frame positions (mm)
+# BIO: skin patches at body surface (effective_radius=2mm from body center).
+# Thermoreceptors/nociceptors: epidermis-dermis junction, r=2mm.
+# Relay (WDR): dorsal horn lamina V, r=1.5mm (0.5mm internal from skin).
+# REF: Basbaum, Bautista, Scherrer & Julius 2009. "Cellular and Molecular
+#      Mechanisms of Pain." Cell 139(2):267–284.
+#      Body frame: x=front, y=right, z=up; origin at body center.
+# ─────────────────────────────────────────────────────────────────────
+
+_SKIN_POS: dict = {
+    # Skin surface (r=2mm) — thermoreceptors and nociceptors
+    "front": ( 2.0,  0.0, 0.0),
+    "back":  (-2.0,  0.0, 0.0),
+    "left":  ( 0.0, -2.0, 0.0),
+    "right": ( 0.0,  2.0, 0.0),
+}
+
+_RELAY_POS: dict = {
+    # Dorsal horn WDR relay (r=1.5mm, 0.5mm internal from skin surface)
+    "front": ( 1.5,  0.0, 0.0),
+    "back":  (-1.5,  0.0, 0.0),
+    "left":  ( 0.0, -1.5, 0.0),
+    "right": ( 0.0,  1.5, 0.0),
+}
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Neuron configurations
 # ─────────────────────────────────────────────────────────────────────
 
@@ -75,6 +102,7 @@ def _thermoreceptor_config(patch_id: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"thermo_{patch_id}",
+        position=_SKIN_POS.get(patch_id),   # BIO: TRPV/TRPM channels at epidermis-dermis, r=2mm
         capacitance=1.0,        # reduced from 5.0 → 5× faster equilibration
         r_leak=5.0,             # reduced from 20.0 → τ=5.0, V_ss=T_skin×5.0
         inertia=1.0,
@@ -121,6 +149,7 @@ def _nociceptor_config(patch_id: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"noci_{patch_id}",
+        position=_SKIN_POS.get(patch_id),   # BIO: TRPV1 C-fiber terminals at epidermis-dermis, r=2mm
         capacitance=0.02,       # bare nerve: 25× smaller → ultrafast
         r_leak=50.0,            # τ = 1ms, higher R → higher V_ss
         inertia=0.3,
@@ -147,6 +176,7 @@ def _relay_config(patch_id: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"relay_{patch_id}",
+        position=_RELAY_POS.get(patch_id),  # BIO: WDR neuron at dorsal horn lamina V, r=1.5mm
         capacitance=2.0,        # moderate integration
         r_leak=10.0,            # τ = 20ms
         inertia=1.0,
