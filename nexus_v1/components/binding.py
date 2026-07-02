@@ -20,7 +20,7 @@ from .neuron import Neuron
 
 @dataclass
 class BindingConfig:
-    """Configuration for one hyperedge (binding cell)."""
+    """TYPE:BIO — Configuration for one hyperedge (binding cell)."""
     binding_id: str = ""
     source_axes: Tuple[str, ...] = ()   # e.g. ("yaw", "pitch")
     co_activation_threshold: float = 0.05  # θ_p: minimum activation
@@ -28,7 +28,7 @@ class BindingConfig:
 
 
 class BindingCell:
-    """A single hyperedge that detects conjunctive activation (§5.2).
+    """TYPE:BIO — A single hyperedge that detects conjunctive activation (§5.2).
 
     Activation = G × Π ReLU((a_i - θ) / θ)  (AND gate)
 
@@ -71,7 +71,7 @@ class BindingCell:
 
 
 class BindingLayer:
-    """Collection of all hyperedges for the circuit (§5.3).
+    """TYPE:BIO — Collection of all hyperedges for the circuit (§5.3).
 
     Structurally creates C(n,2) binding cells at initialization.
     All start dormant (gain=1.0 but weights to motor are ~0.001).

@@ -85,7 +85,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ExtracellularMatrix:
-    """Extracellular Matrix: ion buffer + thermal mass + plasticity gate.
+    """TYPE:HYBRID — Extracellular Matrix: ion buffer + thermal mass + plasticity gate.
 
     Models the interstitial space between neurons as a dynamic
     medium that buffers ions, absorbs heat, and gates plasticity.

@@ -15,8 +15,8 @@ Success criteria:
   5. STDP ACTIVE: enc→col bundle weights for thermal axes change over time
   6. ENERGY ACCOUNTING: Noether balance remains bounded
 """
-import sys
-sys.path.insert(0, r"d:\cell-cc")
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import json
 from nexus_v1.circuit.variant_adapter import VariantCircuit
@@ -137,16 +137,26 @@ def run_phase3_gate(total_steps=20000, report_interval=2000):
     if any_nonzero:
         passed += 1
 
-    # Gate 2: Encoding alive — at least 1 thermal enc neuron has fired
-    any_enc_fired = any(
-        any(v > 0 for v in snapshot.values())
-        for snapshot in enc_therm_activity
-    )
-    status = "✅ PASS" if any_enc_fired else "❌ FAIL"
-    print(f"\n[2] ENCODING ALIVE — thermal enc neurons fired: {status}")
-    if enc_therm_activity:
-        print(f"    Last snapshot: {enc_therm_activity[-1]}")
-    if any_enc_fired:
+    # Gate 2: Encoding differentiation — thermal encoding shows spatial selectivity
+    #   Old check: any(v > 0) — tautological because ambient baseline drives all
+    #   enc neurons to nonzero activation. Changed to differential check that
+    #   verifies gradient information (not just baseline) reaches encoding layer.
+    enc_front_ema = circuit.encoding_neurons.get('reg_therm_front')
+    enc_back_ema = circuit.encoding_neurons.get('reg_therm_back')
+    if enc_front_ema and enc_back_ema:
+        enc_diff = abs(enc_front_ema._activation_ema - enc_back_ema._activation_ema)
+        any_enc_diff = enc_diff > 0.01  # gradient signal threshold
+    else:
+        any_enc_diff = False
+        enc_diff = 0.0
+    status = "✅ PASS" if any_enc_diff else "❌ FAIL"
+    print(f"\n[2] ENCODING DIFFERENTIATION — thermal enc gradient signal: {status}")
+    print(f"    front-back EMA diff: {enc_diff:.4f} (threshold > 0.01)")
+    if enc_front_ema:
+        print(f"    front EMA: {enc_front_ema._activation_ema:.4f}")
+    if enc_back_ema:
+        print(f"    back EMA:  {enc_back_ema._activation_ema:.4f}")
+    if any_enc_diff:
         passed += 1
 
     # Gate 3: Shadow receives — shadow col therm has nonzero calcium_rate

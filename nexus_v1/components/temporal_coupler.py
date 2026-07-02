@@ -36,7 +36,7 @@ from .semiconductor import Capacitor, MOSFET
 
 
 class TemporalCoupler:
-    """Adaptive impedance-matching between layers of different timescales.
+    """TYPE:SEMI — Adaptive impedance-matching between layers of different timescales.
 
     Two-layer regulation:
       B (slow): circulation mismatch → τ_base drift (dam capacity)

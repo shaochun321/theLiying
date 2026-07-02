@@ -79,11 +79,10 @@ for step in range(STEPS):
         # DA concentration
         da_conc = c.dopamine.concentration
 
-        # Skin temperatures (from SomatosensoryChain patch_temps)
+        # Skin temperatures
         skin_T = {}
-        if hasattr(c, '_patch_temps'):
-            for pid, vals in c._patch_temps.items():
-                skin_T[pid] = round(vals[0], 4)
+        for p in c.world.body.skin_patches:
+            skin_T[p.patch_id] = round(p.current_temperature, 4)
 
         # Thermal column activations (per-patch)
         col_act = {}

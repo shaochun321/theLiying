@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class EnergyStoreConfig:
-    """Configuration for the energy reservoir."""
+    """TYPE:SEMI — Configuration for the energy reservoir."""
     # Capacity: maximum stored energy
     # Must survive learning period (~50k steps) without feeding.
     # DA neurons draw ~0.01/step, vascular ~0.001/step, basal ~0.0001/step.
@@ -43,6 +43,13 @@ class EnergyStoreConfig:
     capacity: float = 1000.0
 
     # Initial fill level (fraction of capacity)
+    # DESIGN NOTE: 0.5 is deliberately chosen, not 0.7.
+    # With init_fill=0.7, the organism has enough energy to accumulate DA≈0.12
+    # before the AGC cold-start ramp (step 2k-4k). When AGC jumps to 5.0,
+    # DA overshoots to 1.0 (saturated) → motor runaway → P_out≈0.335/step >>
+    # P_in_max≈0.047/step → catastrophic 8k-step starvation spiral.
+    # With init_fill=0.5, the crash happens at step 2k-4k before DA accumulates
+    # (DA≈0.13 only), so recovery with max_deposit=0.08 is smooth and fast.
     initial_fill: float = 0.5
 
     # Passive drain rate: basal metabolic cost per step
@@ -54,7 +61,18 @@ class EnergyStoreConfig:
     # BIO: blood-brain barrier limits glucose delivery rate.
     # PHYS: constant current source — universe's power budget.
     # P2.1: This + constant per-bundle drain = thermodynamic ceiling.
-    max_deposit_per_step: float = 0.05
+    #
+    # FIX-DEPOSIT-RATE: 0.05 → 0.08 → 0.12.
+    # EXP-023 run1 (0.05): P_net=-6.9e-4/step → fill 0.50→0.155 over 500k.
+    # EXP-023 run2 (0.08): P_out_max≈0.108/step during neural full-load,
+    #   exceeding 0.08 cap → feast-famine oscillations → fill=0 at step 350k.
+    #   Root: delivery_factor=1.0 at full fill → all neurons fire at max →
+    #   aggregate draw = 0.108 > 0.08 → structural deficit → collapse.
+    # At 0.12: P_in_max(0.12) > P_out_max(0.108) → positive margin even at
+    #   full neural load. Fill should stabilize without hitting zero.
+    # BIO: r=30 thermal field → larger skin contact area → higher heat flux.
+    # PHYS: Stefan-Boltzmann P ∝ A·T⁴; larger A (radius) → higher P_absorb.
+    max_deposit_per_step: float = 0.12
 
     # Efficiency of deposit (not all consumed energy is stored)
     # BIO: digestive efficiency ≈ 85-95%
@@ -66,7 +84,7 @@ class EnergyStoreConfig:
 
 
 class EnergyStore:
-    """External energy reservoir — the organism's 'battery'.
+    """TYPE:SEMI — External energy reservoir — the organism's 'battery'.
 
     Sits between World (food acquisition) and internal metabolism.
     Can be replaced/upgraded without changing internal wiring.

@@ -1,6 +1,6 @@
 """Experiment 2: Timing differentiation + weight evolution analysis."""
 import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World

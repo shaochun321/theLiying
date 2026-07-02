@@ -43,7 +43,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
         "encoding": {
             "capacitance": 3.0,    # 3x main (1.0) -> tau=15
             "r_leak": 5.0,
-            "vr_base_rate": 0.05,   # 影子归一：除法归一化分母×5 → 稳态V_ss压制饱和
+            "vr_base_rate": 0.01,   # higher recovery for large currents
             # ── DIFFERENTIATION: DivisiveNormalizationReceptor (I) ──
             # Shadow enc receives Xin from vestibular chain (magnitude 0.2~20).
             # DN receptor provides per-neuron input adaptation instead of
@@ -55,7 +55,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
         "column": {
             "capacitance": 3.0,
             "r_leak": 5.0,
-            "vr_base_rate": 0.05,  # 影子归一：同 encoding 层
+            "vr_base_rate": 0.01,
             # ── DIFFERENTIATION: Spiking + CalciumRateIntegrator (H) ──
             # Shadow col IS spiking (hard upper bound on activation).
             # BUT downstream reads calcium_rate (continuous), not activation.
@@ -129,7 +129,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
 # ─────────────────────────────────────────────────────────────
 
 class ShadowSandbox:
-    """Shadow Layer built from real Neuron + Bundle + ECM components.
+    """TYPE:HYBRID — Shadow Layer built from real Neuron + Bundle + ECM components.
 
     Usage:
         sandbox = ShadowSandbox()
@@ -140,10 +140,10 @@ class ShadowSandbox:
 
     # Shadow operates every k steps (slow timescale)
     SHADOW_K = 10
-    # Xin input gain: 1:1 物理映射，废除人工放大器。
-    # 源头降维：前庭链自然|Ξ|已达15~30，3.0倍放大等于三倍轰炸影子层→积分饱和。
-    # REF: 大一统方案 §4.4; 1:1真实非平衡态热力学映射
-    XIN_GAIN = 1.0
+    # Xin input gain: amplifies weak Xin tension (~0.02) to drive shadow neurons
+    # Without gain, dV = 0.02/3 * 0.01 = 0.00007 per step (too small for STDP)
+    # With gain=3, dV = 0.06/3 * 0.01 = 0.0002 per step (meaningful)
+    XIN_GAIN = 3.0
 
     def __init__(self):
         self._initialized = False
@@ -342,14 +342,179 @@ class ShadowSandbox:
 
         self._initialized = True
 
+    def _expand_for_new_axes(self, circuit):
+        """Dynamically expand shadow topology when new axes appear.
+
+        Called from observe() each shadow step. Detects axes in
+        circuit.all_axes that are not yet in self._axes and creates:
+          - 2 encoding neurons (reg + irr) per new axis
+          - 1 column neuron per new axis
+          - enc→col bundle per new axis
+          - col→mot bundle per new axis
+          - cross-axis bundles between new axis and ALL existing axes
+          - Xin routing for new axis
+
+        INCREMENTAL: never modifies existing neurons/bundles.
+        BIO: cortical map expansion (Merzenich 1984).
+        """
+        current_axes = set(self._axes)
+        circuit_axes = list(getattr(circuit, 'all_axes', []))
+        new_axes = [ax for ax in circuit_axes if ax not in current_axes]
+
+        if not new_axes:
+            return
+
+        vest_axes = list(circuit.vestibular.axes)
+
+        for axis in new_axes:
+            # ── 1. Create encoding neurons ──
+            for kind in ["reg", "irr"]:
+                nid = f"s_enc_{kind}_{axis}"
+                self.neurons[nid] = Neuron(create_shadow_config(nid, "encoding"))
+
+            # ── 2. Create column neuron ──
+            nid_col = f"s_col_{axis}"
+            self.neurons[nid_col] = Neuron(create_shadow_config(nid_col, "column"))
+
+            # ── 3. Enc → Col bundle ──
+            srcs = [self.neurons[f"s_enc_reg_{axis}"],
+                    self.neurons[f"s_enc_irr_{axis}"]]
+            tgts = [self.neurons[nid_col]]
+            bid_ec = f"s_enc_to_col_{axis}"
+            cfg_ec = BundleConfig(
+                bundle_id=bid_ec,
+                initial_weight=0.1,
+                stdp_lr=0.01,
+                remodel_cost_kappa=0.001,
+                synapse_gain=10.0,
+                bundle_role="shadow",
+            )
+            self.bundles[bid_ec] = SynapticBundle(cfg_ec, srcs, tgts)
+
+            # ── 4. Col → Mot bundle ──
+            # Thermal patches: assign to motor by spatial direction
+            if "front" in axis or "back" in axis:
+                mot_key = "x"  # front/back → longitudinal movement
+            elif "left" in axis or "right" in axis:
+                mot_key = "y"  # left/right → lateral movement
+            elif "therm" in axis:
+                mot_key = "x"  # generic thermal → primary motor
+            else:
+                mot_key = "z"  # fallback
+
+            src_col = [self.neurons[nid_col]]
+            tgt_mot = [self.neurons[f"s_mot_{mot_key}"]]
+            bid_cm = f"s_col_to_mot_{axis}"
+            cfg_cm = BundleConfig(
+                bundle_id=bid_cm,
+                initial_weight=0.05,
+                stdp_lr=0.01,
+                remodel_cost_kappa=0.001,
+                synapse_gain=10.0,
+                bundle_role="shadow",
+            )
+            self.bundles[bid_cm] = SynapticBundle(cfg_cm, src_col, tgt_mot)
+
+            # ── 5. Cross-axis bundles with ALL existing axes ──
+            for existing_ax in self._axes:
+                existing_col = f"s_col_{existing_ax}"
+                if existing_col not in self.neurons:
+                    continue
+                # New → Existing
+                bid_ne = f"s_cross_{axis}_{existing_ax}"
+                cfg_ne = BundleConfig(
+                    bundle_id=bid_ne,
+                    initial_weight=0.001,  # dormant
+                    stdp_lr=0.01,
+                    remodel_cost_kappa=0.001,
+                    silence_threshold=0.0005,
+                    synapse_gain=10.0,
+                    bundle_role="cross_axis",
+                    delay_steps=2,
+                )
+                self.bundles[bid_ne] = SynapticBundle(
+                    cfg_ne,
+                    [self.neurons[nid_col]],
+                    [self.neurons[existing_col]],
+                )
+                # Existing → New
+                bid_en = f"s_cross_{existing_ax}_{axis}"
+                cfg_en = BundleConfig(
+                    bundle_id=bid_en,
+                    initial_weight=0.001,
+                    stdp_lr=0.01,
+                    remodel_cost_kappa=0.001,
+                    silence_threshold=0.0005,
+                    synapse_gain=10.0,
+                    bundle_role="cross_axis",
+                    delay_steps=2,
+                )
+                self.bundles[bid_en] = SynapticBundle(
+                    cfg_en,
+                    [self.neurons[existing_col]],
+                    [self.neurons[nid_col]],
+                )
+
+            # ── 6. Cross-axis between new axes (if multiple new) ──
+            for prev_new in new_axes:
+                if prev_new == axis:
+                    break  # only pair with earlier new axes
+                prev_col = f"s_col_{prev_new}"
+                if prev_col not in self.neurons:
+                    continue
+                bid_nn = f"s_cross_{prev_new}_{axis}"
+                cfg_nn = BundleConfig(
+                    bundle_id=bid_nn,
+                    initial_weight=0.001,
+                    stdp_lr=0.01,
+                    remodel_cost_kappa=0.001,
+                    silence_threshold=0.0005,
+                    synapse_gain=10.0,
+                    bundle_role="cross_axis",
+                    delay_steps=2,
+                )
+                self.bundles[bid_nn] = SynapticBundle(
+                    cfg_nn,
+                    [self.neurons[prev_col]],
+                    [self.neurons[nid_col]],
+                )
+
+            # ── 7. Xin routing for new axis ──
+            main_bid = f"enc_to_col_{axis}"
+            self._xin_routing[main_bid] = [
+                f"s_enc_reg_{axis}", f"s_enc_irr_{axis}",
+            ]
+            if axis in vest_axes:
+                main_bid_met = f"met_to_hc_{axis}"
+                self._xin_routing[main_bid_met] = [f"s_enc_reg_{axis}"]
+
+            # ── 8. Initialize baseline EMA for new neurons ──
+            for kind in ["reg", "irr"]:
+                nid = f"s_enc_{kind}_{axis}"
+                self._baseline_ema[nid] = 0.0
+            self._baseline_ema[nid_col] = 0.0
+
+        # Update axes list
+        self._axes.extend(new_axes)
+
     def observe(self, circuit, tick: int):
         """Observe circuit and run one shadow step.
 
         PURE OBSERVER — does NOT modify the main circuit.
         Called every step; shadow only updates every SHADOW_K steps.
+
+        Metabolic tax: shadow neurons/bundles draw energy from the
+        shared EnergyStore. No tax = energy cancer (永动机癌细胞).
         """
         if not self._initialized:
             self.initialize(circuit)
+
+        # Cache energy_store reference for metabolic tax
+        self._energy_store = getattr(circuit, 'energy_store', None)
+
+        # Dynamic expansion: detect new axes from main circuit
+        if tick % (self.SHADOW_K * 100) == 0:  # check every 1000 real steps
+            self._expand_for_new_axes(circuit)
 
         self._tick = tick
 
@@ -467,6 +632,12 @@ class ShadowSandbox:
         # ── 11. Weight change rate (novelty signal for DA) ──
         self._update_weight_change_rate()
 
+        # ── 12. Metabolic tax: shadow pays energy rent ──
+        # Every 100 shadow steps (= 1000 real steps), aligned with main tax cadence.
+        # Shadow growth without tax = Noether violation → energy cancer.
+        if tick % (self.SHADOW_K * 100) == 0:
+            self._apply_metabolic_tax()
+
     def _manage_silent_synapses(self, tick: int):
         """Check for bundles entering/exiting silent state (§3)."""
         for bid, bundle in self.bundles.items():
@@ -518,16 +689,7 @@ class ShadowSandbox:
 
     def _update_free_energy(self, xin_values: List[float]):
         """Update free energy kernel K and motion potential ν. §5."""
-        K_raw = sum(xi ** 2 for xi in xin_values)
-        # Michaelis-Menten saturation: K is bounded by physical state space.
-        # BIO: calmodulin/CaMKII activation saturates at finite Ca2+ concentration
-        #      (Bhaskara 2011). No free-energy variable can grow unboundedly.
-        # Normal K_raw (|xi|~0.1-1.0, ~35 bundles) ≈ 0.35-35 → linear region.
-        # Pathological K_raw (xi diverges) → bounded near K_MM_LIMIT.
-        # CALIBRATE: K_MM_LIMIT=1000 keeps normal range fully linear (<3% sat).
-        # Pending EXP validation of exact saturation point.
-        K_MM_LIMIT = 1000.0
-        K = K_raw * K_MM_LIMIT / (K_raw + K_MM_LIMIT)
+        K = sum(xi ** 2 for xi in xin_values)
         self._k_ema = self._k_ema * 0.99 + K * 0.01
 
         if self._k_history:
@@ -627,6 +789,16 @@ class ShadowSandbox:
             "delta_a_sample": {
                 nid: round(self._get_delta_a(nid), 6)
                 for nid in list(self.neurons.keys())[:4]
+            },
+            "metabolic_tax": {
+                "total_paid": round(getattr(self, '_total_tax_paid', 0.0), 4),
+                "active_bundles": sum(
+                    1 for b in self.bundles.values()
+                    if not b.config.is_silent),
+                "cost_per_tax_check": round(
+                    sum(1 for b in self.bundles.values()
+                        if not b.config.is_silent) * self.SHADOW_BUNDLE_COST
+                    + len(self.neurons) * self.SHADOW_NEURON_COST, 6),
             },
         }
 
@@ -769,3 +941,80 @@ class ShadowSandbox:
             self._weight_change_ema * 0.98
             + self._weight_change_rate * 0.02
         )
+
+    # ─────────────────────────────────────────────────────────
+    # Metabolic tax (§审计局追查: Shadow必须缴税)
+    # ─────────────────────────────────────────────────────────
+
+    # Per-bundle maintenance cost: same as main system (hebbian.py L607)
+    SHADOW_BUNDLE_COST: float = 0.0005
+    # Per-neuron basal metabolic cost (membrane ion pump operation)
+    SHADOW_NEURON_COST: float = 0.0001
+    # Energy floor: below this, shadow bundle weights decay
+    SHADOW_ENERGY_FLOOR: float = 0.3
+
+    def _apply_metabolic_tax(self):
+        """Shadow metabolic tax — every synapse/neuron costs energy.
+
+        MANDATORY: Without this, shadow growth is a free lunch
+        (永动机癌细胞) that violates Noether energy accounting.
+
+        Mechanism:
+          1. Each shadow bundle drains SHADOW_BUNDLE_COST from EnergyStore
+          2. Each shadow neuron drains SHADOW_NEURON_COST from EnergyStore
+          3. If EnergyStore delivery degrades (is_starving or low fill),
+             shadow bundle weights decay proportionally to deficit
+          4. Silent bundles cost nothing (already pruned)
+
+        This creates thermodynamic selection pressure:
+          - Shadow can grow (new axes → new bundles) but each bundle
+            increases total energy drain
+          - When organism stops eating, shadow is first to starve
+            (lower priority than sensorimotor)
+          - Predictive value must justify maintenance cost
+
+        BIO: synaptic maintenance consumes ~40% of brain energy.
+        Prediction circuits are metabolically expensive.
+        REF: Harris et al. 2012 — synaptic energy budget.
+        """
+        store = self._energy_store
+        if store is None:
+            return
+
+        # ── 1. Per-bundle drain ──
+        active_bundle_count = 0
+        for bid, bundle in self.bundles.items():
+            if bundle.config.is_silent:
+                continue  # silent bundles cost nothing
+            active_bundle_count += 1
+            store.withdraw(self.SHADOW_BUNDLE_COST)
+
+        # ── 2. Per-neuron drain ──
+        neuron_count = len(self.neurons)
+        store.withdraw(self.SHADOW_NEURON_COST * neuron_count)
+
+        # ── 3. Energy-starved weight decay ──
+        # When EnergyStore delivery factor drops, shadow synapses
+        # lose conductance (protein turnover without ATP replacement).
+        delivery = store.delivery_factor()
+        if delivery < 1.0:
+            # Deficit = how much below full delivery
+            deficit = 1.0 - delivery
+            # Decay rate proportional to deficit (same formula as main)
+            decay_rate = deficit * 0.002
+
+            for bid, bundle in self.bundles.items():
+                if bundle.config.is_silent:
+                    continue
+                for row in bundle._memristors:
+                    for m in row:
+                        dw = -decay_rate * m.w  # proportional decay
+                        m.apply_dw(dw, bundle.config.weight_min,
+                                   bundle.config.weight_max)
+
+        # ── 4. Track tax paid (for Noether audit) ──
+        if not hasattr(self, '_total_tax_paid'):
+            self._total_tax_paid = 0.0
+        tax_this_round = (active_bundle_count * self.SHADOW_BUNDLE_COST
+                          + neuron_count * self.SHADOW_NEURON_COST)
+        self._total_tax_paid += tax_this_round

@@ -2,8 +2,8 @@
 
 量化推演: vital脉搏 -> dT/dt -> Nociceptor 是否发火?
 """
-import sys, math
-sys.path.insert(0, "d:\\cell-cc")
+import os, sys, math
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from nexus_v1.components.world import SkinPatch, Body, World, HeatSource
 

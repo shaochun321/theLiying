@@ -17,7 +17,7 @@ from ..components.temporal_coupler import TemporalCoupler
 
 @dataclass
 class BundleConfig:
-    """Configuration for a synaptic bundle."""
+    """TYPE:SEMI — Configuration for a synaptic bundle."""
     bundle_id: str = ""
     learning_rule: str = "stdp"   # "stdp", "bcm", "frozen"
     bundle_inertia: float = 1.0
@@ -91,9 +91,27 @@ class BundleConfig:
     _sw_step_count: int = 0
     standing_wave_score: float = 0.0
 
+    # ── Phase 3: Eligibility trace (three-factor learning) ──
+    # When enabled, LTP is gated by DA: dw_ltp = η_elig × E(t) × DA(t).
+    # E(t) is a leaky capacitor charged by pre×post co-activation.
+    # Without DA confirmation, LTP is frozen → only LTD + decay operate.
+    # BIO: CaMKII/PKC priming at synapse → DA burst → AMPA insertion.
+    # REF: Izhikevich 2007 — "Solving the distal reward problem"
+    # REF: Gerstner et al. 2018 — "Eligibility traces and plasticity"
+    use_eligibility_trace: bool = False
+    # τ_elig: eligibility trace decay time constant (steps).
+    # BIO: CaMKII autophosphorylation half-life ≈ 100ms-1s.
+    # PHYS: must bridge pre×post event → DA arrival delay (100-500 steps).
+    eligibility_tau: float = 300.0
+    # η_elig: scaling factor for E(t) × DA(t) → dw_ltp.
+    eligibility_gain: float = 1.0
+    # η_ltd: realtime LTD rate (not DA-gated — forgetting is always on).
+    # BIO: AMPA receptor endocytosis is constitutive (Ehlers 2000).
+    eligibility_ltd_rate: float = 0.01
+
 
 class SynapticBundle:
-    """A bundle of synaptic connections from sources to targets.
+    """TYPE:SEMI — A bundle of synaptic connections from sources to targets.
 
     Each (source, target) pair has a Memristor whose conductance
     determines the connection strength.
@@ -148,6 +166,17 @@ class SynapticBundle:
 
         # ── Delay buffer (C-001.3: axon conduction delay) ──
         self._delay_buffer: list = []  # FIFO queue of target_currents
+
+        # ── Phase 3: Per-synapse eligibility traces ──
+        # E[i][j] = leaky capacitor tracking pre×post co-activation.
+        # Charged by correlated activity, discharges with τ_elig.
+        # Only allocated when use_eligibility_trace is enabled.
+        if config.use_eligibility_trace:
+            self._eligibility_traces: List[List[float]] = [
+                [0.0] * len(targets) for _ in sources
+            ]
+        else:
+            self._eligibility_traces = None
 
         # ── Xin state (§7 of math spec) ──
         # Previous source activations for predict-compare
@@ -233,17 +262,42 @@ class SynapticBundle:
                         ema_upstream=ema_up)
                 tgt.step(current, dt)
 
-    def learn(self, dt: float = 1.0, plasticity_gate: float = 1.0):
+    # Phase 2: Energy-gated plasticity freeze threshold.
+    # When EnergyStore fill_fraction < this, ALL plasticity is linearly
+    # suppressed (both LTP and LTD). At fill=0, weights fully frozen.
+    # BIO: Both LTP (AMPA receptor insertion) and LTD (AMPA receptor
+    # removal) require ATP. Energy depletion freezes the entire synapse.
+    # EXP-016 evidence: Δw collapsed +0.289→+0.013 when fill→0.
+    # Phase 2 v1 (LTD-only gate) caused common-mode chase: w_back grew
+    # alongside w_front when LTD was suppressed but LTP continued.
+    # v2 fix: symmetric freeze prevents both erosion AND unchecked growth.
+    FILL_THRESHOLD_PLASTICITY = 0.10
+
+    def learn(self, dt: float = 1.0, plasticity_gate: float = 1.0,
+             fill_fraction: float = 1.0, da_concentration: float = 0.0):
         """Apply unified learning rule (§4.4 of math spec).
 
         Learning rule is determined by target neuron maturation stage:
-          - spine (M=0): STDP with soft bounds
+          - spine (M=0): STDP with soft bounds (or three-factor if enabled)
           - column (M=1): BCM with sliding threshold
           - area (M=2): frozen
+
+        Phase 2: energy-gated plasticity freeze (symmetric).
+        When fill_fraction < FILL_THRESHOLD_PLASTICITY, ALL weight changes
+        (both potentiation and depression) are linearly suppressed.
+        At fill=0, dw=0 → weights fully frozen (hibernation).
+
+        Phase 3: Three-factor eligibility trace (when use_eligibility_trace=True).
+        LTP is gated by DA: dw_ltp = η_elig × E(t) × DA(t).
+        Without DA, only LTD + decay operate → no blind potentiation.
+        REF: Izhikevich 2007 — "Solving the distal reward problem"
 
         Args:
             dt: Time step.
             plasticity_gate: PNN-derived gate g_ℓ ∈ [0,1]. Multiplicative.
+            fill_fraction: EnergyStore fill level ∈ [0,1]. Gates ALL plasticity.
+            da_concentration: Dopamine concentration ∈ [0,1]. Gates LTP in
+                three-factor mode. Default 0.0 → LTP frozen (safe default).
         """
         if self.config.learning_rule == "frozen":
             return
@@ -279,25 +333,76 @@ class SynapticBundle:
             min(max_maturation, len(self.config.plasticity_by_stage) - 1)
         ]
 
+        # Phase 2: compute energy-gated plasticity scale factor.
+        # Linear ramp: fill >= threshold → 1.0 (normal plasticity)
+        #              fill = 0          → 0.0 (fully frozen)
+        # Symmetric: gates BOTH LTP and LTD equally.
+        # No if/else discontinuity — smooth physical transition.
+        energy_plasticity_scale = min(
+            1.0, fill_fraction / self.FILL_THRESHOLD_PLASTICITY)
+
         for i, src in enumerate(self.sources):
             for j, tgt in enumerate(self.targets):
                 m = self._memristors[i][j]
 
                 if effective_rule == "stdp":
-                    # §4.1: STDP with multiplicative soft bounds
-                    ltp = src.pre_trace * tgt.post_trace
-                    decay = self.config.decay_rate_by_stage[0] * m.w
-                    dw_raw = self.config.stdp_lr * dt * (ltp - decay)
+                    if self.config.use_eligibility_trace:
+                        # ── Phase 3: Three-factor eligibility trace ──
+                        # LTP is fully DA-gated. No blind STDP potentiation.
+                        #
+                        # Step 1: Update eligibility trace (Capacitor dynamics)
+                        #   E(t+1) = E(t) × (1 - dt/τ) + pre_trace × post_act × dt
+                        #   BIO: CaMKII priming by coincident pre+post activity.
+                        post_act = self._get_activity_signal(tgt)
+                        decay_factor = 1.0 - dt / max(
+                            self.config.eligibility_tau, 1.0)
+                        self._eligibility_traces[i][j] = (
+                            self._eligibility_traces[i][j] * decay_factor
+                            + src.pre_trace * post_act * dt
+                        )
 
-                    # Multiplicative bounds (§4.1)
-                    if dw_raw > 0:
-                        dw = dw_raw * (self.config.weight_max - m.w)
+                        # Step 2: LTP = η_elig × E(t) × DA(t)  (DA-gated)
+                        #   Only DA confirmation converts the eligibility
+                        #   mark into actual weight change.
+                        #   DA=0 → ltp=0 → no blind potentiation.
+                        ltp = (self.config.eligibility_gain
+                               * self._eligibility_traces[i][j]
+                               * da_concentration)
+
+                        # Step 3: LTD + decay (realtime, no DA gate)
+                        #   BIO: AMPA endocytosis is constitutive.
+                        #   Forgetting is always on — only growth needs permission.
+                        ltd = (self.config.eligibility_ltd_rate * dt
+                               * src.pre_trace * post_act)
+                        decay = self.config.decay_rate_by_stage[0] * m.w * dt
+
+                        # Step 4: Combine with multiplicative soft bounds
+                        dw_raw = ltp - ltd - decay
+                        if dw_raw > 0:
+                            dw = dw_raw * (self.config.weight_max - m.w)
+                        else:
+                            dw = dw_raw * (m.w - self.config.weight_min)
+
+                        # Phase 2 + PNN gates (unchanged architecture)
+                        dw *= plasticity_gate * plasticity * energy_plasticity_scale
+                        m.apply_dw(dw, self.config.weight_min, self.config.weight_max)
                     else:
-                        dw = dw_raw * (m.w - self.config.weight_min)
+                        # Original two-factor STDP (backward compatible)
+                        # §4.1: STDP with multiplicative soft bounds
+                        ltp = src.pre_trace * tgt.post_trace
+                        decay = self.config.decay_rate_by_stage[0] * m.w
+                        dw_raw = self.config.stdp_lr * dt * (ltp - decay)
 
-                    # Apply plasticity gate (PNN) and maturation rate
-                    dw *= plasticity_gate * plasticity
-                    m.apply_dw(dw, self.config.weight_min, self.config.weight_max)
+                        # Multiplicative bounds (§4.1)
+                        if dw_raw > 0:
+                            dw = dw_raw * (self.config.weight_max - m.w)
+                        else:
+                            dw = dw_raw * (m.w - self.config.weight_min)
+
+                        # Apply plasticity gate (PNN), maturation rate,
+                        # AND energy-gated plasticity freeze (Phase 2).
+                        dw *= plasticity_gate * plasticity * energy_plasticity_scale
+                        m.apply_dw(dw, self.config.weight_min, self.config.weight_max)
 
                 elif effective_rule == "bcm":
                     # §4.2: BCM with sliding threshold
@@ -311,7 +416,8 @@ class SynapticBundle:
                     theta = getattr(tgt.config, 'theta_m', post)
                     dw = (self.config.stdp_lr * dt * pre
                           * post * (post - theta)
-                          * plasticity_gate * plasticity)
+                          * plasticity_gate * plasticity
+                          * energy_plasticity_scale)  # Phase 2
                     m.apply_dw(dw, self.config.weight_min, self.config.weight_max)
 
                     # Update sliding threshold: dθ/dt = (a²_j - θ) / τ_θ
@@ -337,7 +443,9 @@ class SynapticBundle:
                     ]
                     growth = self.config.stdp_lr * dt * pre * post
                     decay = decay_rate * dt * m.w
-                    dw = (growth - decay) * plasticity_gate * plasticity
+                    # Phase 2: energy gate on entire dw (symmetric freeze).
+                    dw = ((growth - decay) * plasticity_gate * plasticity
+                          * energy_plasticity_scale)
                     m.apply_dw(dw, self.config.weight_min, self.config.weight_max)
 
         # ── E_remodel: STDP weight changes consume energy (§2.2) ──
@@ -643,12 +751,12 @@ class SynapticBundle:
             New SynapticBundle (the sprout).
         """
         import random
-        from copy import copy
+        from copy import deepcopy
 
         CROSS_PROB = 0.3  # probability each target is replaced by a peer
         EXPAND_WEIGHT_FRACTION = 0.3  # fraction of parent weight for expand sprouts
 
-        child_config = copy(self.config)
+        child_config = deepcopy(self.config)
         child_config.bundle_id = f"{self.id}_s{tick}"
 
         # E1: expand-triggered sprouts inherit partial parent weight.

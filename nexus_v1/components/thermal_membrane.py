@@ -41,7 +41,7 @@ from .world import World, Body
 
 @dataclass
 class ThermalMembrane:
-    """Scalar thermal sensor with methylation adaptation.
+    """TYPE:BIO — Scalar thermal sensor with methylation adaptation.
 
     ONE sensor. ONE number. Direction comes from cross-modal learning.
 

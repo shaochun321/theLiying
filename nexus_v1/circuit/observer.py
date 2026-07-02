@@ -28,7 +28,7 @@ from ..circuit.bundle import SynapticBundle
 
 @dataclass
 class TickSnapshot:
-    """Frozen copy of circuit state at one tick."""
+    """TYPE:INFRA — Frozen copy of circuit state at one tick."""
     tick: int = 0
 
     # Per-neuron state (neuron_id → value)
@@ -51,7 +51,7 @@ class TickSnapshot:
 
 @dataclass
 class EntropyBalance:
-    """Per-tick entropy accounting.
+    """TYPE:INFRA — Per-tick entropy accounting.
 
     For each tick, tracks:
       - input_entropy: energy injected into the system
@@ -79,7 +79,7 @@ class EntropyBalance:
 
 @dataclass
 class LedgerEntry:
-    """One row in the entropy ledger."""
+    """TYPE:INFRA — One row in the entropy ledger."""
     tick: int
     snapshot: TickSnapshot
     entropy: EntropyBalance
@@ -90,7 +90,7 @@ class LedgerEntry:
 # ─────────────────────────────────────────────────────────────
 
 class CircuitObserver:
-    """External observer — reads nexus_v1 HebbianCircuit, never writes.
+    """TYPE:INFRA — External observer — reads nexus_v1 HebbianCircuit, never writes.
 
     Usage:
         observer = CircuitObserver()

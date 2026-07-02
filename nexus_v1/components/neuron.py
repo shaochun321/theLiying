@@ -31,7 +31,7 @@ from .compensation import (
 
 @dataclass
 class ChannelConfig:
-    """Configuration for one ion channel (= one MOSFET)."""
+    """TYPE:BIO — Configuration for one ion channel (= one MOSFET)."""
     name: str                    # e.g. "met", "k", "ca", "leak"
     v_threshold: float = 0.3    # activation voltage
     gm: float = 1.0             # max conductance
@@ -42,7 +42,7 @@ class ChannelConfig:
 
 @dataclass
 class NeuronConfig:
-    """Complete neuron configuration."""
+    """TYPE:BIO — Complete neuron configuration."""
     neuron_id: str = ""
 
     # Base parameters
@@ -181,7 +181,7 @@ class NeuronConfig:
 
 
 class Neuron:
-    """Extended MetaNeuron — unified model for all layers.
+    """TYPE:BIO — Extended MetaNeuron — unified model for all layers.
 
     Same semiconductor components throughout. Configuration determines
     whether it behaves as a simple threshold, a hair cell, or a spiking
@@ -669,9 +669,9 @@ class Neuron:
         BIO: asymmetric cell division — mother cell retains identity,
         daughter cell starts fresh with inherited genetic program.
         """
-        from copy import copy
+        from copy import deepcopy
 
-        child_config = copy(self.config)
+        child_config = deepcopy(self.config)
         child_config.neuron_id = child_id
         # Child starts at maturation stage 0 (maximum plasticity)
         # so it can learn in even high-PNN environments

@@ -71,13 +71,7 @@ def _met_config(axis: str) -> NeuronConfig:
             ChannelConfig(
                 name="default",
                 v_threshold=0.001,   # BIO: mechanically-gated, NO voltage barrier
-                gm=2.0,              # CROSS-MODAL [A·s/rad]: mechanoelectric transduction (MET channel)
-                                     # EXP-vest-scan-P0-2026-06-30 (STDP-frozen, authoritative):
-                                     #   canal slope: yaw=1.21, pitch=2.25, roll=1.93 Hz/unit
-                                     #   Anchor (Lasker 2008, C57BL/6, 2Hz): 1 unit ≈ 1.80 deg/s (canal mean)
-                                     #   [Phase 1 value 5.5 deg/s was inflated by STDP LTP during measurement]
-                                     # CROSS-MODAL per-axis (independent, 32% non-isomorphic):
-                                     #   yaw:1.21 deg/s  pitch:2.25 deg/s  roll:1.93 deg/s  (per model unit)
+                gm=2.0,              # BIO: high sensitivity
                 tau_gate=0.0,        # BIO: < 0.1 ms = instantaneous
                 reversal=0.615,      # NORM: E_MET = 0 mV
                 sign=1.0,
@@ -169,11 +163,6 @@ def _afferent_regular_config(axis: str) -> NeuronConfig:
     FIX-017: Added tonic discharge (bc_current=0.05) per Goldberg 2000.
       Real vestibular afferents fire at 50-100 Hz even at rest.
       VR rate increased 0.001→0.05 to prevent energy depletion.
-    NOTE (2026-06-29): P2 structural audit found Aff at ~2 Hz in World sim.
-      Root cause: v_peak=0.23 calibrated for weak HC inputs in World physics.
-      All single-neuron fixes (v_peak, fatigue_k) break T5.1: increasing baseline
-      Aff rate causes Xin to fire on both half-cycles → second harmonic at 1 Hz.
-      Fix requires Aff→Enc synapse recalibration (hebbian.py) for 2 Hz operation.
     """
     return NeuronConfig(
         neuron_id=f"aff_reg_{axis}",
@@ -237,7 +226,7 @@ def _afferent_irregular_config(axis: str) -> NeuronConfig:
 # ─────────────────────────────────────────────────────────────────────
 
 class VestibularChain:
-    """5-layer vestibular transduction chain, built from MetaNeurons.
+    """TYPE:BIO — 5-layer vestibular transduction chain, built from MetaNeurons.
 
     Architecture per axis:
         mechanical_input → [MET] → [HairCell] → release → [Afferent_reg]

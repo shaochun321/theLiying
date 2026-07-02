@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Capacitor:
-    """Membrane capacitance: charge accumulation with RC time constant.
+    """TYPE:SEMI — Membrane capacitance: charge accumulation with RC time constant.
 
     Q = CV, dV/dt = I/C - V/(RC).
 
@@ -114,7 +114,7 @@ class Capacitor:
 
 @dataclass
 class MOSFET:
-    """Voltage-gated threshold with optional gating dynamics.
+    """TYPE:SEMI — Voltage-gated threshold with optional gating dynamics.
 
     Base behavior (instantaneous):
       Superthreshold: I = gm × (Vgs - Vth)
@@ -196,7 +196,7 @@ class MOSFET:
 
 @dataclass
 class Memristor:
-    """Synaptic weight: plastic resistance with STDP via charge flux.
+    """TYPE:SEMI — Synaptic weight: plastic resistance with STDP via charge flux.
 
     R = R_min + ΔR × (1 - w), where w ∈ [0, 1].
     
@@ -217,14 +217,19 @@ class Memristor:
 
     @property
     def resistance(self) -> float:
-        return self.r_min + (self.r_max - self.r_min) * (1.0 - self.w)
+        # Defensive clamp: prevent w drifting outside [0,1] due to
+        # numerical error or external injection from causing negative R.
+        w_safe = max(0.0, min(1.0, self.w))
+        return self.r_min + (self.r_max - self.r_min) * (1.0 - w_safe)
 
     @property
     def conductance(self) -> float:
-        # BUG FIX: clamp at r_min (not 1e-6) so w > 1.0 doesn't produce
-        # negative resistance → infinite conductance → current explosion.
-        # Physical: r_min is wire resistance floor; conductance ≤ 1/r_min.
-        return 1.0 / max(self.resistance, self.r_min)
+        # Physical upper limit: conductance cannot exceed 1/r_min
+        # (contact resistance of fully potentiated synapse).
+        # Prevents infinite conductance if resistance → 0.
+        resistance_val = self.resistance
+        g = 1.0 / max(resistance_val, self.r_min)
+        return min(g, 1.0 / self.r_min)
 
     def conduct(self, v_in: float) -> float:
         """Pass current through memristor. I = V × G."""
@@ -273,7 +278,7 @@ class Memristor:
 
 @dataclass
 class PowerRail:
-    """Metabolic energy supply: Vdd from SubstrateNetwork.
+    """TYPE:SEMI — Metabolic energy supply: Vdd from SubstrateNetwork.
 
     V_actual = Vdd - I × R_internal.
     IR drop is the natural gain limiter — large currents saturate.

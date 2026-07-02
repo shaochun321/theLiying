@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class NDRElement:
-    """N-type Negative Differential Resistance element.
+    """TYPE:HYBRID — N-type Negative Differential Resistance element.
 
     Provides a non-monotonic I-V characteristic where increasing
     voltage DECREASES current in the NDR region. This enables:
@@ -178,7 +178,7 @@ class NDRElement:
 
 @dataclass
 class InhibitorySynapse:
-    """NDR-based lateral inhibition.
+    """TYPE:HYBRID — NDR-based lateral inhibition.
 
     Uses the NDR characteristic to implement winner-take-all:
     when one neuron's activation is high, it REDUCES current to

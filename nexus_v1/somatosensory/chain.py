@@ -62,17 +62,11 @@ def _thermoreceptor_config(patch_id: str) -> NeuronConfig:
     """Thermoreceptor: DC/tonic temperature sensor.
 
     RC time constant calibrated for dt=0.001 (1ms per step):
-      τ_th = C × R = 1.0 × 1.0 = 1.0 time-units = 1000 steps = 1s biological
-      V_ss = I × R = T_skin × 1.0.  For T_skin=1.0: V_ss=1.0 (in [0,1]).
-      Reaches 63% in ~1000 steps (1s), 95% in ~3000 steps (3s).
+      τ_th = C × R = 1.0 × 5.0 = 5.0 time-units = 5000 steps = 5s biological
+      V_ss = I × R = T_skin × 5.0.  For T_skin=0.2: V_ss=1.0.
+      Reaches 63% in ~5000 steps (5s), 95% in ~15000 steps (15s).
     BIO: TRPV3/TRPM8 channels — thermal integration τ ≈ 1-10s for tonic response.
     Previous τ=100 was 20× too slow (never reached steady state in typical runs).
-
-    FIX-P1 (2026-06-29): r_leak 5.0→1.0.
-      Old calibration assumed T_skin≤0.2 (V_ss=0.2×5=1.0). In CylindricalHeatSource
-      experiment T_skin reaches ~0.55 near heat source → V_ss=2.75, exceeds [0,1].
-      New r_leak=1.0: V_ss=T_skin×1.0 ≤ 1.0 for any T_skin≤1.0.
-      NORM: τ drops from 5s→1s, still within TRPV3 adaptation range (1-10s).
 
     Uses single-channel mode (activation = MOSFET(V_m)) with low threshold
     because skin temperatures are small (0.1-0.3 normalized). Default
@@ -82,7 +76,7 @@ def _thermoreceptor_config(patch_id: str) -> NeuronConfig:
     return NeuronConfig(
         neuron_id=f"thermo_{patch_id}",
         capacitance=1.0,        # reduced from 5.0 → 5× faster equilibration
-        r_leak=1.0,             # FIX-P1: 5.0→1.0, V_ss=T_skin×1.0 ≤ 1.0 (was 5.0 → overflow)
+        r_leak=5.0,             # reduced from 20.0 → τ=5.0, V_ss=T_skin×5.0
         inertia=1.0,
         vdd=1.0,
         r_supply=0.05,
@@ -133,10 +127,10 @@ def _nociceptor_config(patch_id: str) -> NeuronConfig:
         vdd=1.0,
         r_supply=0.05,
         spiking=True,
-        v_peak=0.01,            # hypersensitive: 50× lower threshold
-        v_reset=0.001,          # small reset gap (near-threshold)
-        b_adapt=0.02,           # moderate adaptation: allows bursting
-        tau_w=5.0,              # longer adaptation decay
+        v_peak=0.25,            # BIO: TRPV1 C-fiber AP threshold V_th≈-47mV → norm=0.254 (Julius & Basbaum 2001)
+        v_reset=0.001,          # small reset gap
+        b_adapt=0.0002,         # BIO: w_adapt_ss=0.005 @ 50Hz; V_ss=-0.005×50=-0.25V (Caterina 1997)
+        tau_w=0.5,              # BIO: C-fiber AHP τ≈200-500ms (Caterina et al. 1997)
         use_voltage_regulator=True,
         vr_base_rate=0.05,
         vr_activity_coeff=0.3,
@@ -172,7 +166,7 @@ def _relay_config(patch_id: str) -> NeuronConfig:
 # ─────────────────────────────────────────────────────────────────────
 
 class SomatosensoryChain:
-    """Thermal skin sensing chain, parallel to VestibularChain.
+    """TYPE:BIO — Thermal skin sensing chain, parallel to VestibularChain.
 
     Architecture per patch:
         T_sample → [Thermoreceptor] ──┐
@@ -192,12 +186,26 @@ class SomatosensoryChain:
     # Lateral inhibition gain — user-specified constraint
     LATERAL_GAIN: float = 0.05
 
+    # Sensory adaptation time constant (steps).
+    # RC high-pass filter: tracks relay baseline (DC) and subtracts it,
+    # outputting only the AC component (temperature changes / gradients).
+    # BIO: spike frequency adaptation in thermoreceptors — tonic response
+    # decays over seconds, leaving only phasic (dT/dt) sensitivity.
+    # τ_adapt = 5000 steps × dt=0.001 = 5s biological time constant.
+    # At 63% of τ, baseline tracking is 63% complete.
+    TAU_ADAPT: float = 5000.0
+
     def __init__(self, patch_ids: List[str] | None = None,
-                 lateral_gain: float = 0.05):
+                 lateral_gain: float = 0.05,
+                 tau_adapt: float = 5000.0):
         if patch_ids is None:
             patch_ids = list(PATCH_IDS)
         self.patch_ids = patch_ids
         self.LATERAL_GAIN = lateral_gain
+        self.TAU_ADAPT = tau_adapt
+
+        # Adaptation state: slow capacitor tracking relay baseline per patch
+        self._thermal_adapt: Dict[str, float] = {pid: 0.0 for pid in patch_ids}
 
         # ── Create neurons per patch ──
         self.thermoreceptors: Dict[str, Neuron] = {}
@@ -218,11 +226,7 @@ class SomatosensoryChain:
                     learning_rule="stdp",
                     initial_weight=0.3,
                     stdp_lr=0.005,
-                    # RC-2: 0.3 keeps relay activation ~0.37 (below VDD=1.0 and
-                    # pre_trace clamp=10). gain=3.0 caused relay~3.7 → all patch
-                    # pre_traces saturated at 10 → STDP lost gradient direction.
-                    # BIO: Aδ→WDR gain ~1.5-3mV EPSP/spike (Craig&Dostrovsky 1999)
-                    synapse_gain=0.3,
+                    synapse_gain=3.0,
                     bundle_role="feedforward",
                     # TemporalCoupler: bridge slow thermo (τ=100ms) to relay
                     coupler_capacitance=50.0,
@@ -323,6 +327,12 @@ class SomatosensoryChain:
     # (Caterina et al. 1997, Julius & Basbaum 2001)
     NOCI_DT_GAIN: float = 200.0
 
+    # Thermoreceptor transduction gain: scales T_skin [0-5] to effective input [0-0.5].
+    # Without scaling: V_ss = T_skin × R_leak = 4.2 × 5.0 = 21V (thermo saturated).
+    # With 0.1 scaling: V_ss ≈ 2.1V; relay output returns to [0,1] range.
+    # BIO: TRPV3/TRPM8 transduction efficiency ~0.1 (Brauchi et al. 2004)
+    THERMAL_TRANSDUCTION_GAIN: float = 0.1
+
     def step(self, patch_temps: Dict[str, Tuple[float, float, float]],
              dt: float = 1.0):
         """Process one time step.
@@ -340,9 +350,9 @@ class SomatosensoryChain:
             dT = vals[1] if len(vals) > 1 else 0.0
             damage = vals[2] if len(vals) > 2 else 0.0
 
-            # Thermoreceptor: driven by skin temperature (Fourier-integrated)
-            # This is the real T_skin, NOT the environment temperature.
-            self.thermoreceptors[pid].step(T, dt)
+            # Thermoreceptor: T_skin scaled by THERMAL_TRANSDUCTION_GAIN before injection.
+            # Raw T_skin [0-5] would produce V_ss=21V (saturated); scaled → V_ss≈2.1V.
+            self.thermoreceptors[pid].step(T * self.THERMAL_TRANSDUCTION_GAIN, dt)
 
             # Nociceptor: DUAL-CHANNEL input
             #   Channel A: dT/dt → rapid thermal gradient detection
@@ -412,20 +422,41 @@ class SomatosensoryChain:
             }
         return output
 
-    def get_mechanical_inputs(self) -> Dict[str, float]:
+    def get_mechanical_inputs(self, dt: float = 1.0) -> Dict[str, float]:
         """Get per-patch values formatted for hebbian extra_axes input.
 
         Returns dict with keys like 'therm_front', 'dtherm_front' etc.
         These are injected into mechanical_inputs for the Hebbian circuit.
 
-        Uses _activation_ema (smoothed) for stable output in [0, ~1.0],
-        matching the vestibular chain's output convention.
+        Applies sensory adaptation (RC high-pass filter) to relay output:
+          adapted_baseline += (raw - adapted_baseline) × (1 - e^(-dt/τ))
+          output = max(0, raw - adapted_baseline)
+
+        This absorbs constant ambient temperature (DC component) and only
+        passes through temperature changes (AC component). Equivalent to
+        spike frequency adaptation in biological thermoreceptors.
+
+        BIO: TRPV3/TRPM8 channels show strong adaptation — sustained
+        constant temperature → firing rate returns to near-baseline
+        within seconds. Only dT/dt drives persistent output.
         """
+        # Exponential decay factor for adaptation capacitor
+        decay = math.exp(-dt / max(self.TAU_ADAPT, 1.0))
+
         result = {}
         for pid in self.patch_ids:
-            # Relay EMA → tonic axis (reg encoding)
-            result[f"therm_{pid}"] = self.relays[pid]._activation_ema
-            # Noci EMA → phasic axis (irr encoding)
+            raw = self.relays[pid]._activation_ema
+
+            # Slow capacitor tracks baseline (DC component)
+            self._thermal_adapt[pid] = (
+                self._thermal_adapt[pid] * decay + raw * (1.0 - decay)
+            )
+
+            # High-pass output: only the AC component (gradient signal)
+            result[f"therm_{pid}"] = max(0.0, raw - self._thermal_adapt[pid])
+
+            # Noci EMA → phasic axis (irr encoding) — no adaptation needed
+            # (nociceptors are already phasic/differentiating by design)
             result[f"dtherm_{pid}"] = self.nociceptors[pid]._activation_ema
         return result
 

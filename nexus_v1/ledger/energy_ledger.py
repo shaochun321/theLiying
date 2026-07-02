@@ -1,6 +1,6 @@
 """nexus_v1.ledger.energy_ledger — Global Entropy Accounting System.
 
-TYPE:INFRASTRUCTURE — Thermodynamic bookkeeping for the neural circuit.
+TYPE:INFRA — Thermodynamic bookkeeping for the neural circuit.
 
 ===========================================================
 ZERO DEPENDENCY ON EXISTING NEXUS CODE (observation only).
@@ -41,7 +41,7 @@ from typing import Dict, List, Optional, Tuple
 
 @dataclass
 class EntropyLedger:
-    """Global thermodynamic bookkeeper for the neural circuit.
+    """TYPE:INFRA — Global thermodynamic bookkeeper for the neural circuit.
 
     Observes (never modifies) circuit state to compute:
     - Energy balance across all layers
@@ -70,12 +70,6 @@ class EntropyLedger:
     _layer_energy: Dict[str, List[float]] = field(default_factory=dict, repr=False)
     _layer_heat: Dict[str, List[float]] = field(default_factory=dict, repr=False)
     _layer_activity: Dict[str, List[float]] = field(default_factory=dict, repr=False)
-    # Spike-rate proxy using pre_trace (correct for spiking neurons)
-    # Used by transfer entropy; _layer_activity kept for energy reporting.
-    _layer_spike_proxy: Dict[str, List[float]] = field(default_factory=dict, repr=False)
-
-    # Shadow sandbox K_ema history (divergence indicator)
-    _k_ema_history: List[float] = field(default_factory=list, repr=False)
 
     # Time series (rolling window)
     _entropy_rate: List[float] = field(default_factory=list, repr=False)
@@ -127,7 +121,7 @@ class EntropyLedger:
             'S_Enc': [], 'S_Col': [], 'S_Mot': [],
             # DA circuit
             'DA': [],
-            # Somatosensory chain (V07)
+            # P2-FIX: Somatosensory chain (was invisible prior to P1-FIX)
             'Soma_Therm': [], 'Soma_Noci': [], 'Soma_Relay': [],
         }
         for n in neurons:
@@ -144,12 +138,6 @@ class EntropyLedger:
                 layers['S_Col'].append(n)
             elif nid.startswith('s_mot_'):
                 layers['S_Mot'].append(n)
-            elif nid.startswith('thermo_'):
-                layers['Soma_Therm'].append(n)
-            elif nid.startswith('noci_'):
-                layers['Soma_Noci'].append(n)
-            elif nid.startswith('relay_'):
-                layers['Soma_Relay'].append(n)
             elif nid.startswith('enc_') or nid.startswith('reg_'):
                 layers['L4_Enc'].append(n)
             elif nid.startswith('col_'):
@@ -158,6 +146,13 @@ class EntropyLedger:
                 layers['DA'].append(n)
             elif nid.startswith('motor_') or nid.startswith('move_'):
                 layers['L6_Mot'].append(n)
+            # P2-FIX: somatosensory neuron categorization
+            elif nid.startswith('thermo_'):
+                layers['Soma_Therm'].append(n)
+            elif nid.startswith('noci_'):
+                layers['Soma_Noci'].append(n)
+            elif nid.startswith('relay_'):
+                layers['Soma_Relay'].append(n)
 
         for layer_name, layer_neurons in layers.items():
             if not layer_neurons:
@@ -166,28 +161,20 @@ class EntropyLedger:
                 self._layer_energy[layer_name] = []
                 self._layer_heat[layer_name] = []
                 self._layer_activity[layer_name] = []
-                self._layer_spike_proxy[layer_name] = []
 
             avg_energy = sum(n.energy for n in layer_neurons) / len(layer_neurons)
             avg_heat = sum(n.heat_output for n in layer_neurons) / len(layer_neurons)
             avg_act = sum(n._activation_ema for n in layer_neurons) / len(layer_neurons)  # M4
-            # Spike-rate proxy: pre_trace for spiking neurons, |activation| otherwise
-            avg_proxy = sum(
-                abs(n.pre_trace) if n.config.spiking else abs(n._activation_ema)
-                for n in layer_neurons
-            ) / len(layer_neurons)
 
             self._layer_energy[layer_name].append(avg_energy)
             self._layer_heat[layer_name].append(avg_heat)
             self._layer_activity[layer_name].append(avg_act)
-            self._layer_spike_proxy[layer_name].append(avg_proxy)
 
             # Keep rolling window
             if len(self._layer_energy[layer_name]) > self.window_size:
                 self._layer_energy[layer_name] = self._layer_energy[layer_name][-self.window_size:]
                 self._layer_heat[layer_name] = self._layer_heat[layer_name][-self.window_size:]
                 self._layer_activity[layer_name] = self._layer_activity[layer_name][-self.window_size:]
-                self._layer_spike_proxy[layer_name] = self._layer_spike_proxy[layer_name][-self.window_size:]
 
         # ── 3. Entropy production rate ──
         # dS/dt ∝ heat_dissipated / T (simplified)
@@ -206,13 +193,6 @@ class EntropyLedger:
         self._energy_efficiency.append(efficiency)
         if len(self._energy_efficiency) > self.window_size:
             self._energy_efficiency = self._energy_efficiency[-self.window_size:]
-
-        # ── 5. K_ema from shadow sandbox (divergence indicator) ──
-        kema = getattr(getattr(circuit, 'shadow_sandbox', None), '_k_ema', None)
-        if kema is not None:
-            self._k_ema_history.append(kema)
-            if len(self._k_ema_history) > self.window_size:
-                self._k_ema_history = self._k_ema_history[-self.window_size:]
 
     def compute_isi_entropy(self, neuron_id: str) -> float:
         """Compute ISI entropy for a neuron (bits).
@@ -255,22 +235,22 @@ class EntropyLedger:
     def compute_transfer_entropy(self, src_id: str, tgt_id: str) -> float:
         """Estimate information transfer between two neurons.
 
-        Uses spike-rate proxy (pre_trace for spiking layers) to avoid
-        the near-zero correlation artifact from binary activation EMA.
-        Returns value in [-1, 1]; positive = forward transfer.
+        Simplified: correlation of activity patterns.
+        Returns value in [0, 1] where 1 = perfect transfer.
         """
         src_act = []
         tgt_act = []
-        for layer_name in self._layer_spike_proxy:
-            lkey = layer_name.split('_')[1].lower() if '_' in layer_name else layer_name.lower()
-            if src_id.startswith(lkey):
-                src_act = self._layer_spike_proxy[layer_name]
-            if tgt_id.startswith(lkey):
-                tgt_act = self._layer_spike_proxy[layer_name]
+        # Use layer activity if available
+        for layer_name, acts in self._layer_activity.items():
+            if src_id.startswith(layer_name.split('_')[1].lower()):
+                src_act = acts
+            if tgt_id.startswith(layer_name.split('_')[1].lower()):
+                tgt_act = acts
 
         if len(src_act) < 10 or len(tgt_act) < 10:
             return 0.0
 
+        # Cross-correlation (simplified transfer entropy proxy)
         n = min(len(src_act), len(tgt_act))
         src = src_act[-n:]
         tgt = tgt_act[-n:]
@@ -283,7 +263,8 @@ class EntropyLedger:
             return 0.0
 
         cov = sum((src[i] - mean_s) * (tgt[i] - mean_t) for i in range(n)) / n
-        return cov / math.sqrt(var_s * var_t)
+        corr = cov / math.sqrt(var_s * var_t)
+        return max(0.0, corr)  # only positive transfer
 
     def summary(self) -> Dict:
         """Generate comprehensive entropy ledger report."""
@@ -345,19 +326,20 @@ class EntropyLedger:
                 h = self.compute_isi_entropy(nid)
                 print(f"    {nid:<25s}: {h:.3f} bits ({n_spk} spikes)")
 
-        print(f"\n  Layer Transfer (spike-proxy correlation):")
+        print(f"\n  Layer Transfer (correlation):")
         layer_pairs = [
             ('L1_MET', 'L2_HC'), ('L2_HC', 'L3_Aff'),
             ('L3_Aff', 'L4_Enc'), ('L4_Enc', 'L5_Col'),
             ('L5_Col', 'L6_Mot'),
+            # Shadow layer
             ('S_Enc', 'S_Col'), ('S_Col', 'S_Mot'),
+            # DA circuit
             ('DA', 'L6_Mot'),
         ]
         for src, tgt in layer_pairs:
-            sp = self._layer_spike_proxy
-            if src in sp and tgt in sp:
-                src_act = sp[src]
-                tgt_act = sp[tgt]
+            if src in self._layer_activity and tgt in self._layer_activity:
+                src_act = self._layer_activity[src]
+                tgt_act = self._layer_activity[tgt]
                 n = min(len(src_act), len(tgt_act))
                 if n > 10:
                     s = src_act[-n:]
@@ -371,11 +353,6 @@ class EntropyLedger:
                         corr = cov / math.sqrt(vs * vt)
                         bar = "█" * int(max(0, corr) * 20)
                         print(f"    {src} → {tgt}: {corr:>6.3f}  {bar}")
-
-        # K_ema status
-        if self._k_ema_history:
-            print(f"\n  Shadow K_ema: {self._k_ema_history[-1]:.1f}"
-                  f"  ({'DIVERGING' if self._k_ema_history[-1] > 10000 else 'OK'})")
 
     def energy_balance_check(self) -> Tuple[bool, str]:
         """Check if energy is balanced (1st law of thermodynamics).
@@ -404,70 +381,6 @@ class EntropyLedger:
             msgs.append("Energy balance OK (1st+2nd law satisfied)")
 
         return ok, "; ".join(msgs)
-
-    def check_anomalies(self, min_window: int = 50) -> List[str]:
-        """Check for known anomalies and return alert strings.
-
-        # NORM(V05/V06/V08): implements 纪律约束 #6 "告警不沉默"
-        # Checks: Col layer dead, DA heat dominance, Shadow Col dead.
-        # Does NOT modify circuit state — pure observation.
-
-        Args:
-            min_window: minimum recorded steps before alerting (avoid false
-                        positives during warm-up).
-        Returns:
-            List of alert strings (empty = no anomalies detected).
-        """
-        alerts: List[str] = []
-
-        # ── A1: L5_Col layer dead ──
-        col_acts = self._layer_activity.get('L5_Col', [])
-        if len(col_acts) >= min_window:
-            recent = col_acts[-min_window:]
-            avg_col = sum(recent) / len(recent)
-            if avg_col < 1e-4:
-                alerts.append(
-                    f"DEG-COL: L5_Col avg_activity={avg_col:.2e} < 1e-4 "
-                    f"over last {min_window} steps — Column layer dead "
-                    f"(lateral inhibition over-suppression?)"
-                )
-
-        # ── A2: DA heat dominance ──
-        da_heat = self._layer_heat.get('DA', [])
-        total_heat_layers = sum(
-            (self._layer_heat.get(k, [0])[-1] if self._layer_heat.get(k) else 0)
-            for k in ('L1_MET', 'L2_HC', 'L3_Aff', 'L4_Enc', 'L5_Col', 'L6_Mot', 'DA')
-        )
-        if da_heat and total_heat_layers > 1e-8:
-            da_frac = da_heat[-1] / total_heat_layers
-            if da_frac > 0.5:
-                alerts.append(
-                    f"DEG-DA: DA heat fraction={da_frac:.1%} > 50% "
-                    f"— DA layer dominates dissipation, may mask other layers"
-                )
-
-        # ── A3: Shadow Col dead ──
-        scol_acts = self._layer_activity.get('S_Col', [])
-        if len(scol_acts) >= min_window:
-            recent = scol_acts[-min_window:]
-            avg_scol = sum(recent) / len(recent)
-            if avg_scol < 1e-6:
-                alerts.append(
-                    f"DEG-SCOL: S_Col avg_activity={avg_scol:.2e} < 1e-6 "
-                    f"over last {min_window} steps — Shadow Column layer dead "
-                    f"(K_ema likely diverging)"
-                )
-
-        # ── A4: K_ema divergence (shadow free energy) ──
-        if self._k_ema_history:
-            latest_kema = self._k_ema_history[-1]
-            if latest_kema > 10000:
-                alerts.append(
-                    f"DEG-KEMA: shadow K_ema={latest_kema:.1f} > 10000 "
-                    f"— shadow free energy diverging (unbounded momentum)"
-                )
-
-        return alerts
 
     # ── Registry integration ──────────────────────────────────────
 

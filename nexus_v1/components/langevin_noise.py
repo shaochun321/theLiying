@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class LangevinConfig:
-    """Configuration for the Langevin thermal noise source.
+    """TYPE:HYBRID — Configuration for the Langevin thermal noise source.
 
     σ₀ and τ are physically grounded — not free parameters.
     """
@@ -65,15 +65,16 @@ class LangevinConfig:
 
     # OU correlation time (s) — finite bandwidth, avoids white noise pathology.
     # BIO: hair cell membrane time constant τ_hair ≈ 0.1-1.0 s
-    # Chosen as 0.5 s to sit within the hair cell integration window.
-    tau: float = 0.5
+    # Phase4: extended from 0.5s to 3.0s so each push lasts ~3000 steps,
+    # producing macroscopic body displacement that cuts through temperature field.
+    tau: float = 3.0
 
     # Number of noise axes (one per otolith axis: x, y, z)
     n_axes: int = 3
 
 
 class LangevinNoise:
-    """Ornstein-Uhlenbeck thermal noise source for vestibular afferent path.
+    """TYPE:HYBRID — Ornstein-Uhlenbeck thermal noise source for vestibular afferent path.
 
     Provides physical thermal fluctuations driven by ECM temperature.
     Injected at the sensor (afferent) side — not at Motor (efferent).

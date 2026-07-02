@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class MagnetofluidDamper:
-    """Field-controlled adaptive damper.
+    """TYPE:HYBRID — Field-controlled adaptive damper.
 
     Variable resistance that increases with local current flow
     (via self-induced magnetic field). Provides:

@@ -6,7 +6,7 @@ Observe:
 3. Deep coupling: does shadow w(oto_x, therm) encode spatial relationship?
 """
 import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -62,7 +62,7 @@ for step in range(STEPS):
         shadow_history.append({
             'step': step,
             'heat_energy': heat_src.energy,
-            'col_therm': c.column_neurons['therm'].activation,
+            'col_therm': next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0),
             'intra_avg': sum(intra.values()) / max(1, len(intra)),
             'cross_avg': sum(cross.values()) / max(1, len(cross)),
             'intra_max': max(intra.values()) if intra else 0,
@@ -80,7 +80,7 @@ for step in range(STEPS):
         print(f"  Body: [{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}]  "
               f"dist={dist:.1f}  T={T:.4f}")
         print(f"  Heat source: E={heat_src.energy:.1f}  T_eff={heat_src.effective_temperature():.3f}")
-        print(f"  Col therm: {c.column_neurons['therm'].activation:.6f}")
+        print(f"  Col therm: {next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0):.6f}")
 
         # Shadow state
         print(f"  Shadow neurons: {len(c.shadow_sandbox.neurons)}")

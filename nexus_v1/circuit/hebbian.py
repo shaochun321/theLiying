@@ -74,11 +74,66 @@ def _encoding_config(name: str) -> NeuronConfig:
         vr_activity_coeff=0.5,
         vr_max_rate=0.2,
         # C. BiasCurrentSource — baseline firing (BIO: tonic 20-40 Hz)
-        # V_ss = bc × R = 0.02 × 5 = 0.10 << v_peak=0.35
-        # Low bias: encoding is silent without afferent drive.
-        # Previous 0.05 → V_ss=0.25 → even unstimulated axes fired 100%.
+        # PHASE-1 FIX: 0.02 → 0.005 to cut common-mode saturation.
+        # OLD: V_ss = 0.02 × 5 = 0.10 → thermal encoding fired 100% on bias alone.
+        # NEW: V_ss = 0.005 × 5 = 0.025 << v_peak=0.35 → encoding quiet without input.
+        # Vestibular encoding still fires via afferent→enc drive (unaffected).
         use_bias_current=True,
-        bc_current=0.02,
+        bc_current=0.005,
+    )
+
+
+def _thermal_encoding_config(name: str) -> NeuronConfig:
+    """TYPE:ANALOG — Thermal encoding: graded (non-spiking) mode.
+
+    PHASE-1 FIX: spiking encoding at dt=1.0 has only ~3 discrete ISI
+    levels, destroying the 12% relay differential between front/back
+    patches. Non-spiking mode preserves graded information:
+
+        activation = gm × max(0, V_m - v_threshold)
+
+    With relay_front=2.35, relay_back=2.10, EXTRA_AXIS_GAIN=0.04:
+        I_front=0.094, I_back=0.084
+        V_ss_front = 0.094 × 5.0 = 0.47
+        V_ss_back  = 0.084 × 5.0 = 0.42
+        act_front = 0.5 × (0.47 - 0.10) = 0.185
+        act_back  = 0.5 × (0.42 - 0.10) = 0.160
+        Δ(act) = 0.025 → 16% relative difference (preserved!)
+
+    BIO: thermosensory cortex (S1 area 3a) uses rate coding with
+    graded firing rates, not sparse binary spiking. Temperature
+    perception requires analog precision.
+
+    gm=0.5: keeps activation in [0, ~0.5] range, preventing
+    downstream column saturation. Column v_peak=0.25 needs
+    enc_activation < 0.5 for graded operation.
+    """
+    return NeuronConfig(
+        neuron_id=f"enc_{name}",
+        capacitance=0.15,
+        r_leak=5.0,
+        inertia=0.5,
+        vdd=1.0,
+        r_supply=0.1,
+        # NON-SPIKING: graded analog output
+        spiking=False,
+        channels=[
+            ChannelConfig(
+                name="default",
+                v_threshold=0.10,   # higher threshold: quiet when relay < 1.0
+                gm=0.5,            # low gm: keeps activation < 0.5
+                tau_gate=0.0,
+                reversal=0.0,
+                sign=1.0,
+            ),
+        ],
+        # A. VoltageRegulator — very low, just metabolic
+        use_voltage_regulator=True,
+        vr_base_rate=0.02,
+        vr_activity_coeff=0.3,
+        vr_max_rate=0.1,
+        # C. No bias current — thermal encoding should be silent without input
+        use_bias_current=False,
     )
 
 
@@ -102,7 +157,7 @@ def _column_config(name: str) -> NeuronConfig:
         # Non-spiking Col caused massive attenuation (act=0.04 from Vm=0.24).
         # BIO: cortical column neurons fire spikes.
         spiking=True,
-        v_peak=0.25,    # EXP-012: raised from 0.15 for DA modulation headroom
+        v_peak=0.10,    # Phase4-P0: lowered from 0.25 — coupler compresses enc→col; 0.10 restores firing
         v_reset=0.02,   # clean reset
         b_adapt=0.01,
         tau_w=1.0,
@@ -127,32 +182,47 @@ def _column_config(name: str) -> NeuronConfig:
         # Column MUST receive encoding input to spike.
         use_bias_current=True,
         bc_current=0.01,
-        # H. CalciumRateIntegrator — 战役二：钙流填谷
-        # BIO: CaMKII积分NMDA钙内流 → 编码发放率为连续信号供Col→Motor STDP读取。
-        # REF: 大一统方案 §4.3; Lisman et al. 2012 — CaMKII as molecular switch
-        # 参数推导: Ca_ss = f × q × R = 15.5Hz × 0.02 × 1.0 = 0.31
-        #   τ = C×R = 1.0×1.0 = 1.0s → 半衰期≈693步≈700步（NMDA长效尺度）
-        #   保证 15.5 Hz 发放下 Ca_ss≈0.3 > Col→Motor STDP驱动阈值 ✓
-        use_calcium_rate_integrator=True,
-        cri_capacitance=1.0,
-        cri_r_leak=1.0,    # τ=1.0s, γ_Ca=0.001/步, half-life≈700步
-        cri_q_spike=0.02,  # REF: 大一统方案 §4.3 CALCIUM_INCREMENT=0.02
     )
 
 
 def _thermal_column_config(name: str) -> NeuronConfig:
-    """TYPE:SEMI — Thermal column: lower threshold for sparse thermal drive.
+    """TYPE:SEMI — Column layer for thermal extra axes (therm_front/back/left/right).
 
-    BIO: Thermoregulatory column neurons have lower activation threshold
-    than vestibular columns because thermal drive is typically weaker
-    (ThermalMembrane dT/dt signal is small relative to vestibular input).
-    Phase 5: v_peak lowered 0.25→0.20 to match thermal signal amplitude.
-    All other parameters identical to _column_config.
+    Same circuit as _column_config but v_peak=0.20.
+    BIO: L2/3 pyramidal AP threshold V_th≈-52mV → norm=0.215 (Liu et al. 2014).
+    Thermal encoding output is graded non-spiking (max act≈0.5 from _thermal_encoding_config),
+    so thermal columns need higher v_peak than vestibular to prevent noise-driven firing.
+    Vestibular col uses 0.10 (tuned for spiking afferent burst drive).
     """
-    cfg = _column_config(name)
-    cfg.neuron_id = f"col_{name}"
-    cfg.v_peak = 0.20    # Phase 5: lower threshold for thermal drive
-    return cfg
+    return NeuronConfig(
+        neuron_id=f"col_{name}",
+        capacitance=0.2,
+        r_leak=5.0,
+        inertia=1.0,
+        vdd=1.0,
+        r_supply=0.1,
+        spiking=True,
+        v_peak=0.20,    # BIO: L2/3 pyramidal AP threshold norm=0.215 (Liu 2014)
+        v_reset=0.02,
+        b_adapt=0.01,
+        tau_w=1.0,
+        channels=[
+            ChannelConfig(
+                name="default",
+                v_threshold=0.08,
+                gm=0.8,
+                tau_gate=0.0,
+                reversal=0.0,
+                sign=1.0,
+            ),
+        ],
+        use_voltage_regulator=True,
+        vr_base_rate=0.015,
+        vr_activity_coeff=0.5,
+        vr_max_rate=0.1,
+        use_bias_current=True,
+        bc_current=0.01,
+    )
 
 
 def _motor_config(name: str) -> NeuronConfig:
@@ -244,7 +314,7 @@ def _motor_config(name: str) -> NeuronConfig:
 # ─────────────────────────────────────────────────────────────────────
 
 class HebbianCircuit:
-    """Minimal Hebbian circuit integrated with vestibular chain.
+    """TYPE:INFRA — Minimal Hebbian circuit integrated with vestibular chain.
 
     The vestibular chain IS part of this circuit — not a separate system.
     VestibularChain provides the sensory layers (MET, HairCell, Afferent).
@@ -295,18 +365,23 @@ class HebbianCircuit:
 
         # ── Encoding layer: 2 neurons per axis (vestibular + extra) ──
         # One for regular pathway (DC/tonic), one for irregular (AC/phasic)
+        # PHASE-1 FIX: thermal (extra_axes) use graded non-spiking config
+        # to preserve 12% relay differential that spiking ISI destroys.
         self.encoding_neurons: Dict[str, Neuron] = {}
+        extra_set = set(self.extra_axes)
         for axis in self.all_axes:
+            cfg_fn = _thermal_encoding_config if axis in extra_set else _encoding_config
             self.encoding_neurons[f"reg_{axis}"] = Neuron(
-                _encoding_config(f"reg_{axis}"))
+                cfg_fn(f"reg_{axis}"))
             self.encoding_neurons[f"irr_{axis}"] = Neuron(
-                _encoding_config(f"irr_{axis}"))
+                cfg_fn(f"irr_{axis}"))
 
         # ── Column layer: 1 neuron per axis ──
+        # Thermal axes use _thermal_column_config (v_peak=0.20); vestibular use 0.10.
+        # Mirrors the encoding-layer pattern (_thermal_encoding_config for extra_axes).
         self.column_neurons: Dict[str, Neuron] = {}
         for axis in self.all_axes:
-            # Thermal axis uses lower v_peak (Phase 5: thermal drive is weaker)
-            cfg_fn = _thermal_column_config if axis == 'therm' else _column_config
+            cfg_fn = _thermal_column_config if axis in extra_set else _column_config
             self.column_neurons[axis] = Neuron(cfg_fn(axis))
 
         # ── Motor layer: 3 neurons (x, y, z) ──
@@ -338,23 +413,13 @@ class HebbianCircuit:
                 config=BundleConfig(
                     bundle_id=f"aff_reg_to_enc_{axis}",
                     learning_rule="stdp",
-                    # P0 Class 1 Driver Synapse (Sherman & Guillery 1998):
-                    # Thalamo-cortical projection calibrated for World physics:
-                    # Aff fires at ~2 Hz (not design-doc 12.5 Hz) in VariantCircuit.
-                    # FIX-P2: synapse_gain 2.0→16.0 to close calibration gap.
-                    # I_mean = f_aff × W × g_syn × Δt_spike ≈ 2×2.5×16×0.001=0.08
-                    # V_ss = I_mean × R_leak ≈ 0.08 × 5 = 0.40 > V_th=0.30 ✓ (22% margin)
-                    # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
-                    # CROSS-MODAL [V·s]: Aff firing rate (Hz) → Enc membrane voltage (V)
-                    # EXP-vest-scan-P0-2026-06-30 (STDP-frozen, authoritative):
-                    #   WP(amp=6) f_reg: yaw=9, pitch=15, roll=14.5, oto_x=11.5, oto_y=23.5, oto_z=19.5 Hz
-                    #   [Phase 1 values 7–48 Hz were inflated by STDP LTP during measurement]
-                    #   V_ss range: 9×0.2=1.8V (yaw) to 23.5×0.2=4.7V (oto_y) >> V_th=0.30V ✓
-                    # Bio target (N_conv=10 Aff, DEG-016): g_syn_bio ≈ 0.48 → current 33× bio
-                    initial_weight=2.5,
-                    weight_max=5.0,
-                    stdp_lr=0.005,
-                    synapse_gain=16.0,
+                    initial_weight=0.2,
+                    stdp_lr=0.01,
+                    # GainChain fix: gain 1→2. Aff pre_trace≈0.64, w≈0.2,
+                    # gain=1 → I=0.085 → Enc Vm=0.37, act=0.12 (too weak).
+                    # gain=2 → I=0.17 → Enc Vm≈0.8, act≈0.7 (healthy).
+                    # Previous gain=10 caused saturation at act=7+.
+                    synapse_gain=2.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: prevents Enc 100% saturation.
                     # Enc v_peak=0.35, adapt_vth=0.2 (target ~20% duty).
@@ -377,15 +442,10 @@ class HebbianCircuit:
                 config=BundleConfig(
                     bundle_id=f"aff_irr_to_enc_{axis}",
                     learning_rule="stdp",
-                    # P0 Class 1 Driver — same FIX-P2 calibration as reg pathway.
-                    # synapse_gain 2.0→16.0 to match 2 Hz World physics (see reg above).
-                    # REF: 皮层除颤与热力学大一统方案 §2.4, §4.4
-                    # CROSS-MODAL [V·s]: same calibration as reg pathway (see above);
-                    # irr Aff has irregular discharge (no spontaneous tonic), spike-driven gain required
-                    initial_weight=2.5,
-                    weight_max=5.0,
-                    stdp_lr=0.005,
-                    synapse_gain=16.0,
+                    initial_weight=0.2,
+                    stdp_lr=0.01,
+                    # GainChain fix: same as reg pathway
+                    synapse_gain=2.0,
                     bundle_role="feedforward",  # C-001.3: sensory input, fast
                     # Adaptive coupler: same as reg pathway.
                     coupler_capacitance=1.0,
@@ -403,8 +463,14 @@ class HebbianCircuit:
             self.bundles_vest_to_enc.append(b_irr)
 
         # ── Bundles: Encoding → Column (all axes) ──
+        # Thermal axes use higher synapse_gain (4.0) to compensate for lower
+        # thermal encoding drive (non-spiking graded, max act≈0.5 vs vestibular≈0.7).
+        # EXP-PHASE5-R2: gain=4.0 drove w_back→0.495 (DR1 PASS); R3 gain=10 caused
+        # higher energy drain → fill freeze at 250k → worse outcome. Reverted to 4.0.
+        # BIO: spinothalamic ascending gain (Craig 2002).
         self.bundles_enc_to_col: List[SynapticBundle] = []
         for axis in self.all_axes:
+            _enc_col_gain = 4.0 if axis in extra_set else 3.0
             b = SynapticBundle(
                 config=BundleConfig(
                     bundle_id=f"enc_to_col_{axis}",
@@ -415,18 +481,15 @@ class HebbianCircuit:
                     # gain=1 → I=0.07 → Col Vm=0.03 (starved).
                     # gain=3 → I=0.21 → Col Vm≈1.0, act≈0.8 (healthy).
                     # Previous gain=5 + old high Enc caused saturation.
-                    # Phase 5: therm axis uses 4.5 (thermal drive is weaker
-                    # than vestibular, needs higher amplification to reach
-                    # col_therm v_peak=0.20). BIO: compensates for smaller
-                    # thermal input amplitude vs otolith/canal signals.
-                    synapse_gain=4.5 if axis == 'therm' else 3.0,
+                    synapse_gain=_enc_col_gain,
                     bundle_role="feedforward",  # C-001.3: encoding pathway
-                    # Temporal coupler: bridges fast Enc spikes (τ=0.5) to
-                    # slow Col membrane (τ=0.25) across dt=1.0.
-                    # τ_couple = 1.0 × 2.0 = 2.0 → retains 60% per step.
-                    # BIO: dendritic integration capacitance.
+                    # Temporal coupler: bridges fast Enc spikes to slow Col membrane.
+                    # PHASE-1 FIX: r_leak 2.0 → 0.5 to cut coupler accumulation.
+                    # OLD: τ_couple = 1.0 × 2.0 = 2.0 → retained 60% per step → saturated.
+                    # NEW: τ_couple = 1.0 × 0.5 = 0.5 → retains 14% per step → linear range.
+                    # BIO: dendritic integration with faster synaptic clearance.
                     coupler_capacitance=1.0,
-                    coupler_r_leak=2.0,
+                    coupler_r_leak=0.5,
                     # C-layer adaptive: gate = target ema (firing rate).
                     # Attractor at ema=0.2 (20% duty). When ema>0.2 →
                     # MOSFET conducts → extra leak → coupler output drops.
@@ -469,12 +532,8 @@ class HebbianCircuit:
                     learning_rule="stdp",
                     initial_weight=0.4,   # C2: strong topological bias (VOR hardwire)
                     weight_max=0.5,
-                    # 战役四：脊髓扩音（贝兹细胞扩音器）
-                    # BIO: Betz cells → corticospinal tract, highest gain pyramidal projection
-                    # gain: 5.0→10.0; lr: 0.005→0.05（关键期高可塑性）
-                    # REF: 大一统方案 §4.5
-                    stdp_lr=0.05,
-                    synapse_gain=10.0,
+                    stdp_lr=0.05,       # Campaign 4 complete: 0.005→0.05 (align with thermal bundles)
+                    synapse_gain=10.0,  # Campaign 4 complete: 5.0→10.0  (Betz-cell amplifier, align with thermal)
                     bundle_role="feedforward",
                     coupler_capacitance=1.0,
                     coupler_r_leak=2.0,
@@ -490,6 +549,79 @@ class HebbianCircuit:
                 targets=[self.motor_neurons[mot_name]],
             )
             self.bundles_col_to_motor.append(b)
+
+        # ── Thermal Col → Motor: DIFFERENTIAL PAIR bundles ──
+        # PHASE 1 (差分拓扑): Split dual-source thermal bundles into
+        # signed differential pairs for directional selectivity.
+        #
+        # PROBLEM: dual-source [front, back] → move_x used shared weights.
+        # STDP drove both weights to ≈0.091 — a constant drive, not a
+        # gradient drive. The organism couldn't distinguish front-heat
+        # from back-heat because I_net = (a_f + a_b) × w × g.
+        #
+        # FIX: Split into two single-source bundles with opposite gains:
+        #   therm_front → move_x (gain = +10.0)  excitatory: front heat → move forward
+        #   therm_back  → move_x (gain = -10.0)  inhibitory: back heat → move backward
+        #   therm_left  → move_y (gain = +10.0)  excitatory: left heat → move left
+        #   therm_right → move_y (gain = -10.0)  inhibitory: right heat → move right
+        #
+        # Now I_net = a_f × w_f × (+10) + a_b × w_b × (-10).
+        # STDP independently tunes w_f and w_b. With negative gain,
+        # strong back-heat hyperpolarizes motor → net forward motion.
+        #
+        # STDP sign handling: standard rules (no sign inversion).
+        # The gain sign is applied at the OUTPUT (bundle.propagate L199),
+        # not inside STDP. w_b grows via normal LTP when front-spike
+        # correlates with motor-spike — the -10 gain then converts
+        # that learned weight into the correct inhibitory current.
+        #
+        # BIO: opponent-process coding in spinothalamic tract.
+        #      ON-center/OFF-surround receptive fields (Hubel & Wiesel 1962).
+        #      Warm/cold thermoreceptor opponency (Craig 2002).
+        #
+        # No therm→move_z: 2D plane is sufficient for thermotaxis.
+        thermal_differential_map = [
+            # (source_col,     target_motor, gain_sign)
+            ('therm_front',   'move_x',      +10.0),   # front heat → excite move_x
+            ('therm_back',    'move_x',      -10.0),   # back heat  → inhibit move_x
+            ('therm_left',    'move_y',      +10.0),   # left heat  → excite move_y
+            ('therm_right',   'move_y',      -10.0),   # right heat → inhibit move_y
+        ]
+        for therm_col, mot_name, gain in thermal_differential_map:
+            # Guard: only build if thermal column exists
+            if therm_col in self.column_neurons:
+                b_therm = SynapticBundle(
+                    config=BundleConfig(
+                        bundle_id=f"therm_{therm_col}_to_{mot_name}",
+                        learning_rule="stdp",
+                        initial_weight=0.1,   # low start: STDP earns the weight
+                        weight_max=0.5,       # each direction gets full ceiling
+                        stdp_lr=0.05,         # critical-period high plasticity
+                        synapse_gain=gain,    # SIGNED: ±10.0 Betz-cell amplifier
+                        bundle_role="feedforward",
+                        coupler_capacitance=1.0,
+                        coupler_r_leak=2.0,
+                        coupler_adapt_vth=0.2,
+                        coupler_adapt_gm=2.0,
+                        coupler_blayer_c_slow=100.0,
+                        coupler_blayer_r_slow=10.0,
+                        coupler_blayer_gm=0.01,
+                        coupler_blayer_k=2.0,
+                        decay_rate_by_stage=(0.5, 0.1, 0.01),
+                        # Phase 3: DA-gated LTP via eligibility trace.
+                        # Therm→Motor is the key thermotaxis pathway.
+                        # Without DA confirmation, LTP is frozen.
+                        # BIO: corticostriatal synapses require DA for LTP
+                        # (Reynolds & Wickens 2002).
+                        use_eligibility_trace=True,
+                        eligibility_tau=300.0,     # bridge pre×post → DA delay
+                        eligibility_gain=1e-5,     # EXP-PHASE5: dt=0.001 calibration; 1.0 caused 1-step saturation
+                        eligibility_ltd_rate=0.01,
+                    ),
+                    sources=[self.column_neurons[therm_col]],
+                    targets=[self.motor_neurons[mot_name]],
+                )
+                self.bundles_col_to_motor.append(b_therm)
 
         # Cross-axis bundle (weak: all columns → all motors)
         # Allows STDP to develop compensatory cross-axis pathways.
@@ -521,6 +653,7 @@ class HebbianCircuit:
         )
         self.bundles_col_to_motor.append(b_cross)
 
+
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one full time step.
 
@@ -551,8 +684,26 @@ class HebbianCircuit:
             tonic_val = mechanical_inputs.get(axis, 0.0)
             enc_reg = self.encoding_neurons.get(f"reg_{axis}")
             if enc_reg is not None:
-                # Apply as input current (same as bundle would)
-                enc_reg.step(tonic_val * 5.0, dt)  # gain=5 matches enc_to_col
+                # PHASE-1 FIX: Impedance-matched injection gain.
+                # DIAGNOSIS: relay._activation_ema is UNBOUNDED (reaches 2.35+
+                # from somatosensory chain, not clamped to [0,1]).
+                # Raw gain=1.0 → V_ss=11.75 → permanent saturation.
+                #
+                # CALIBRATION v2: exploits ISI quantization at dt=1.0.
+                # Spiking neurons with dt=1.0 have discrete ISI levels:
+                #   V_ss > 0.50: ISI=1 → ema≈1.0 (fires every step)
+                #   V_ss = 0.44: ISI=2 → ema≈0.5 (fires every 2 steps)
+                #   V_ss < 0.35: no spiking → ema=0.0
+                #
+                # At gain=0.04, relay_front≈2.35 → V_ss=0.50 (ISI=1, ema=1.0)
+                #              relay_back ≈2.10 → V_ss=0.45 (ISI=2, ema=0.5)
+                # → 100% firing rate differential from 12% relay difference!
+                #
+                # Regression test (relay≈1.0): V_ss=0.225 → quiet (T2.2 passes).
+                # BIO: somatosensory relay to cortex uses sparse coding
+                #   (dorsal column → thalamic relay → S1), not 1:1 current.
+                EXTRA_AXIS_GAIN = 0.04
+                enc_reg.step(tonic_val * EXTRA_AXIS_GAIN, dt)
             else:
                 continue
 
@@ -560,7 +711,7 @@ class HebbianCircuit:
             phasic_val = mechanical_inputs.get(f"d{axis}", 0.0)
             enc_irr = self.encoding_neurons.get(f"irr_{axis}")
             if enc_irr is not None:
-                enc_irr.step(phasic_val * 5.0, dt)
+                enc_irr.step(phasic_val * EXTRA_AXIS_GAIN, dt)
 
         # ── 3. Encoding → Column ──
         # ── 4. Column → Motor ──
@@ -1034,7 +1185,7 @@ class HebbianCircuit:
         BIO: dendritic arbor splits; axon branches to both daughters.
         """
         import random
-        from copy import copy
+        from copy import deepcopy
 
         # Find all bundles where parent is a target (incoming)
         all_bundles = self.get_all_bundles()
@@ -1049,8 +1200,8 @@ class HebbianCircuit:
         new_bundles = []
         for bundle in all_bundles:
             if parent in bundle.sources:
-                # Create a weak copy for child
-                child_config = copy(bundle.config)
+                # Create a physically independent copy for child
+                child_config = deepcopy(bundle.config)
                 child_config.bundle_id = f"{bundle.id}_mc{self._step_count}"
                 child_config.initial_weight = 1e-4
                 child_config.xin_tension = 0.0

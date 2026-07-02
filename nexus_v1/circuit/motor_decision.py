@@ -35,7 +35,7 @@ from typing import Dict, List, Optional
 
 @dataclass
 class MotionState:
-    """Extracted motion state from vestibular processing chain.
+    """TYPE:INFRA — Extracted motion state from vestibular processing chain.
 
     This is the OUTPUT of the motion state discrimination structure
     (Met→HC→Aff→Enc→Col) — the foundation for all higher motor functions.
@@ -81,6 +81,9 @@ class MotionState:
     homeo_deviation: float = 0.0     # max(0, 0.7 - rho_homeo)
     # Energy absorbed from heat sources this step
     energy_absorbed: float = 0.0
+    # EnergyStore fill level [0, 1]. Bridges metabolic state → behavior.
+    # BIO: blood glucose level → hypothalamic hunger signal.
+    fill_fraction: float = 1.0
 
     # ── A7: Motor potential (ν = dK/dt) ──
     # ν > 0: accelerating (gaining kinetic energy)
@@ -94,24 +97,23 @@ class MotionState:
     # P→1: single-axis motion (偏振). P→1/3: uniform (非偏振).
     polarization: float = 0.333
 
-    # ── 步骤2: VitalOscillator output (宏观传出轨) ──
-    # BIO: hemodynamic pulsation → postural sway (Collins & De Luca 1993)
+    # ── Vital Oscillator (basal heartbeat drive) ──
+    # Per-axis vital drive injected into Motor membranes
+    # BIO: postural sway from cardiac/respiratory rhythm
     vital_pulse: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    # Scalar: total vital oscillation magnitude
     vital_amplitude: float = 0.0
 
-    # ── B.06: Thermal potential ν_th = dT_skin/dt ──
-    # ν_th > 0: skin warming (moving toward heat)
-    # ν_th < 0: skin cooling (moving away from heat)
-    # BIO: klinokinesis — bacteria-style chemotaxis via temporal comparison.
-    # REF: AI编程自足文档 步骤1 B.06
-    thermal_potential: float = 0.0      # ν_th = mean dT/dt across patches
-    thermal_gradient: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    # dot(∇T, v): positive = moving toward heat source
-    thermal_gradient_dot_velocity: float = 0.0
+    # ── Phase 4: AGC (automatic gain control) ──
+    # Current effective gain multiplier from AGC.
+    # 1.0 = no boost (energy/DA sufficient).
+    # 5.0 = maximum boost (severe deficit).
+    # BIO: HPA axis cortisol → locomotor drive scaling.
+    agc_gain: float = 1.0
 
 
 class MotorRhythmGenerator:
-    """Central Pattern Generator (CPG) — coupled oscillator model.
+    """TYPE:BIO — Central Pattern Generator (CPG) — coupled oscillator model.
 
     Three phase oscillators (x, y, z), one per motor axis.
     Each generates an intrinsic rhythm that modulates motor output.
@@ -231,7 +233,7 @@ class MotorRhythmGenerator:
 
 
 class DirectionSelector:
-    """Placeholder: Action selection / direction decision.
+    """TYPE:MATH — Placeholder: Action selection / direction decision.
 
     Future: selects which direction to move (or whether to move at all)
     based on MotionState + reward signals (DA).
@@ -262,7 +264,7 @@ class DirectionSelector:
 
 
 class SpatialNavigator:
-    """Placeholder: Path integration / spatial memory.
+    """TYPE:MATH — Placeholder: Path integration / spatial memory.
 
     Future: integrates MotionState over time to maintain internal
     position estimate. Provides "where am I" signal.
@@ -293,7 +295,7 @@ class SpatialNavigator:
 
 
 class LateralInhibition:
-    """Winner-take-all competition within same-axis motor pool.
+    """TYPE:BIO — Winner-take-all competition within same-axis motor pool.
 
     Each motor inhibits all other same-axis motors proportionally
     to its own activation. Strongest motor suppresses weakest.
@@ -348,7 +350,7 @@ class LateralInhibition:
 
 
 class MotorDecisionLayer:
-    """Middle decision layer between Col and Motor.
+    """TYPE:HYBRID — Middle decision layer between Col and Motor.
 
     Receives MotionState from vestibular processing chain.
     Contains four sub-systems that modulate motor output.

@@ -55,7 +55,7 @@ from .semiconductor import MOSFET
 
 @dataclass
 class SpinalReflexConfig:
-    """Configuration for the spinal reflex arc.
+    """TYPE:BIO — Configuration for the spinal reflex arc.
 
     L2:SELECTION — These parameters are artificial evolutionary choices.
     They define the "innate reflexes" of the organism.
@@ -85,18 +85,38 @@ class SpinalReflexConfig:
     #      (Saper et al. 2002: "The need to feed")
     # Gain is lower than noci: feeding urge is weaker than pain.
     # PHYS: uses thermoreceptor DC channel (not nociceptor AC).
-    hunger_approach_gain: float = 0.3
+    # CALIBRATION (EXP-018 diag): with gain=0.6, hunger_drive_x steady-state
+    # ≈ 0.08 — below motor v_threshold (~0.1-0.2). Motor never fires.
+    # Need V_ss = gain × delta_x × da_factor × gate ≈ 0.5 to exceed threshold.
+    # At steady-state: delta_x≈0.45, da_factor≈1.0, gate≈0.53
+    # → gain=2.0 → drive≈0.48 (above motor threshold)
+    hunger_approach_gain: float = 2.0     # calibrated: V_ss > motor v_threshold
 
     # Hunger gate MOSFET: controlled by (1 - fill_fraction)
     # fill_fraction ≈ 1.0 → hunger_voltage ≈ 0 → gate closed (satiated)
     # fill_fraction ≈ 0.0 → hunger_voltage ≈ 1 → gate open (starving)
     # BIO: leptin/ghrelin modulation of hypothalamic feeding circuits
-    hunger_gate_v_threshold: float = 0.3  # gate opens below ~70% fill
-    hunger_gate_gm: float = 1.5           # moderate gain (gentler than pain)
+    hunger_gate_v_threshold: float = 0.15  # gate opens below ~85% fill (was 0.3/~70%)
+    hunger_gate_gm: float = 1.5            # moderate gain (gentler than pain)
+
+    # ── DA modulation of hunger approach (basal ganglia motor gating) ──
+    # BIO: basal ganglia output (GPi/SNr) gates locomotor drive.
+    #      High DA (high prediction error / urgency) → stronger approach.
+    #      Low DA (homeostasis) → baseline reflex level (NOT suppressed).
+    # PHYS: gain_factor = da_min_gain + DA × (da_max_gain - da_min_gain)
+    #   DA=0 → gain × 1.0 (baseline: reflex is innate, not DA-dependent)
+    #   DA=0.5 → gain × 1.5 (moderate boost)
+    #   DA=1 → gain × 2.0 (double strength)
+    # DESIGN: reflexes are L2-hardwired (prior to learning). DA should only
+    # AMPLIFY the reflex (positive modulation), never suppress it.
+    # REF: Mogenson 1980 — "limbic-motor integration"
+    da_min_gain: float = 1.0    # DA=0: full reflex strength (innate baseline)
+    da_max_gain: float = 2.0    # DA=1: double reflex strength (DA amplification)
+
 
 
 class SpinalReflexArc:
-    """Nociceptive withdrawal reflex: noci spatial contrast → directional motor.
+    """TYPE:BIO — Nociceptive withdrawal reflex: noci spatial contrast → directional motor.
 
     L2:SELECTION — Hardwired at "birth" (init). Not learned.
     BIO: flexion withdrawal reflex (Sherrington 1906).
@@ -198,64 +218,22 @@ class SpinalReflexArc:
 
     def process_hunger(self, thermo_activations: Dict[str, float],
                        fill_fraction: float,
-                       dt: float = 1.0) -> Dict[str, float]:
-        """Hunger-driven thermotaxis: approach warmer side when hungry.
+                       da_concentration: float = 0.0,
+                       gain_multiplier: float = 1.0,
+                       dt: float = 0.001) -> Dict[str, float]:
+        """DEPRECATED: Hardcoded thermotaxis reflex removed in STDP cold-start experiment.
 
-        Architecturally parallel to nociceptive withdrawal, but:
-          - Uses thermoreceptor activation (DC/tonic), not nociceptor (AC/phasic)
-          - Direction is INVERTED: approach warmth, not flee from pain
-          - Gate is controlled by hunger (1 - fill_fraction), not cortex
-
-        Args:
-            thermo_activations: dict of patch_id → thermoreceptor activation
-                Expected keys: "front", "back", "left", "right"
-            fill_fraction: EnergyStore fill level [0, 1].
-                1.0 = full → no hunger drive.
-                0.0 = empty → maximum hunger drive.
-            dt: time step
-
-        Returns:
-            dict of motor_key → signed current to inject
-                "move_x": positive = toward front (warmer front)
-                "move_y": positive = toward left (warmer left)
-                "move_z": always 0.0
-
-        BIO: Hypothalamic hunger → locomotor activation toward
-             thermal/chemical gradient. Caenorhabditis elegans uses
-             identical thermotaxis mechanism (Mori & Ohshima 1995).
+        Returns zero drives. Motor is now driven exclusively by Langevin noise
+        (AGC-modulated). Thermotaxis must emerge from STDP weight learning.
+        See: STDP冷启动实验方案, Phase 1 (裁定文档 D04).
         """
-        front = thermo_activations.get("front", 0.0)
-        back = thermo_activations.get("back", 0.0)
-        left = thermo_activations.get("left", 0.0)
-        right = thermo_activations.get("right", 0.0)
-
-        # Spatial contrast: approach the WARMER side
-        # INVERTED vs noci: front - back (approach), not back - front (flee)
-        delta_x = front - back
-        delta_y = left - right
-
-        # No contrast → no drive (noise filter)
-        max_thermo = max(front, back, left, right)
-        if max_thermo < 1e-6:
-            return {"move_x": 0.0, "move_y": 0.0, "move_z": 0.0}
-
-        # Apply approach gain
-        raw_x = delta_x * self.config.hunger_approach_gain
-        raw_y = delta_y * self.config.hunger_approach_gain
-
-        # Hunger gate: controlled by energy deficit
-        # PHYS: hunger_voltage = 1 - fill_fraction
-        #   fill=1.0 → voltage=0 → gate closed (satiated, no approach)
-        #   fill=0.3 → voltage=0.7 → gate open (hungry, approach food)
-        #   fill=0.0 → voltage=1.0 → gate fully open (starving)
-        hunger_voltage = 1.0 - fill_fraction
-        gate_factor = self._hunger_gate.conduct(hunger_voltage)
-
-        return {
-            "move_x": raw_x * gate_factor,
-            "move_y": raw_y * gate_factor,
-            "move_z": 0.0,
-        }
+        import warnings
+        warnings.warn(
+            "process_hunger() is disabled (STDP cold-start experiment Phase 1). "
+            "All drives are zero. Remove the call in variant_adapter.py to silence this.",
+            DeprecationWarning, stacklevel=2
+        )
+        return {"move_x": 0.0, "move_y": 0.0, "move_z": 0.0}
 
     @property
     def gate_voltage(self) -> float:

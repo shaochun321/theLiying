@@ -64,7 +64,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ResonantOscillator:
-    """Self-sustained oscillator based on Van der Pol dynamics.
+    """TYPE:HYBRID — Self-sustained oscillator based on Van der Pol dynamics.
 
     Produces a periodic output signal with controllable frequency,
     amplitude, and waveform shape (sinusoidal ↔ relaxation).
@@ -192,7 +192,7 @@ class ResonantOscillator:
 
 @dataclass
 class CoupledOscillatorArray:
-    """Array of coupled oscillators for cross-frequency dynamics.
+    """TYPE:HYBRID — Array of coupled oscillators for cross-frequency dynamics.
 
     Models theta-gamma coupling:
         Slow oscillator (theta, 5 Hz) modulates amplitude of

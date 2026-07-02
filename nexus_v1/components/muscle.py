@@ -22,7 +22,7 @@ from typing import List
 
 @dataclass
 class Muscle:
-    """Single muscle group converting neural activation to force.
+    """TYPE:BIO — Single muscle group converting neural activation to force.
 
     Output force follows motor activation with a conduction delay.
     """
@@ -68,7 +68,7 @@ class Muscle:
 
 
 class MuscleSystem:
-    """Three muscle groups for 3D movement (xyz).
+    """TYPE:BIO — Three muscle groups for 3D movement (xyz).
 
     Connects motor neurons (move_x, move_y, move_z) to Body forces.
     """

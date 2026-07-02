@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 @dataclass
 class EntropySnapshot:
-    """One measurement of weight distribution entropy."""
+    """TYPE:INFRA — One measurement of weight distribution entropy."""
     tick: int = 0
     # Per-layer Shannon entropy (bits)
     layer_entropy: Dict[str, float] = field(default_factory=dict)
@@ -29,12 +29,10 @@ class EntropySnapshot:
     # Landauer check: Q >= kT*ln2*max(0, ΔS)
     # (qualitative: k=1, T=system temperature)
     landauer_satisfied: bool = True
-    # NORM(V14): True when delta≈0 for FREEZE_THRESHOLD consecutive measurements
-    learning_frozen: bool = False
 
 
 class WeightEntropyProbe:
-    """Shannon entropy of weight distributions.
+    """TYPE:INFRA — Shannon entropy of weight distributions.
 
     Measures information content of the learned weight structure.
     Learning REDUCES entropy (from uniform → structured).
@@ -46,8 +44,6 @@ class WeightEntropyProbe:
     """
 
     N_BINS = 50  # Histogram bins for weight distribution [0, 1]
-    FREEZE_THRESHOLD = 10   # consecutive near-zero delta → learning frozen
-    FREEZE_EPS = 1e-8       # |delta| below this = no learning
 
     def __init__(self):
         self._prev_entropy: float = 0.0
@@ -55,7 +51,6 @@ class WeightEntropyProbe:
         self._cumulative_heat: float = 0.0
         self._heat_since_last: float = 0.0
         self._history: List[EntropySnapshot] = []
-        self._frozen_count: int = 0   # consecutive frozen measurements
 
     def accumulate_heat(self, heat: float):
         """Called every step to track heat between entropy measurements."""
@@ -75,6 +70,10 @@ class WeightEntropyProbe:
             "enc_to_col": [],
             "col_to_motor": [],
             "sprouts": [],
+            # P3-FIX: somatosensory chain bundles (was invisible)
+            "soma_thermo_to_relay": [],
+            "soma_noci_to_relay": [],
+            "soma_lateral": [],
         }
 
         for b in getattr(circuit, 'bundles_vest_to_enc', []):
@@ -92,6 +91,19 @@ class WeightEntropyProbe:
         for b in getattr(circuit, '_sprouted_bundles', []):
             layer_weights["sprouts"].extend(
                 m.w for row in b._memristors for m in row)
+
+        # P3-FIX: somatosensory chain weight collection
+        soma = getattr(circuit, 'somatosensory', None)
+        if soma is not None:
+            for b in getattr(soma, 'bundles_thermo_to_relay', {}).values():
+                layer_weights["soma_thermo_to_relay"].extend(
+                    m.w for row in b._memristors for m in row)
+            for b in getattr(soma, 'bundles_noci_to_relay', {}).values():
+                layer_weights["soma_noci_to_relay"].extend(
+                    m.w for row in b._memristors for m in row)
+            for b in getattr(soma, 'bundles_lateral', {}).values():
+                layer_weights["soma_lateral"].extend(
+                    m.w for row in b._memristors for m in row)
 
         # Compute per-layer entropy
         total_s = 0.0
@@ -128,13 +140,6 @@ class WeightEntropyProbe:
         self._prev_entropy = snap.total_entropy
         self._heat_since_last = 0.0
         self._prev_tick = tick
-
-        # NORM(V14): detect learning freeze — delta≈0 for FREEZE_THRESHOLD steps
-        if abs(snap.delta_entropy) < self.FREEZE_EPS:
-            self._frozen_count += 1
-        else:
-            self._frozen_count = 0
-        snap.learning_frozen = (self._frozen_count >= self.FREEZE_THRESHOLD)
 
         self._history.append(snap)
         if len(self._history) > 500:
@@ -177,8 +182,6 @@ class WeightEntropyProbe:
             "delta_entropy": round(latest.delta_entropy, 6),
             "q_dissipated": round(latest.q_dissipated, 6),
             "landauer_ok": latest.landauer_satisfied,
-            "learning_frozen": latest.learning_frozen,
-            "frozen_count": self._frozen_count,
             "per_layer": {k: round(v, 4)
                          for k, v in latest.layer_entropy.items()},
             "measurements": len(self._history),

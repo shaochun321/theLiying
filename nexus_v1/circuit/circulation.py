@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Tuple
 
 @dataclass
 class CirculationPath:
-    """A closed loop through the circuit."""
+    """TYPE:INFRA — A closed loop through the circuit."""
     path_id: str
     # Source column axis
     col_axis: str
@@ -41,7 +41,7 @@ class CirculationPath:
 
 @dataclass
 class CirculationState:
-    """Current circulation state of the circuit."""
+    """TYPE:INFRA — Current circulation state of the circuit."""
     tick: int = 0
     # P: dominant circulation (strongest closed path)
     p_path: Optional[CirculationPath] = None
@@ -69,7 +69,7 @@ class CirculationState:
 
 
 class CirculationMeter:
-    """Measures persistent circulation strength, frequency, and topology.
+    """TYPE:INFRA — Measures persistent circulation strength, frequency, and topology.
 
     Circulation is always running (C-001.2). This class measures it,
     not detects it. Like a heart rate monitor — the heart beats

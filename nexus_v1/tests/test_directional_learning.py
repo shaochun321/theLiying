@@ -13,8 +13,8 @@ Prediction:
   = the system has learned "heat is in the x direction"
   WITHOUT any directional thermal sensor
 """
-import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+import os, sys, math
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -60,10 +60,12 @@ for step in range(STEPS):
     # Record thermal signal every 100 steps
     if step % 100 == 0:
         state = c.thermal_membrane.get_state()
+        # Use first therm_* column neuron (per-patch keys: therm_front, etc.)
+        _therm_col = next((n for k, n in c.column_neurons.items() if 'therm' in k), None)
         therm_history.append({
             'step': step,
             'adapted': state['adapted'],
-            'col_therm': c.column_neurons['therm'].activation,
+            'col_therm': _therm_col.activation if _therm_col else 0.0,
             'pos_x': c.world.body.position[0],
             'vel_x': c.world.body.velocity[0],
         })
@@ -84,7 +86,8 @@ for step in range(STEPS):
         print(f"--- Step {step:>6d} ---")
         print(f"  pos=[{pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f}]  dist={dist:.3f}")
         print(f"  T_raw={T_raw:.4f}  adapted={state['adapted']:.6f}")
-        print(f"  col_therm={c.column_neurons['therm'].activation:.6f}")
+        _tc = next((n for k, n in c.column_neurons.items() if 'therm' in k), None)
+        print(f"  col_therm={_tc.activation if _tc else 0.0:.6f}")
 
         if sw:
             # Sort by weight

@@ -1,6 +1,6 @@
 """Quick smoke test: scalar thermal sensor + motor firing."""
 import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -37,7 +37,7 @@ for step in range(10000):
         print(f"  Body: [{pos[0]:.3f}, {pos[1]:.3f}, {pos[2]:.3f}]")
         print(f"  T_raw: {T:.4f}")
         print(f"  Sensor state: {state}")
-        print(f"  Col therm: {c.column_neurons['therm'].activation:.6f}")
+        print(f"  Col therm: {next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0):.6f}")
         print(f"  Motor spikes so far: {spikes}")
 
 pos = c.world.body.position

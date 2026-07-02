@@ -30,6 +30,12 @@
 链 6 (新): 熵账本系统
   分散熵追踪 ──→ ledger/ 子包统一 ──→ EntropyLedger 安装 ──→ 影子层+DA 覆盖
   状态: ✅ → ✅ → ✅ → ⚠️(影子层不在 get_all_neurons, 单独追踪)
+
+链 8 (新): L2:SELECTION 损伤反馈 → 回避行为涌现
+  B.01 patch 拓扑 ──→ B.02 Nociceptor ──→ L2.01~04 四反馈环 ──→ L2.08 生物筛选
+  状态: ✅ → ✅ → ✅(已实装) → ❌(待长步骤实验)
+  组件: SpinalReflexArc (MOSFET gate) + damage_integral → EnergyStore/Vital/ECM
+  方法论: METHODOLOGY_biological_screening.md
 ```
 
 ---
@@ -126,43 +132,75 @@
 ## 下一步
 
 ```
-现在:
-  500k 长期验证 v1.6.0 (全指标 + P_nu*H_flow)
+已完成:
+  ✅ ledger/ 子包重构 (v1.7.2)
+  ✅ EntropyLedger 安装
+  ✅ DA 乘法调制 (_propagate_bundles 钩子)
+  ✅ shadow→DA / xin→DA 权重冻结 + weight_max 修复
+  ✅ 回归测试 17/17 pass
 
-完成后:
-  分析 P_nu*H_flow 守恒 vs 慢漂移
-  C5 三因子 Fruit 效果量化
-  D3 分化对比实验
-
-远期:
-  B 线: 自发对称性破缺
-  C8 侦察兵反传播
-  C6/C7 空间导航
-```
-
----
-
-## 下一步
-
-```
-现在:
-  ✅ ledger/ 子包重构完成 (v1.7.2)
-  ✅ EntropyLedger 安装并录入数据
-  ✅ 回归测试 21/21 + pytest 12/12
+当前:
+  ⚠️ 链 3 重定义: 原 C6/C7 空间导航 → 第二主体 B 域先行
+  ❓ B 域架构决策（待用户确认后执行）
 
 待办:
-  shadow→DA 权重冻结 (先天反射弧不应被 STDP 衰减)
-  DA→Motor 闭环验证
   影子层结构动态生长 (Merzenich 1984)
-  500k 长期验证 v1.7.2
-
-远期:
-  B 线: 自发对称性破缺
-  C8 侦察兵反传播
-  C6/C7 空间导航
+  500k 长期验证 v1.7.2+
+  时间耦合器热感受参数文档
 ```
 
 ---
 
-*Git 存档点: v1.7.2 (ledger 重构)*
+## 链 7 (新 ❓待确定): 第二主体——热的感受与涌现
+
+> 2026-06-10/11 讨论产出。依赖 B 域架构决策。
+
+```
+链 7: 热感受链（类比链 1 运动势基础）
+
+  B.00 刚体壳 → B.01 patch 拓扑 → B.02 感受神经元 (压电式 Thermo/Noci)
+                                          ↓
+                                   B.02b SomatoRelay (脊髓背角)
+                                   连接拓扑 = 体表隐式流形
+                                          ↓
+                                   → Encoding (汇入已有 Column)
+                                          ↓
+  B.03 自身原点模块 (小脑类比) ←┬── 交感层 (skin afferent)
+                                ├── Motor (efference copy, 已有)
+                                └── Shadow (prediction error, 已有)
+                                          ↓
+                                   B.04 感受→DA 闭环
+                                   热接触→能量→shadow→DA→STDP
+                                          ↓
+                                   B.06 热势 ν_th = dE_thermal/dt
+                                   ν × ΔT 相关性 → 方向涌现
+  状态: 全部 ❓待确定
+```
+
+### 链 3 修订: 空间导航 → 依赖第二主体
+
+```
+旧链 3: C2 分化锁定 → C6 SpatialNavigator → C7 DirectionSelector
+新链 3: B 域 (热感受) → B.03 自身原点 → 空间导航涌现 (非硬编码)
+
+关键变更:
+  C6/C7 的功能不应由 DirectionSelector 硬编码
+  而应从 B.04 (感受→DA→STDP) 自然涌现
+  平行构建的 DirectionSelector 被判定为显式语义内置
+```
+
+### 关键架构决策 (❓)
+
+| 编号 | 问题 | 选项 |
+|---|---|---|
+| A1 | B.03 自身原点是独立模块 or 涌现？ | 小脑类比（三层交汇结构）← 初步倾向 |
+| A2 | SomatoRelay 需要 reg/irr 分化？ | Thermo→reg only, Noci→irr only ← 初步倾向 |
+| A3 | 热源分化：标签 or 后果？ | 后果（能量增减），不用标签 ← 已确认 |
+| A4 | 最小 patch 数？ | 4 (前后左右) ← 初步倾向 |
+| A5 | 感受链时间耦合器 τ？ | ~100ms (vs 运动 2ms) ← 待验证 |
+
+---
+
+*Git 存档点: v1.7.2+ (DA 乘法调制 + B 域架构设计)*
+
 

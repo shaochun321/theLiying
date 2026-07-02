@@ -1,6 +1,6 @@
 """Smoke test: 7-axis circuit with thermal + body movement."""
 import sys
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 import math
 from nexus_v1.circuit.variant_adapter import VariantCircuit
@@ -50,9 +50,9 @@ for step in range(5000):
         pos = c.world.body.position
         vel = c.world.body.velocity
         T_body = c.world.temperature_at(pos)
-        enc_reg = c.encoding_neurons['reg_therm'].activation
-        enc_irr = c.encoding_neurons['irr_therm'].activation
-        col_therm = c.column_neurons['therm'].activation
+        enc_reg = next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('reg_therm')), 0.0)
+        enc_irr = next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('irr_therm')), 0.0)
+        col_therm = next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0)
 
         print(f"\n--- Step {step} ---")
         print(f"  Body pos: [{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}]")

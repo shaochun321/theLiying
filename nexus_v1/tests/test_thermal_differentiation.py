@@ -5,7 +5,7 @@ Apply random vestibular perturbations to simulate natural movement.
 Observe: do cross-modal binding nodes differentiate from intra-vestibular?
 """
 import sys, math, random
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -74,9 +74,9 @@ for step in range(STEPS):
         history['body_y'].append(pos[1])
         history['body_z'].append(pos[2])
         history['T_at_body'].append(T_body)
-        history['enc_therm_reg'].append(c.encoding_neurons['reg_therm'].activation)
-        history['enc_therm_irr'].append(c.encoding_neurons['irr_therm'].activation)
-        history['col_therm'].append(c.column_neurons['therm'].activation)
+        history['enc_therm_reg'].append(next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('reg_therm')), 0.0))
+        history['enc_therm_irr'].append(next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('irr_therm')), 0.0))
+        history['col_therm'].append(next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0))
         history['motor_x'].append(c.motor_neurons['move_x'].activation)
         history['motor_y'].append(c.motor_neurons['move_y'].activation)
         history['motor_z'].append(c.motor_neurons['move_z'].activation)
@@ -99,9 +99,9 @@ for step in range(STEPS):
         pos = c.world.body.position
         T_body = c.world.temperature_at(pos)
         dist = math.sqrt(sum((pos[i]-heat_src.position[i])**2 for i in range(3)))
-        enc_r = c.encoding_neurons['reg_therm'].activation
-        enc_i = c.encoding_neurons['irr_therm'].activation
-        col_t = c.column_neurons['therm'].activation
+        enc_r = next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('reg_therm')), 0.0)
+        enc_i = next((n.activation for k, n in c.encoding_neurons.items() if k.startswith('irr_therm')), 0.0)
+        col_t = next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0)
 
         print(f"--- Step {step:>6d} ---")
         print(f"  Body: [{pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f}]  "

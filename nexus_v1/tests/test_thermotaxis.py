@@ -6,7 +6,7 @@ Motor is firing (FIX-017). Now observe:
 3. Does the body trajectory change as weights evolve?
 """
 import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, "d:\\cell-cc")
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -64,7 +64,7 @@ for step in range(STEPS):
         dist = math.sqrt(sum((pos[i]-heat_src.position[i])**2 for i in range(3)))
         trajectory.append({
             'step': step, 'pos': pos, 'vel': vel, 'T': T, 'dist': dist,
-            'col_therm': c.column_neurons['therm'].activation,
+            'col_therm': next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0),
             'motor_x_V': c.motor_neurons['move_x']._membrane.voltage,
         })
 
@@ -89,7 +89,7 @@ for step in range(STEPS):
         print(f"  Velocity: [{vel[0]:.6f}, {vel[1]:.6f}, {vel[2]:.6f}]")
         print(f"  Motor spikes: x={motor_spikes['move_x']}"
               f"  y={motor_spikes['move_y']}  z={motor_spikes['move_z']}")
-        print(f"  Col therm: {c.column_neurons['therm'].activation:.4f}")
+        print(f"  Col therm: {next((n.activation for k, n in c.column_neurons.items() if 'therm' in k), 0.0):.4f}")
 
         # Col->Motor state
         b = c.bundles_col_to_motor[0]

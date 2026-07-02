@@ -23,7 +23,7 @@ Signal chain under test:
 Run: python nexus_v1/tests/test_exp016_vital_thermotaxis.py
 """
 import sys, math, os, time
-sys.path.insert(0, "d:\\cell-cc")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -81,11 +81,10 @@ for step in range(STEPS):
         # DA
         da_conc = c.dopamine.concentration
 
-        # Skin temperatures (from SomatosensoryChain patch_temps)
+        # Skin temperatures
         skin_T = {}
-        if hasattr(c, '_patch_temps'):
-            for pid, vals in c._patch_temps.items():
-                skin_T[pid] = round(vals[0], 4)
+        for p in c.world.body.skin_patches:
+            skin_T[p.patch_id] = round(p.current_temperature, 4)
 
         # Shadow col calcium_rate
         shadow_cr = {}

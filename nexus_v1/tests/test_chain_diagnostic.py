@@ -1,6 +1,6 @@
 """Signal chain diagnostic: trace amplitude at every stage."""
-import sys, math
-import os; sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+import os, sys, math
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
@@ -56,10 +56,16 @@ for ax in ['yaw', 'oto_x']:
 
 # Stage 4: Encoding
 print("\n--- Stage 4: Encoding ---")
-for ax in ['yaw', 'oto_x', 'therm']:
+# Vestibular axes
+for ax in ['yaw', 'oto_x']:
     for kind in ['reg', 'irr']:
         n = c.encoding_neurons[f"{kind}_{ax}"]
         print(f"  {kind}_{ax}: V={n._membrane.voltage:.4f}  "
+              f"act={n.activation:.6f}  E={n.energy:.4f}")
+# Thermal axes (keyed by patch: therm_chest, therm_back, etc.)
+for key, n in c.encoding_neurons.items():
+    if 'therm' in key:
+        print(f"  {key}: V={n._membrane.voltage:.4f}  "
               f"act={n.activation:.6f}  E={n.energy:.4f}")
 
 # Stage 5: Column
@@ -133,7 +139,7 @@ print(f"  Overload factor: {abs(I_per_motor)/I_max:.1f}x")
 # What gain would work?
 if len(b.sources) > 0:
     # Without gain, what's the raw current?
-    raw_I = sum(abs(s.activation) * b._memristors[b.sources.index(s)][0].conductance()
+    raw_I = sum(abs(s.activation) * b._memristors[b.sources.index(s)][0].conductance
                 for s in b.sources)
     print(f"\n  Raw current (gain=1): {raw_I:.4f}")
     ideal_gain = I_max / raw_I if raw_I > 0 else 0

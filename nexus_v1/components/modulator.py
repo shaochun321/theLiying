@@ -72,7 +72,7 @@ from typing import Dict
 
 @dataclass
 class Neuromodulator:
-    """Diffusive neuromodulatory signal.
+    """TYPE:HYBRID — Diffusive neuromodulatory signal.
 
     Models a slow, volume-transmitted chemical signal that
     globally modulates the behavior of target neurons.

@@ -10,28 +10,27 @@ Architecture:
                         StructuralBridge, GuidedConstructionAuditor
   - energy_ledger.py:   EntropyLedger (global energy/heat/spike accounting)
   - noether_probe.py:   NoetherProbe (conservation law verification)
-  - nu_probe.py:        NuProbe (ν power flux: ξ|O-P| − ξ²/R_ξ per bundle)
 
 REF: Jaynes 1957 (MaxEnt), Landauer 1961 (erasure bound)
 REF: Attwell & Laughlin 2001 (energy budget for cortical signaling)
 """
 
 from .weight_entropy import WeightEntropyProbe, EntropySnapshot
-from .toprxin import TOPRXinLedger, TOPRXinSnapshot, BundlePhaseIntensity, RhoVector
+from .toprxin import TOPRXinLedger, TOPRXinSnapshot, BundlePhaseIntensity
 from .structural import (RecursionTracker, RecursionCycle,
                          UltrametricSpace, StructuralEntropy, StructuralBridge,
                          SerialModificationLog, GuidedConstructionAuditor)
 from .energy_ledger import EntropyLedger
 from .noether_probe import NoetherProbe
-from .nu_probe import NuProbe, NuSnapshot, NuReport
+from .component_registry import ComponentRegistry, ComponentEntry
 
 __all__ = [
     'WeightEntropyProbe', 'EntropySnapshot',
-    'TOPRXinLedger', 'TOPRXinSnapshot', 'BundlePhaseIntensity', 'RhoVector',
+    'TOPRXinLedger', 'TOPRXinSnapshot', 'BundlePhaseIntensity',
     'RecursionTracker', 'RecursionCycle',
     'UltrametricSpace', 'StructuralEntropy', 'StructuralBridge',
     'SerialModificationLog', 'GuidedConstructionAuditor',
     'EntropyLedger',
     'NoetherProbe',
-    'NuProbe', 'NuSnapshot', 'NuReport',
+    'ComponentRegistry', 'ComponentEntry',
 ]

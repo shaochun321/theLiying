@@ -69,7 +69,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class VascularCooling:
-    """Activity-coupled vascular cooling and energy delivery.
+    """TYPE:HYBRID — Activity-coupled vascular cooling and energy delivery.
 
     Models the neurovascular unit (NVU) as a closed-loop cooling
     and energy supply system. Activity increases blood flow, which

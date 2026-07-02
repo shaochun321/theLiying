@@ -20,10 +20,9 @@ Variant components added:
    12. MuscleSystem: Motor neuron → physical force → body movement
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
-from ..vestibular.chain_v2 import VestibularChainV2
 
 import math
 
@@ -35,23 +34,28 @@ from ..components.vascular import VascularCooling, create_brainstem_vascular
 from ..components.ndr import NDRElement, InhibitorySynapse
 from ..components.router import LiquidMetalRouter
 from ..components.modulator import Neuromodulator, create_dopamine
-from ..components.binding import BindingLayer
+from ..components.binding_temporal import TemporalBindingLayer
+from ..components.yolk_sac import YolkSac
+from ..components.da_differential_gate import DADifferentialGate
 from ..components.shadow_sandbox import ShadowSandbox
 from ..components.world import World, Body, HeatSource
+from ..components.heat_source import CylindricalHeatSource
+from ..components.thermal_mouth import ThermalMouth
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
-from ..components.energy_store import EnergyStore
 from ..somatosensory.chain import SomatosensoryChain
+from ..components.energy_store import EnergyStore
 from ..components.vital_oscillator import VitalOscillator
-from ..components.langevin_noise import LangevinNoise
 from ..components.circulation_proportion import CirculationProportionCircuit
+from ..components.spinal_reflex import SpinalReflexArc
+from ..components.agc import AutomaticGainControl
+from ..components.langevin_noise import LangevinNoise
 from .bundle import SynapticBundle, BundleConfig
 from .circulation import CirculationMeter
 from .motor_decision import MotorDecisionLayer, MotionState
 from ..ledger import (WeightEntropyProbe, TOPRXinLedger, RecursionTracker,
                       UltrametricSpace, StructuralEntropy, StructuralBridge,
-                      EntropyLedger, NoetherProbe,
-                      SerialModificationLog, GuidedConstructionAuditor)
+                      EntropyLedger, NoetherProbe, ComponentRegistry)
 
 # Governance: parallel system, co-equal with nexus_v1
 import sys as _sys
@@ -66,17 +70,11 @@ try:
 except ImportError:
     _GOVERNANCE_AVAILABLE = False
 
-# ── Vestibular v2.0 feature flag ──
-# "V1_ONLY"          – current default, v2 not instantiated
-# "V2_PARALLEL_LOG"  – Phase 1: v2 runs in parallel, logs state, no motor contribution
-# "V2_ACTIVE_DRIVE"  – Phase 2: pass VestibularChainV2 to HebbianCircuit at init time
-VESTIBULAR_MODE: str = "V2_ACTIVE_DRIVE"
-
 
 # ── A3: Thermal delay buffer for finite heat propagation ──
 
 class _ThermalDelayBuffer:
-    """FIFO delay line for inter-layer heat propagation (A3 fix).
+    """TYPE:INFRA — FIFO delay line for inter-layer heat propagation (A3 fix).
 
     Heat entering the buffer takes `delay_steps` ticks to emerge.
     Models finite thermal propagation speed in tissue.
@@ -111,7 +109,7 @@ class _ThermalDelayBuffer:
 
 
 class VariantCircuit(HebbianCircuit):
-    """HebbianCircuit + variant components (oscillator + damper).
+    """TYPE:INFRA — HebbianCircuit + variant components (oscillator + damper).
 
     Design principle: INHERIT, DON'T MODIFY.
     - HebbianCircuit.__init__() runs 100% unchanged
@@ -124,18 +122,11 @@ class VariantCircuit(HebbianCircuit):
     3. No risk of corrupting the mother codebase
     """
 
-    def __init__(self, vestibular_mode: Optional[str] = None):
-        # Resolve mode: per-instance override > module constant.
-        # Tests pass vestibular_mode="V2_PARALLEL_LOG" directly without editing the constant.
-        _mode = vestibular_mode if vestibular_mode is not None else VESTIBULAR_MODE
-
-        # ── Mother initialization with thermal extra axis ──
-        # Phase 2 (V2_ACTIVE_DRIVE): pass VestibularChainV2 as the primary chain.
-        # HebbianCircuit.bundles are then wired to v2 neurons — cannot be hot-swapped.
-        if _mode == "V2_ACTIVE_DRIVE":
-            super().__init__(vestibular=VestibularChainV2(), extra_axes=["therm"])
-        else:
-            super().__init__(extra_axes=["therm"])
+    def __init__(self):
+        # ── Mother initialization with thermal patch axes ──
+        # 4 skin patches → 4 extra axes in the Hebbian circuit
+        _patch_axes = ["therm_front", "therm_back", "therm_left", "therm_right"]
+        super().__init__(extra_axes=_patch_axes)
 
         # ── Variant: Oscillators for afferent ISI synchronization ──
         # REF: Vestibular nucleus tonic oscillation
@@ -268,11 +259,15 @@ class VariantCircuit(HebbianCircuit):
         self._feedback_tau = 0.5     # 500ms smoothing
 
         # ── Variant: Binding Layer (§5 of math spec) ──
-        # Uses ALL axes (vestibular + thermal) for cross-modal binding
-        # C(7,2) = 21 binding cells (was C(6,2)=15 for vestibular only)
-        self.binding_layer = BindingLayer(
+        # Patch B: TemporalBindingLayer replaces BindingLayer.
+        # STF convolution on vestibular axes (tau_w=30); thermal stays instantaneous.
+        # co_activation_threshold=0.0: learning window fully open (calibration doc §1).
+        # BIO: Presynaptic Ca2+ remnant, Zucker & Regehr 2002.
+        self.binding_layer = TemporalBindingLayer(
             axes=list(self.all_axes),
-            co_activation_threshold=0.05,
+            co_activation_threshold=0.0,
+            tau_w=30,
+            thermal_axes={'therm'},
         )
 
         # Binding → Motor bundle (side channel, parallel to Col→Motor)
@@ -292,38 +287,15 @@ class VariantCircuit(HebbianCircuit):
         # Heat source at [70,50,50], body starts at [50,50,50]
         self.world = World()
         self.thermal_membrane = ThermalMembrane()
-        # CROSS-MODAL [N/V]: Motor voltage → muscle contractile force
-        # gain=0.1 default; EXP-RouteA: 0.1→0.3 gives body speed 0.001→0.01 (10×)
-        # BIO: Hill (1938) — force ∝ activation; fast-twitch peak ~0.3 N per mV at V_th
-        # DEG-017: value engineering-backfit; no direct force calibration available
         self.muscle_system = MuscleSystem(gain=0.1, delay=2)
 
-        # ── Variant: VitalOscillator (步骤2 — 宏观传出轨) ──
-        # Three-frequency detuned Van der Pol heart; injects into Motor membrane.
-        # BIO: sinoatrial node → hemodynamic pulsation → postural sway (Collins 1993).
-        # Energy from EnergyStore — death switch at fill < 0.05.
-        self.vital_oscillator = VitalOscillator()
-
-        # ── Variant: LangevinNoise (步骤2 — 微观传入轨) ──
-        # OU process: σ₀=0.70 anchored by FDT + stochastic resonance optimum.
-        # σ* ≈ θ_sys/√2 ≈ 0.07; T_bath≈0.01 → σ₀ = 0.07/√0.01 = 0.70.
-        # BIO: endolymph thermal fluctuation → hair cell displacement.
-        # REF: 皮层除颤与热力学大一统方案 §2.1-§2.3
-        self._langevin = LangevinNoise()
-        # ── V8战术一: LangevinNoise → 半规管（angular axes） ──
-        # BIO: 半规管内淋巴液布朗运动 → 椭圆囊毛细胞底噪（与耳石相同 FDT 机制）。
-        # 激活 Col[yaw/pitch/roll] → axis-specific 束（gain=10.0）→ STDP 成长。
-        # REF: V8方案 §三 战术一; same σ₀=0.70 from FDT (symmetric sensor)
-        self._langevin_angular = LangevinNoise()
-
-        # ── Variant: SomatosensoryChain (V01) ──
-        # 4 skin patches (front/back/left/right), each with:
-        #   Thermoreceptor (tonic T) → Nociceptor (phasic dT/dt) → Relay (∇²T)
-        # Provides 12 neurons + 12 bundles visible to all entropy ledger tools.
-        # BIO: TRPV/TRPM thermoreceptors + spinal dorsal-horn relays.
-        self.somatosensory = SomatosensoryChain()
-        # Previous patch temperatures for dT/dt computation (one per patch)
-        self._soma_prev_temps: dict = {pid: 0.0 for pid in self.somatosensory.patch_ids}
+        # ── Variant: Somatosensory chain (4-patch thermal sensing) ──
+        # Parallel to vestibular chain: Thermoreceptor + Nociceptor + SomatoRelay
+        # per skin patch. Relay output feeds encoding layer via extra_axes.
+        self.somatosensory = SomatosensoryChain(
+            patch_ids=["front", "back", "left", "right"],
+            lateral_gain=0.3,   # Phase4: 0.05→0.3, amplifies patch contrast via S0 InhibitorySynapse
+        )
 
         # ── Variant: EnergyStore (external reservoir) ──
         # Bridges World.consume_nearby() → Vascular → neuron.energy.
@@ -331,14 +303,57 @@ class VariantCircuit(HebbianCircuit):
         # BIO: liver glycogen + blood glucose buffer.
         self.energy_store = EnergyStore()
 
-        # ── Variant: VestibularChainV2 Phase 1 parallel observer ──
-        # Phase 1 (V2_PARALLEL_LOG): v2 runs in shadow, zero motor contribution.
-        # Phase 2 uses the primary chain (self.vestibular); no shadow needed.
-        self._v2_p_avail: list = [1.0]  # mutable slot updated each step from energy_store.fill
-        self._vestibular_v2: Optional[VestibularChainV2] = None
-        self._v2_last_state: dict = {}
-        if _mode == "V2_PARALLEL_LOG":
-            self._vestibular_v2 = VestibularChainV2(p_avail_ref=self._v2_p_avail)
+        # ── Patch C: YolkSac (embryonic bootstrap energy) ──
+        # Non-replenishable maternal reserve; discharges at 0.002/step into EnergyStore.
+        # Provides baseline energy for STDP during cold-start before feeding.
+        # Depletes at step ~100k. BIO: Davidson 2006, The Regulatory Genome, Ch.3.
+        self.yolk_sac = YolkSac()
+
+        # ── Patch D: DADifferentialGate (VTA RPE signal) ──
+        # DA fires on positive rate-of-change of energy fill, not absolute level.
+        # Replaces c3_da_current from circulation_proportion (absolute deviation).
+        # BIO: Schultz et al. 1997, Science 275:1593-1599.
+        self.da_gate = DADifferentialGate(
+            initial_fill=self.energy_store.fill_fraction
+        )
+
+        # ── Variant: VitalOscillator (basal heartbeat / tri-heart) ──
+        # Three detuned VdP oscillators (2.00, 2.11, 1.93 Hz) produce
+        # Lissajous wandering in 3D. Energy-coupled via EnergyStore.
+        # Breaks cold-start deadlock by providing basal motor drive.
+        # BIO: sinoatrial node → hemodynamic pulsation → postural sway.
+        self.vital_oscillator = VitalOscillator()
+
+        # ── L2:SELECTION: Spinal Reflex Arc (nociceptive withdrawal) ──
+        # BIO: Aδ-fiber → spinal interneuron → α-motor neuron (Sherrington 1906).
+        # DESIGN: Hardwired directional withdrawal from nociceptor spatial contrast.
+        #         MOSFET gate (default VDD=open) provides cortical override placeholder.
+        # EMERGE: Withdrawal direction is L2-fixed. Cortical override is future L1.
+        self.spinal_reflex = SpinalReflexArc()
+
+        # ── Phase 4: Automatic Gain Control (AGC) ──
+        # RC leaky integrator driven by physiological deficit (energy + DA).
+        # τ ≈ 40k steps — slow enough to avoid interference with Phase 2/3.
+        # Output scales hunger reflex drive and Col→Motor bundle currents.
+        # BIO: HPA axis cortisol → locomotor drive (Sapolsky 1992).
+        self.agc = AutomaticGainControl()
+
+        # ── V8: LangevinNoise (Ornstein-Uhlenbeck thermal noise) ──
+        # Provides physical thermal fluctuations to vestibular afferent path.
+        # Driven by ECM temperature (endolymph thermal bath).
+        # BIO: Johnson-Nyquist noise → hair cell membrane displacement.
+        # DESIGN: Sensor-side injection: O_k = a_body + η_k (宏微观同构).
+        #         Shadow predictor cannot predict η → persistent Xin residual.
+        # REF: langevin_noise.py; 步骤2统一物理架构方案 §二 ECM热浴
+        self._langevin = LangevinNoise()
+
+        # ── L2:SELECTION: Overridable feedback loop parameters ──
+        # Default values from L2.08 screening (FULL PASS baseline).
+        # L2.09 parameter sweep overrides these post-construction.
+        self.vital_damage_k: float = 0.5       # Loop A: cardiac depression sensitivity
+        self.repair_energy_rate: float = 0.005  # Loop B: repair metabolic tax
+        self.k_barrier: float = 2.0             # Loop D: ECM barrier half-saturation
+        self.breach_conductance: float = 0.1    # Loop D: breach heat transfer rate
 
         # ── Variant: CirculationProportionCircuit (C3' structural carrier) ──
         # Three capacitors integrate amplitude signals → voltages = ratios.
@@ -369,12 +384,8 @@ class VariantCircuit(HebbianCircuit):
         # Previously existed as dead code (never instantiated).
         self._energy_ledger = EntropyLedger()
 
-        # ── Variant: Guided Construction Auditor (V15) ──
-        # Tracks serial modifications to pathways; flags 过渡自限.
-        # READ-ONLY observer — never modifies circuit state.
-        self._construction_auditor = GuidedConstructionAuditor()
-        # Audit alert log: receives alerts from energy_ledger + weight_entropy
-        self._ledger_alerts: List[str] = []
+        # ── Variant: Component Registry (TYPE tags + census visibility) ──
+        self._component_registry = ComponentRegistry()
 
         # ── Governance: parallel co-equal system ──
         if _GOVERNANCE_AVAILABLE:
@@ -432,6 +443,15 @@ class VariantCircuit(HebbianCircuit):
         self._efference_gain = {'x': 0.0, 'y': 0.0, 'z': 0.0}
         self._motor_efficacy = {'x': 1.0, 'y': 1.0, 'z': 1.0}
 
+        # ── Patch E: Efference Copy suppression ratio monitoring (INFRA) ──
+        # Tracks fraction of Binding events suppressed by low motor efficacy.
+        # Alert threshold: R_supp >= 0.9 (critation doc §五).
+        self._efference_supp_count: int = 0
+        self._efference_total_count: int = 0
+        self._efference_supp_ratio: float = 0.0
+        self._efference_monitor_window: int = 10000  # steps per reporting window
+        self._efficacy_suppress_threshold: float = 0.1  # efficacy < 0.1 = motor ineffective
+
         # ── Middle decision layer (placeholder) ──
         # Sits between Col (motion state) and Motor (muscle commands).
         # Currently passthrough — all three sub-systems are stubs.
@@ -453,9 +473,13 @@ class VariantCircuit(HebbianCircuit):
                 capacitance=2.0,
                 r_leak=1.0,
                 v_rest=0.0,
-                channels=[ChannelConfig(name="default", v_threshold=0.01, gm=8.0)],
+                channels=[ChannelConfig(name="default", v_threshold=0.01, gm=1.0)],
+                # gm=1.0: non-spiking continuous DA neuron; unit gain maps V→activation linearly.
+                # gm=8.0 caused saturation at V>0.135V (too sensitive for tonic mode).
+                # With gm=1.0: concentration = max(0, V-0.01); saturates only at V>1.01.
+                # BIO: VTA DA neurons fire tonically at 1-5Hz; graded output mode (Grace & Onn 1989)
                 # bc_current produces baseline activation ≈ 0.1
-                # V_ss = bc * R = 0.1 * 1.0 = 0.1 (matches DA baseline)
+                # V_ss = bc * R = 0.1 * 1.0 = 0.1 → concentration = 0.09 (tonic ~9%)
                 use_bias_current=True,
                 bc_current=0.1,
                 energy=10.0,
@@ -479,16 +503,13 @@ class VariantCircuit(HebbianCircuit):
                 # → GIRK K⁺ current → hyperpolarization → reduced DA release.
                 # REF: Lacey et al. 1987; Ford 2014
                 use_d2_autoreceptor=True,
-                # RC-3: conductance 0.5→0.1; r_leak 100→20; product g×τ: 50→2.
-                # With RC-2 relay gain ÷10, soma→DA input ÷10; old g=0.5 over-
-                # suppressed DA to 0.03 in 50k steps (7× decay), breaking STDP.
-                # 0.1: lower-expressing VTA DA population. REF: Ford 2014.
-                # r_leak 20 → τ_D2=20ms: DAT-mediated perisynaptic clearance
-                # (Benoit-Marand et al. 2000 J.Neurosci.). τ_D2/τ_mem=10 (stable).
-                d2_conductance=0.1,     # GIRK conductance (was 0.5)
+                d2_conductance=0.5,     # GIRK conductance
                 d2_ec50=0.3,            # D2R activates at [DA] > 0.3
                 d2_da_capacitance=1.0,  # local [DA] integrator
-                d2_da_r_leak=20.0,      # τ_D2=20ms (was 100; DAT clearance kinetics)
+                d2_da_r_leak=1.0,       # τ_D2 = 1s (1000 steps); reaches SS within 10k probe window.
+                # Original 100.0 (τ=100s) was too slow — D2R only built up 9.5% at 10k steps.
+                # BIO: D2R desensitization kinetics 200-500ms (Beckstead 2004); 1.0s = 2× biological ✓
+                # Stability: τ_D2=1s vs τ_membrane=2s; close ratio enables fast self-regulation.
             )
             self.da_neurons[nid] = Neuron(cfg)
 
@@ -509,12 +530,19 @@ class VariantCircuit(HebbianCircuit):
         self._da_circuit_initialized = False
         self.bundles_shadow_to_da: List[SynapticBundle] = []
         self.bundles_xin_to_da: List[SynapticBundle] = []
-        # B.06: Somatosensory relay → DA (structural thermal pathway)
-        self.bundles_soma_to_da: List[SynapticBundle] = []
-        # RC-4: Slow relay neurons for thermal derivative detection (phasic DA)
-        self._slow_relays: Dict[str, Neuron] = {}
-        self._bundles_relay_to_slow: List[SynapticBundle] = []
-        self._bundles_slow_to_da: List[SynapticBundle] = []
+
+        # ── World 2.0: Cylindrical heat source + thermal mouth ──
+        # BIO: hydrothermal vent (Kelley et al. 2002) + chemosynthetic feeding.
+        # DESIGN: Single cylindrical source at Z=25 (body Z-plane, Phase 1 lock).
+        # Objection fix: center Z=25 (not 50) so within_height check always fires.
+        self._cylindrical_source = CylindricalHeatSource(
+            center=[50.0, 50.0, 25.0],  # Z=25: same plane as body (Phase 1)
+            radius=6.0, height=16.0,
+            T_surface=5.0, T_ambient=0.15, sigma=25.0,
+            energy=1000.0, regeneration_rate=0.002,
+        )
+        self.world.cylindrical_sources = [self._cylindrical_source]
+        self.thermal_mouth = ThermalMouth()
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step: mother + variant overlay.
@@ -660,34 +688,23 @@ class VariantCircuit(HebbianCircuit):
                     self._motor_efficacy[axis] + 0.001)
 
         # Thermal membrane senses environment at new body position
+        # (legacy single-point sensor kept for backward compatibility)
         therm_signal = self.thermal_membrane.sense(
             self.world, self.world.body, dt)
 
-        # ── SomatosensoryChain: 4-patch skin sensing (V01) ──
-        # Sample temperature at 4 body-surface offsets (body radius ≈ 1.0 world unit)
-        BODY_RADIUS = 1.0
-        pos = self.world.body.position
-        patch_positions = {
-            "front": [pos[0],            pos[1],            pos[2] + BODY_RADIUS],
-            "back":  [pos[0],            pos[1],            pos[2] - BODY_RADIUS],
-            "left":  [pos[0] - BODY_RADIUS, pos[1],         pos[2]],
-            "right": [pos[0] + BODY_RADIUS, pos[1],         pos[2]],
-        }
-        patch_temps = {}
-        for pid, ppos in patch_positions.items():
-            T = self.world.temperature_at(ppos)
-            dT = (T - self._soma_prev_temps[pid]) / max(dt, 1e-6)
-            self._soma_prev_temps[pid] = T
-            damage = max(0.0, T - 0.8)  # damage accumulates above 0.8 normalized T
-            patch_temps[pid] = (T, dT, damage)
-        self.somatosensory.step(patch_temps, dt)
-        self._patch_temps = patch_temps  # expose for tests/diagnostics
+        # ── Somatosensory chain: 4-patch spatial temperature sensing ──
+        # 1. Sample skin patches at body surface positions
+        patch_temps = self.world.body.sample_skin(self.world, dt)
 
-        # Inject thermal signal into mechanical_inputs for mother step
-        # These get routed to extra_axes encoding neurons in HebbianCircuit
+        # 2. Step the somatosensory chain (Thermo + Noci + Relay)
+        self.somatosensory.step(patch_temps, dt)
+
+        # 3. Inject relay outputs into mechanical_inputs for extra_axes
+        #    Each patch axis gets: tonic = relay activation, phasic = noci activation
         mechanical_inputs = dict(mechanical_inputs)  # don't mutate caller's dict
-        mechanical_inputs['therm'] = therm_signal['therm']
-        mechanical_inputs['dtherm'] = therm_signal['dtherm']
+        soma_out = self.somatosensory.get_mechanical_inputs(dt)
+        for key, val in soma_out.items():
+            mechanical_inputs[key] = val
 
         # ── 0b. Closed sensorimotor loop: body acceleration → vestibular ──
         # BIO: otolith organs measure linear acceleration (utricle, saccule).
@@ -696,51 +713,208 @@ class VariantCircuit(HebbianCircuit):
         # OTOLITH_GAIN scales acceleration to vestibular input range.
         OTOLITH_GAIN = 500.0
         acc = self.world.body.acceleration
-
-        # ── LangevinNoise → otolith afferent (步骤2 微观传入轨) ──
-        # Exact OU discretization (variance-preserving), σ₀=0.70 from FDT.
-        # BIO: endolymph thermal fluctuation → hair cell membrane displacement.
-        # REF: langevin_noise.py; 皮层除颤与热力学大一统方案 §2.1-§2.3
+        # V8: Langevin thermal noise → vestibular afferent (sensor-side)
+        # OU process exact discretization, σ driven by ECM T_bath.
+        # Added to body acceleration BEFORE otolith gain scaling.
         eta = self._langevin.step(self.ecm_vestibular, dt)
-        # Sensor-side addition: O_k = a_body + η (宏微观绝对同构，只做加法)
+        # Patch A: de-mean (zero-point purity, highest priority)
+        # OU samples have finite-window bias ~1e-6; AGC amplifies 5× at starvation.
+        # Over 1M steps this creates deterministic directional bias → breaks emergence.
+        # BIO: LC-NE increases variance, not mean (Sara 2009, NRN 10:211-223).
+        _eta_mean = sum(eta) / len(eta)
+        eta = [x - _eta_mean for x in eta]
+        # Patch A: AGC modulates exploration amplitude (LC-NE analogue)
+        # AGC.gain ∈ [1.0, 5.0]; previous step's gain used (agc.step() at L836).
+        eta = [e * self.agc.gain for e in eta]
+        # Patch A: RMS clamp — motor saturation protection
+        # At starvation: σ_eff ≈ 0.42; peak may exceed 1.0 → Motor runaway.
+        eta = [max(-1.0, min(1.0, e)) for e in eta]
         mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + eta[0]) * OTOLITH_GAIN
         mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + eta[1]) * OTOLITH_GAIN
         mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + eta[2]) * OTOLITH_GAIN
+        # ── World 2.0: Phase 1 planar approximation — lock Z axis ──
+        # TEMP: remove in Phase 2 (full 3D motion). Z=25 matches cylindrical
+        # source center Z, ensuring within_height check always fires.
+        # Prevents non-physical vertical ejection when body enters height range.
+        self.world.body.position[2] = 25.0
+        self.world.body.velocity[2] = 0.0
 
-        # ── V8战术一: LangevinNoise → 半规管（yaw/pitch/roll） ──
-        # BIO: endolymph thermal fluctuation → cupula deflection → angular VN discharge.
-        # Activates Col[yaw/pitch/roll] → axis-specific bundles (gain=10) → STDP growth.
-        # ANGULAR_GAIN=50: σ_k=0.07 × 50 ≈ 3.5 mech-units (gentle bottom noise).
-        # REF: V8方案 §三 战术一
-        ANGULAR_GAIN = 50.0
-        eta_ang = self._langevin_angular.step(self.ecm_vestibular, dt)
-        mechanical_inputs['yaw']   = mechanical_inputs.get('yaw',   0.0) + eta_ang[0] * ANGULAR_GAIN
-        mechanical_inputs['pitch'] = mechanical_inputs.get('pitch', 0.0) + eta_ang[1] * ANGULAR_GAIN
-        mechanical_inputs['roll']  = mechanical_inputs.get('roll',  0.0) + eta_ang[2] * ANGULAR_GAIN
+        # ── World 2.0: Yaw torque from left-right temperature differential ──
+        # BIO: thermotaxis reflex arc — spinal thermal asymmetry → turning.
+        # REF: Hedgecock & Russell 1975 (C. elegans thermotaxis); Fraenkel & Gunn 1940.
+        # DESIGN: T_left > T_right → positive torque → yaw increases (CCW = toward heat).
+        # EXP-W2-003: YAW_GAIN=0.1; calibrate by measuring yaw at fixed ΔT=1.0.
+        T_left  = patch_temps.get("left",  (0.15, 0, 0))[0]
+        T_right = patch_temps.get("right", (0.15, 0, 0))[0]
+        delta_T_lr = T_left - T_right
+        YAW_GAIN = 0.1
+        self.world.body.apply_yaw_torque(delta_T_lr * YAW_GAIN, dt)
 
-        # ── C3': Heat source consumption + ecology ──
-        # Organism absorbs energy from nearby heat sources (metabolic feeding).
-        # BIO: chemolithoautotrophy at hydrothermal vents.
-        # BIO: Thiomicrospira/Beggiatoa chemolithoautotrophs at hydrothermal vents sustain
-        # metabolic rates 2–3 orders of magnitude above abyssal background (Jannasch &
-        # Mottl 1985, Science 229:717). Proximity-weighted intake models the steep energy
-        # gradient at the vent margin; organisms at the plume edge extract proportionally
-        # less than those at the source face (Childress & Fisher 1992, OMBAR 30:337).
-        # EXP-P5RouteA: empirical balance — neural drain 65× world deposit at rate=0.15;
-        # rate=9.75 restores deposit≈drain at equilibrium distance d=20, r=30
-        # (9.75 × 0.333 × 0.001 ≈ 0.00325 ≈ measured drain 0.00324/step).
-        CONSUME_RATE = 9.75
+        # ── World 2.0: Thermal convective drift (buoyancy advection) ──
+        # PHYS: Boussinesq — heated fluid is less dense; cooler fluid flows
+        # inward to replace it, creating an advective current toward the source.
+        # BIO: Hydrothermal vent archaea are carried by thermal plumes (Kelley 2002).
+        # F_conv = k_conv × ∇T applied as Δv; friction damps to v_t = k_conv|∇T|/μ.
+        # EXP-W2-004: k_conv=0.5 → terminal v≈0.12 units/step at σ distance;
+        # expected drift ~11 units toward cylinder over 100k steps.
+        _CONV_K = getattr(self, '_conv_k', 0.5)  # overridable per-instance (EXP: set circuit._conv_k)
+        _grad = self.world.gradient_at(self.world.body.position)
+        self.world.body.velocity[0] += _CONV_K * _grad[0] * dt
+        self.world.body.velocity[1] += _CONV_K * _grad[1] * dt
+        # _grad[2] intentionally skipped: Z axis locked in Phase 1
+
+        # ── World 2.0: Cylinder collision detection ──
+        for _csrc in self.world.cylindrical_sources:
+            if _csrc.alive:
+                self.world.body._collide_with_cylinder(_csrc, dt)
+        # Regenerate cylindrical sources
+        for _csrc in self.world.cylindrical_sources:
+            _csrc.step(dt)
+
+        # ── C3': Thermal energy absorption (feeding) ──
+        # PHYS: Organism converts environmental thermal flux into metabolic
+        # energy — the same temperature field that causes skin damage also
+        # provides sustenance. This is NOT a separate "feeding" channel;
+        # it IS the thermal interaction, viewed from the energy-intake side.
+        #
+        # BIO: chemolithoautotrophy at hydrothermal vents. Organisms like
+        # Riftia pachyptila harvest energy from the thermal/chemical gradient.
+        # The conversion efficiency is a membrane material property.
+        #
+        # COUPLING: temperature_at() and consume_nearby() share the same
+        # (1 - d/r) falloff. By using T_local as the rate, we derive
+        # feeding power directly from the physical field:
+        #   P_feed = T_local × membrane_efficiency × dt
+        # No arbitrary CONSUME_RATE constant needed.
+        #
+        # THERMODYNAMIC BUDGET (self-calibrated):
+        #   T_local at d=5 from source (T_src=5.0): ~3.75
+        #   P_feed = 3.75 × 1.0 × 0.001 = 0.00375/step
+        #   Metabolic expense (measured): ~0.0033/step (vascular withdraw)
+        #   → At d≈5-6, income ≈ expense (equilibrium distance)
+        #   → Closer: net gain (but increasing burn risk)
+        #   → Further: net deficit → eventual starvation
+        T_local = self.world.temperature_at(self.world.body.position)
         energy_absorbed = self.world.consume_nearby(
-            self.world.body.position, CONSUME_RATE, dt)
-        # Regenerate depleted sources (deep-sea vent ecology)
+            self.world.body.position, T_local, dt)
+        # Regenerate depleted point sources (deep-sea vent ecology)
         self.world.regenerate_sources()
 
         # ── Energy pipeline: World → EnergyStore ──
+        # Patch C: YolkSac discharges BEFORE deposit/tick, so it primes the
+        # store for Δfill detection by DADifferentialGate (DA RPE).
+        self.yolk_sac.step(self.energy_store, dt)
         # Consumed energy flows into the external reservoir.
         # Store handles efficiency loss (digestive efficiency ~90%).
         self.energy_store.deposit(energy_absorbed)
+
+        # ── World 2.0: ThermalMouth energy intake ──
+        # BIO: oral thermal exchange organ — chemosynthetic feeding.
+        # FIX-PHASE1-002: ECM temperature passed explicitly (objection fix).
+        # ECM.temperature binds mouth cooling to body thermal state.
+        _ecm_temp = getattr(self, 'ecm_vestibular', None)
+        _ecm_temp_val = _ecm_temp.temperature if _ecm_temp is not None else 0.15
+        self.thermal_mouth.step(
+            self.world, self.world.body, self.energy_store,
+            ecm_temp=_ecm_temp_val, dt=dt)
+
         # Basal metabolic drain: organism costs energy to exist.
         self.energy_store.tick(dt)
+
+        # ═══════════════════════════════════════════════════════════════
+        # L2:SELECTION — Operation Trauma Genesis: Damage Feedback Loops
+        # BIO: Tissue damage has systemic physiological consequences.
+        # DESIGN: We inject physical consequences (not behavioral rules).
+        #         The avoidance behavior must EMERGE from L1 circulation
+        #         coupling under these L2 constraints.
+        # ═══════════════════════════════════════════════════════════════
+
+        # ── Collect damage state from all skin patches ──
+        # patch_temps format: patch_id → (T_skin, dT_skin, damage_integral)
+        _damage_values = [patch_temps[pid][2] for pid in patch_temps]
+        _max_damage = max(_damage_values) if _damage_values else 0.0
+        _total_damage = sum(_damage_values)
+
+        # ── Feedback Loop A: damage → VitalOscillator amplitude decay ──
+        # L2:SELECTION — Tissue damage depresses cardiac output.
+        # BIO: Burn injury → systemic inflammatory response → cardiac
+        #      depression (Horton 2003: hypovolemic shock in burn patients).
+        # DESIGN: max(damage) across patches → sigmoid suppression factor.
+        #         At damage=0 → factor=1.0 (healthy heartbeat).
+        #         At damage=5 → factor≈0.27 (cardiac depression).
+        # EMERGE: System should learn that proximity→damage→vital_drop
+        #         is costly, and self-organize avoidance behavior.
+        vital_damage_factor = 1.0 / (1.0 + _max_damage * self.vital_damage_k)
+
+        # ── Feedback Loop B: damage → EnergyStore repair metabolic cost ──
+        # L2:SELECTION — Tissue repair requires ATP (thermodynamic necessity).
+        # BIO: Wound healing consumes 20-50% additional metabolic energy
+        #      (Arnold & Barbul 2006: "Nutrition and Wound Healing").
+        # DESIGN: total_damage → additional energy drain from EnergyStore.
+        #         This creates thermodynamic pressure: damage costs real energy.
+        # EMERGE: System should learn to avoid states that increase drain.
+        repair_cost = _total_damage * self.repair_energy_rate * dt
+        if repair_cost > 0:
+            self.energy_store.withdraw(repair_cost)
+
+        # ── Vital Oscillator: heartbeat → Motor membrane injection ──
+        # Three detuned VdP oscillators draw energy from store and inject
+        # sub-threshold current into Motor X/Y/Z membranes. This is the
+        # physical origin of basal motility (postural sway).
+        # Signal chain: EnergyStore → VitalOscillator → Motor.inject()
+        vital_outputs = self.vital_oscillator.step(self.energy_store, dt)
+
+        # Apply Feedback A: damage suppresses vital oscillation
+        vital_outputs = [v * vital_damage_factor for v in vital_outputs]
+
+        _VITAL_MOTOR_MAP = ['move_x', 'move_y', 'move_z']
+        for i, mkey in enumerate(_VITAL_MOTOR_MAP):
+            if mkey in self.motor_neurons:
+                self.motor_neurons[mkey]._membrane.inject(
+                    vital_outputs[i], dt)
+        # Record in MotionState
+        ms.vital_pulse = list(vital_outputs)
+        ms.vital_amplitude = sum(abs(v) for v in vital_outputs)
+
+        # ── Feedback Loop C: Spinal nociceptive withdrawal reflex ──
+        # L2:SELECTION — Hardwired directional withdrawal from noxious stimuli.
+        # BIO: Aδ/C-fiber → spinal interneuron → contralateral flexor motor
+        #      neuron. Reflexive withdrawal AWAY from noxious stimulus.
+        #      (Sherrington 1906: "flexion reflex", hardwired at birth.)
+        # DESIGN: Spatial nociceptor contrast → directional motor current.
+        #         Uses existing SkinPatch spatial arrangement.
+        #         MOSFET gate (default: VDD=open) → future cortical override.
+        # EMERGE: None — this IS L2 hardwired. But cortical override CAN
+        #         suppress it in the future ("enduring pain to eat").
+        soma_output = self.somatosensory.get_output()
+        noci_activations = {
+            pid: soma_output[pid]["noci_activation"]
+            for pid in soma_output
+        }
+        reflex_drives = self.spinal_reflex.process(noci_activations, dt)
+        for mkey, drive in reflex_drives.items():
+            if drive != 0.0 and mkey in self.motor_neurons:
+                self.motor_neurons[mkey]._membrane.inject(drive, dt)
+
+        # ── Hunger-driven thermotaxis: approach warmer side when hungry ──
+        # L2:SELECTION — Same spatial contrast architecture as noci withdrawal,
+        # but inverted direction (approach, not flee) and gated by hunger.
+        # BIO: hypothalamic hunger → lateral hypothalamus → locomotor drive
+        #      toward thermal/chemical gradient (Saper et al. 2002).
+        # PHYS: uses thermoreceptor DC channel (not nociceptor AC).
+        thermo_activations = {
+            pid: soma_output[pid]["thermo_activation"]
+            for pid in soma_output
+        }
+        # PHASE 1: Hardcoded thermotaxis reflex disabled — STDP cold-start experiment.
+        # Motor is now driven exclusively by Langevin noise (AGC-modulated).
+        # Thermotaxis must emerge from STDP weight learning, not hardcoded reflex.
+        # hunger_drives = self.spinal_reflex.process_hunger(...)  # [PHASE 1 DISABLED]
+        hunger_drives = {'x': 0.0, 'y': 0.0, 'z': 0.0}  # zero drives
+        # (loop below is intentionally kept — drives are all zero, no injection occurs)
+        for mkey, drive in hunger_drives.items():
+            if drive != 0.0 and mkey in self.motor_neurons:
+                self.motor_neurons[mkey]._membrane.inject(drive, dt)
 
         # ── C3': Homeostatic circulation coupling (structural carrier) ──
         # Raw signals from existing sensors (physical measurements):
@@ -749,9 +923,15 @@ class VariantCircuit(HebbianCircuit):
         thermal_stability = 1.0 / (1.0 + thermal_err * 10.0)
         body_speed = self.world.body.speed()
 
-        # HC-006 removed: feed_alignment dot-product was semantic hardcoding.
-        # Direction-toward-heat must emerge from patch-specific SynapticBundle structure.
-        feed_alignment = 0.0
+        # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
+        # Old code used get_nearest_heat_source() — a privileged coordinate
+        # lookup the organism cannot physically perform. Replaced with the
+        # max-min contrast across skin patches, which IS a local measurement.
+        # BIO: dorsal horn spatial comparison across dermatomes.
+        thermo_vals = [soma_output[pid]["thermo_activation"]
+                       for pid in soma_output]
+        feed_alignment = (max(thermo_vals) - min(thermo_vals)
+                          if thermo_vals else 0.0)
 
         # ── Structural circuit: Capacitor integration + MOSFET deviation ──
         # All ratios emerge from component voltages, not software division.
@@ -768,15 +948,41 @@ class VariantCircuit(HebbianCircuit):
         ms.rho_feed = circ['rho_feed']
         ms.homeo_deviation = circ['deviation']
         ms.energy_absorbed = energy_absorbed
+        ms.fill_fraction = self.energy_store.fill_fraction
 
-        # ── C3': Deviation → DA boost (structural output) ──
-        # MOSFET comparator outputs DA current when deviation > threshold.
-        # Current flows into DA neurons via membrane injection.
-        # Goes through D2R autoregulation naturally (not a bypass).
-        c3_da_current = circ['da_current']
-        if c3_da_current > 0:
+        # ── Phase 4: AGC update ──
+        # Drive signal computed from energy deficit + DA deficit.
+        # Slow RC integrator (τ=40k) produces gain multiplier.
+        # Applied to: (1) hunger reflex, (2) Col→Motor bundle propagation.
+        self.agc.step(self.energy_store.fill_fraction,
+                      self.dopamine.concentration, dt)
+        ms.agc_gain = self.agc.gain
+        ms.yolk_level = self.yolk_sac.level
+        ms.yolk_depleted = self.yolk_sac.is_depleted
+        ms.efference_supp_ratio = self._efference_supp_ratio
+
+        # ── Patch D: DA fires on energy improvement rate (VTA RPE signal) ──
+        # Replaces c3_da_current (absolute deviation) with rate-of-change gate.
+        # DA = max(0, eta_da × Δfill / dt), gated by MOSFET (positive only).
+        # BIO: VTA burst on unexpected reward, silent on steady state.
+        # REF: Schultz et al. 1997, Science 275:1593-1599.
+        _rpe_da = self.da_gate.step(self.energy_store.fill_fraction, dt)
+        # Phase4-P1: Hunger signal as DA floor — prevents DA=0 when fill stable.
+        # hunger_da = max(0, θ × (0.5 - fill)): active below 50% fill, zero above.
+        # BIO: lateral hypothalamus → VTA tonic drive under caloric deficit.
+        # REF: Wise 2004, Nat Rev Neurosci. θ_hunger=1.0 → DA≈0.3 at fill=0.2
+        _hunger_da = max(0.0, 1.0 * (0.5 - self.energy_store.fill_fraction))
+        _da_drive = max(_rpe_da, _hunger_da)
+        # Phase5-revised: RPE inject amplitude calibrated for gm=1.0 DA neurons.
+        # With gm=1.0: concentration = V - 0.01. For meaningful reward signal:
+        # tonic (bc only): V=0.1 → c=0.09 (9%); max RPE: V=0.6 → c=0.59 (59%).
+        # Ratio 2.6× matches VTA burst rate ratio (Schultz 1997: ~3× on unexpected reward).
+        # Formula: V_RPE = bc_V + I_direct×R = 0.1 + RPE×SCALE×1.0; target V_RPE≈0.6.
+        # SCALE = (0.6-0.1)/RPE_peak = 0.5/5.0 = 0.1. D2R keeps max steady-state at ~58%.
+        DA_INJECT_SCALE = 0.1
+        if _da_drive > 0:
             for nid, neuron in self.da_neurons.items():
-                neuron._membrane.inject(c3_da_current, dt)
+                neuron._membrane.inject(_da_drive * DA_INJECT_SCALE, dt)
 
         # ── C.04: Deviation → Motor direct activation ──
         # Spinal-level reflex: bypasses slow DA modulation.
@@ -785,7 +991,10 @@ class VariantCircuit(HebbianCircuit):
         # Phase 1 calibration (EXP-012): 0.05 produced 0.0000045V/step
         # ("whispering in a hurricane"). 1.0 → 0.09V/step at deviation=0.19
         # — sufficient to push past Motor v_peak and force spike.
-        DEVIATION_MOTOR_GAIN = 1.0
+        # dt-invariant: inject(motor_drive, dt) = (deviation × GAIN) × dt / C
+        # GAIN = 1/dt → net dV/step = deviation/C regardless of dt.
+        # Calibrated at dt=0.001 (Phase 5). At dt=1.0 (regression) GAIN→1.0 ← same as before.
+        DEVIATION_MOTOR_GAIN = 1.0 / max(dt, 1e-9)
         deviation = circ['deviation']
         if deviation > 0.1:  # threshold: only significant deviation
             motor_drive = (deviation - 0.1) * DEVIATION_MOTOR_GAIN
@@ -821,18 +1030,10 @@ class VariantCircuit(HebbianCircuit):
         # Transmission = sum of both paths, capped at 1.0
         T_impedance = min(1.0, path_a + path_b)
         for key in list(mechanical_inputs.keys()):
-            if key not in ('therm', 'dtherm'):
-                mechanical_inputs[key] *= T_impedance
-
-        # ── 1b. VestibularChainV2 parallel observer (Phase 1 only) ──
-        if self._vestibular_v2 is not None:
-            self._v2_p_avail[0] = self.energy_store.fill_fraction  # 1-step lag P_avail
-            self._vestibular_v2.step(mechanical_inputs, dt)
-            self._v2_last_state = {
-                'last_gain': self._vestibular_v2.last_gain,
-                'spike_cost': self._vestibular_v2.spike_cost(),
-                'fifo_rms': self._vestibular_v2.fifo_signal_rms(),
-            }
+            # Skip thermal patch axes — not mechanical signals
+            if key.startswith('therm') or key.startswith('dtherm'):
+                continue
+            mechanical_inputs[key] *= T_impedance
 
         # ── 2. Mother step (UNCHANGED) ──
         super().step(mechanical_inputs, dt)
@@ -856,16 +1057,8 @@ class VariantCircuit(HebbianCircuit):
             # Only modulate the deviation from rest
             deviation = v - v_rest
             new_v = v_rest + deviation * max(mod, 0.0)
-            # Set membrane charge to match new voltage
-            # FIX(V04): record delta in _q_in/_q_out so KCL audit stays valid
-            old_charge = aff_reg._membrane.charge
-            new_charge = new_v * aff_reg._membrane.capacitance
-            aff_reg._membrane.charge = new_charge
-            delta_q = new_charge - old_charge
-            if delta_q >= 0:
-                aff_reg._membrane._q_in += delta_q
-            else:
-                aff_reg._membrane._q_out += (-delta_q)
+            # Set membrane charge to match new voltage (KCL-compliant: tracks delta in _q_in/_q_out)
+            aff_reg._membrane.discharge_to(new_v)
 
         # ── 3. Damper-modified leak ──
         # Apply adaptive damping to Enc/Col based on their current
@@ -907,11 +1100,7 @@ class VariantCircuit(HebbianCircuit):
             if gate < 0.9:  # only apply during recovery
                 # Reduce membrane charge proportionally to inactivation
                 reduction = (1.0 - gate) * 0.01  # gentle
-                # FIX(V04): track charge reduction in _q_out for KCL audit
-                old_charge = aff._membrane.charge
                 aff._membrane.charge *= (1.0 - reduction)
-                delta_q = aff._membrane.charge - old_charge  # negative
-                aff._membrane._q_out += (-delta_q)
 
         # ── 6. Lateral inhibition between columns ──
         # M4 fix: use continuous rate for WTA competition, inject IPSP current
@@ -932,6 +1121,29 @@ class VariantCircuit(HebbianCircuit):
         binding_activations = self.binding_layer.compute_all(col_act_dict)
         # Store for _do_learning() to compute sync gate
         self._binding_activations = binding_activations
+
+        # ── Patch E: Efference Copy suppression ratio monitoring (INFRA) ──
+        # Count Binding events suppressed by low motor efficacy.
+        # Alert at R_supp >= 0.9 (critation doc §五).
+        _avg_efficacy = sum(self._motor_efficacy.values()) / max(len(self._motor_efficacy), 1)
+        for _bid in binding_activations:
+            self._efference_total_count += 1
+            if _avg_efficacy < self._efficacy_suppress_threshold:
+                self._efference_supp_count += 1
+        # Report every _efference_monitor_window steps
+        _mtick = getattr(self, '_maturation_tick', 0)
+        if (_mtick > 0 and _mtick % self._efference_monitor_window == 0
+                and self._efference_total_count > 0):
+            import warnings as _warnings
+            self._efference_supp_ratio = (self._efference_supp_count
+                                          / self._efference_total_count)
+            if self._efference_supp_ratio >= 0.9:
+                _warnings.warn(
+                    f"[EXP] Efference suppression ratio {self._efference_supp_ratio:.2f}"
+                    f" >= 0.9 at step {_mtick}. Check motor efficacy.",
+                    RuntimeWarning, stacklevel=2)
+            self._efference_supp_count = 0
+            self._efference_total_count = 0
 
         # Binding → Motor side channel (§5.4: I_total = direct + binding)
         for bid, b_act in binding_activations.items():
@@ -968,20 +1180,6 @@ class VariantCircuit(HebbianCircuit):
                 attenuation = (1.0 - g) * 0.0005  # very gentle
                 self.column_neurons[axis].energy = max(
                     0.001, self.column_neurons[axis].energy - attenuation)
-
-        # ── 7b. VitalOscillator → Motor membrane (步骤2 宏观传出轨) ──
-        # Three-frequency VdP heart injects basal drive into Motor membranes.
-        # BIO: hemodynamic pulsation → postural tremor → basal motility.
-        # Energy withdrawn from EnergyStore (Noether-compliant, via withdraw()).
-        # REF: vital_oscillator.py; 步骤2统一物理架构方案 §一
-        _vital_out = self.vital_oscillator.step(self.energy_store, dt)
-        _vital_axes = ['move_x', 'move_y', 'move_z']
-        for _k, _ax in enumerate(_vital_axes):
-            if _ax in self.motor_neurons:
-                self.motor_neurons[_ax]._membrane.inject(_vital_out[_k], dt)
-        # Record in MotionState for observability
-        self.motion_state.vital_pulse = _vital_out
-        self.motion_state.vital_amplitude = sum(abs(v) for v in _vital_out)
 
         # ── 8. Neuromodulator (DA) update ──
         # 8a. Motor spike tracking (used for feedback, NOT for DA release)
@@ -1028,56 +1226,17 @@ class VariantCircuit(HebbianCircuit):
         # ── DA input bundles: propagate ──
         da_input_currents = {nid: 0.0 for nid in self.da_neurons}
 
-        # HC-018 removed: thermal_gradient/grad_dot_v computed via Python math then
-        # written to motion_state was semantic hardcoding (DR5 read this for PASS/FAIL).
-        # thermal_gradient/thermal_gradient_dot_velocity fields remain in MotionState
-        # (default 0.0) — experiments compute patch-gradient proxy locally from _patch_temps.
-
         for bundle in self.bundles_shadow_to_da:
             currents = bundle.propagate()
             for j, tgt in enumerate(bundle.targets):
                 if j < len(currents) and tgt.id in da_input_currents:
-                    # tanh saturation: vesicle pool + receptor conductance ceiling.
-                    # BIO: max synaptic release rate bounded by vesicle replenishment
-                    #      (Attwell & Laughlin 2001). Receptor conductance saturates.
-                    # I_MAX = 2.0: shadow pathway is secondary modulator (< xin_relay).
-                    # I_SCALE = 3.0: half-sat at I=3. With w=0.1 and Ca_rate~0.25,
-                    # raw I ≈ 7×0.25×0.111≈0.19 → tanh(0.19/3)≈0.063 → effectively
-                    # linear. Upper bound: I_MAX×tanh(∞)=2.0 prevents unbounded DA.
-                    I_MAX, I_SCALE = 2.0, 3.0
-                    import math as _math
-                    da_input_currents[tgt.id] += I_MAX * _math.tanh(currents[j] / I_SCALE)
+                    da_input_currents[tgt.id] += currents[j]
 
         for bundle in self.bundles_xin_to_da:
             currents = bundle.propagate()
             for j, tgt in enumerate(bundle.targets):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
-
-        # B.06: soma relay → DA (thermal pathway, structural)
-        for bundle in self.bundles_soma_to_da:
-            currents = bundle.propagate()
-            for j, tgt in enumerate(bundle.targets):
-                if j < len(currents) and tgt.id in da_input_currents:
-                    da_input_currents[tgt.id] += currents[j]
-
-        # RC-4: slow relay step + inhibitory baseline subtraction
-        # Step each slow relay with its fast relay's output current,
-        # then subtract slow_relay contribution from DA input (phasic signal).
-        if self._bundles_relay_to_slow:
-            slow_in: Dict[str, float] = {}
-            for b in self._bundles_relay_to_slow:
-                c_vec = b.propagate()
-                for j, tgt in enumerate(b.targets):
-                    if j < len(c_vec):
-                        slow_in[tgt.id] = slow_in.get(tgt.id, 0.0) + c_vec[j]
-            for pid, sn in self._slow_relays.items():
-                sn.step(slow_in.get(sn.id, 0.0), dt)
-            for b in self._bundles_slow_to_da:
-                c_vec = b.propagate()
-                for j, tgt in enumerate(b.targets):
-                    if j < len(c_vec) and tgt.id in da_input_currents:
-                        da_input_currents[tgt.id] += c_vec[j]
 
         # ── Step DA neurons ──
         # DA neuron energy: withdraw from EnergyStore (not magic refill).
@@ -1110,8 +1269,9 @@ class VariantCircuit(HebbianCircuit):
         # Don't call dopamine.step() — concentration is set structurally.
 
         # ── STDP on DA input bundles ──
-        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da + self.bundles_soma_to_da:
-            bundle.learn(dt=dt)
+        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da:
+            bundle.learn(dt=dt, fill_fraction=self.energy_store.fill_fraction,
+                         da_concentration=self.dopamine.concentration)
             bundle.compute_xin(dt)
 
         # DA modulation moved to _propagate_bundles() override (multiplicative).
@@ -1214,6 +1374,31 @@ class VariantCircuit(HebbianCircuit):
         self.ecm_vestibular.step(vest_heat, dt)
         self.ecm_encoding.step(enc_heat, dt)
         self.ecm_column.step(col_heat, dt)
+
+        # ── Feedback Loop D: damage → ECM thermal barrier breach ──
+        # L2:SELECTION — Tissue damage destroys dermal barrier → deep heat.
+        # BIO: Burns destroy dermal barrier → deep tissue thermal injury.
+        #      High temperature in ECM → Q10 effect → ion channel acceleration
+        #      → potential febrile seizure (high-thermal chaos in neural net).
+        # PHYS: Damaged insulator → thermal resistance drops → heat flows in.
+        # DESIGN: damage_integral acts as inverse thermal resistance.
+        #         Michaelis-Menten saturation: breach = D/(D+K).
+        #         No damage → ECM fully insulated. High damage → exposed.
+        # EMERGE: ECM thermal disruption → ion channel dynamics change →
+        #         prediction error (Shadow) → DA burst → STDP learning.
+        #         This is the "febrile seizure" catalyst for rapid learning.
+        K_BARRIER = self.k_barrier
+        BREACH_CONDUCTANCE = self.breach_conductance
+        if _max_damage > 0.01:
+            breach_factor = _max_damage / (_max_damage + K_BARRIER)
+            # Find hottest skin patch temperature
+            max_skin_T = max(patch_temps[pid][0] for pid in patch_temps)
+            for ecm in [self.ecm_vestibular, self.ecm_encoding, self.ecm_column]:
+                # Heat flows from hot skin into cooler ECM (thermodynamically correct)
+                delta_T = max_skin_T - ecm.temperature
+                if delta_T > 0:
+                    heat_breach = breach_factor * delta_T * BREACH_CONDUCTANCE
+                    ecm._temperature += heat_breach * dt
 
         # ── 5b. Inter-layer heat diffusion (A3: §1E.2) ──
         # A3 FIX: heat propagates with finite delay and penetration threshold.
@@ -1323,8 +1508,11 @@ class VariantCircuit(HebbianCircuit):
                 currents = [c * da_gain for c in currents]
             bundle.apply_to_targets(currents, dt)
 
-        # Col → Motor: DA also scales column→motor signal
+        # Col → Motor: DA scales column→motor signal
         # BIO: D1 receptors present on both prefrontal and motor cortex
+        # NOTE: AGC is NOT applied here — it acts only on hunger reflex.
+        # Applying AGC broadly amplifies ALL motor pathways (incl. thermal),
+        # which disrupts encoding selectivity (T2.2/T2.3 regression).
         for bundle in self.bundles_col_to_motor:
             currents = bundle.propagate()
             if da_gain != 1.0:
@@ -1370,14 +1558,8 @@ class VariantCircuit(HebbianCircuit):
             if new_violations > 0:
                 self._structural_freeze = True
 
-            # 2. Weight entropy snapshot (Shannon); V14: surface freeze alert
-            w_snap = self._entropy_probe.measure(self, tick)
-            if w_snap.learning_frozen:
-                n_frozen = self._entropy_probe._frozen_count
-                self._ledger_alerts.append(
-                    f"t={tick}: DEG-FREEZE: weight entropy delta≈0 for "
-                    f"{n_frozen} consecutive measurements — learning may be frozen"
-                )
+            # 2. Weight entropy snapshot (Shannon)
+            self._entropy_probe.measure(self, tick)
 
             # 3. TOPRXIN phase intensities + recursion cycle update
             toprxin_snap = self._toprxin_ledger.measure(self, tick)
@@ -1395,11 +1577,8 @@ class VariantCircuit(HebbianCircuit):
             self._structural_bridge.structural_influence(tick)
             # Energy ledger: global thermodynamic accounting
             self._energy_ledger.record(self, dt)
-            # V05/V06/V08: check anomalies and surface any alerts
-            alerts = self._energy_ledger.check_anomalies()
-            if alerts:
-                for alert in alerts:
-                    self._ledger_alerts.append(f"t={tick}: {alert}")
+            # Component registry: scan all live components
+            self._component_registry.scan(self, tick)
 
     def _do_learning(self, dt: float):
         """Phase 4: P→R closure — unified three-factor learning.
@@ -1410,6 +1589,10 @@ class VariantCircuit(HebbianCircuit):
           1. PNN gate (g_ℓ): ECM maturation → critical period closure
           2. DA modulation: Xin tension → DA release → learning rate boost
           3. Sync gate (g_sync): binding activation → col→motor gate
+
+        Phase 2 addition: fill_fraction gates LTD decay in all bundles.
+        When EnergyStore is depleted, LTD is frozen to prevent metabolic
+        forgetting (EXP-016: Δw collapsed +0.289→+0.013 at fill=0).
 
         This replaces both the old step-12 learn() and the PNN lr cache,
         which previously conflicted (double learning + permanent lr mutation).
@@ -1433,13 +1616,24 @@ class VariantCircuit(HebbianCircuit):
         g_sync_raw = self._sync_gate.conduct(total_bind_act)
         g_sync = min(1.0, g_sync_raw)
 
+        # Phase 2: Energy-gated LTD freeze.
+        # Read fill_fraction once, pass to all bundles.
+        fill = self.energy_store.fill_fraction
+
+        # Phase 3: DA concentration for three-factor eligibility trace.
+        # Read once, pass to all bundles. Bundles with use_eligibility_trace=True
+        # will gate LTP by this value. Others ignore it (default da=0.0 is safe).
+        da_conc = self.dopamine.concentration
+
         # Vestibular → Encoding: PNN × DA
         for b in self.bundles_vest_to_enc:
-            b.learn(dt, plasticity_gate=gate_vest * da_lr_mod)
+            b.learn(dt, plasticity_gate=gate_vest * da_lr_mod,
+                    fill_fraction=fill, da_concentration=da_conc)
 
         # Encoding → Column: PNN × DA
         for b in self.bundles_enc_to_col:
-            b.learn(dt, plasticity_gate=gate_enc * da_lr_mod)
+            b.learn(dt, plasticity_gate=gate_enc * da_lr_mod,
+                    fill_fraction=fill, da_concentration=da_conc)
 
         # A4: mass inertia factor — heavier body = slower motor learning
         # BIO: larger organisms have slower motor adaptation rates
@@ -1447,7 +1641,8 @@ class VariantCircuit(HebbianCircuit):
 
         # Column → Motor: PNN × DA × sync × body_inertia
         for b in self.bundles_col_to_motor:
-            b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr)
+            b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                    fill_fraction=fill, da_concentration=da_conc)
 
         # Sprouted bundles: use target layer's gate
         for b in self._sprouted_bundles:
@@ -1458,7 +1653,8 @@ class VariantCircuit(HebbianCircuit):
                 gate = gate_enc * da_lr_mod
             else:
                 gate = gate_vest * da_lr_mod
-            b.learn(dt, plasticity_gate=gate)
+            b.learn(dt, plasticity_gate=gate, fill_fraction=fill,
+                    da_concentration=da_conc)
 
     def get_variant_state(self) -> dict:
         """Get variant component states for monitoring."""
@@ -1535,6 +1731,8 @@ class VariantCircuit(HebbianCircuit):
             "noether": self._noether_probe.summary(),
             # Energy ledger: global thermodynamic accounting
             "energy_ledger": self._energy_ledger.summary(),
+            # Phase 4: AGC state
+            "agc": self.agc.summary(),
         }
 
     # ── Phase 6: Structural event hooks → RecursionTracker ────
@@ -1589,22 +1787,17 @@ class VariantCircuit(HebbianCircuit):
         #              (2) unbounded activation (spiking = hard limit)
         # BIO: CaMKII concentration → synaptic input to VTA DA neurons.
         #
-        # gain=1.0: with post-defibrillation calcium_rate ∈ [0.2, 0.6],
-        # I = 7 sources × rate(0.25) × w(0.1) × 1.0 = 0.175
-        # V_ss = (0.175 + 0.1bc) × 1.0 = 0.275 → DA gradient available ✓
-        # Peak: rate=0.58 → I=0.406 → V_ss=0.506 → D2R kicks in ✓
-        # Phase 1 fix (w=1.0) was calibrated before cortical defibrillation
-        # when Shadow Col had calcium_rate=0 (contributed nothing).
-        # Post-defibrillation calcium_rate=0.2-0.6 → must re-calibrate.
-        # D2R τ_D2=100s means at 10k steps it only provides 10% compensation;
-        # w=1.0 overwhelms it. Original design w=0.05 was for rate≈1.0 full-fire.
-        # New w=0.1 ≈ 0.05 × (1.0/0.25) × 0.5 (half-scale for D2R build-up slack).
-        # REF: 热趋性行为分析_v2.0_2026-06-16 §三 DA再饱和诊断
+        # gain=1.0: with calcium_rate ∈ [0,1],
+        # I = 7 sources × rate(≤1.0) × w(0.05) × 1.0 = 0.35
+        # V_ss = (0.35 + 0.1bc) × 1.0 = 0.45 → moderate DA ✓
+        # D2R will prevent saturation if DA > 0.3 (ec50)
         cfg_shadow = BundleConfig(
             bundle_id="shadow_to_da",
             learning_rule="frozen",  # INNATE: hypothalamus→VTA phylogenetic prior
-            initial_weight=0.1,      # Post-defibrillation recalibration (was 1.0)
-            weight_max=5.0,          # structural upper bound
+            initial_weight=0.05,     # Reverted: w=1.0 (Phase1-fix) was 20× overshoot causing DA sat.
+            # w=0.05 gives I_shadow=7×rate×0.05×1.0=0.175A at rate=0.5. Correct with gm=1.0.
+            # "DA sleeps" at w=0.05 was due to gm=8.0 bug (saturation at V>0.135), not weight.
+            weight_max=0.5,          # reduced ceiling consistent with innate prior weight
             stdp_lr=0.005,           # retained for reference but unused (frozen)
             synapse_gain=1.0,        # col activation is now bounded by spiking
             bundle_role="feedforward",
@@ -1620,8 +1813,9 @@ class VariantCircuit(HebbianCircuit):
         cfg_xin = BundleConfig(
             bundle_id="xin_to_da",
             learning_rule="frozen",  # INNATE: prediction_error→VTA phylogenetic prior
-            initial_weight=5.0,      # Phase 1 fix: 0.1 too thin → DA sleeps
-            weight_max=10.0,         # EXP-012 fix: was default 1.0 → silently clamped 5.0→1.0
+            initial_weight=0.1,      # Reverted: w=5.0 (Phase1-fix) was 50× overshoot.
+            # w=0.1 gives I_xin=relay_act×0.1×0.5=0.025A at relay_act=0.5. Correct with gm=1.0.
+            weight_max=1.0,          # xin pathway is phasic; ceiling matches innate prior
             stdp_lr=0.003,           # retained for reference but unused (frozen)
             synapse_gain=0.5,        # moderate: 1 source, phasic
             bundle_role="feedforward",
@@ -1630,165 +1824,55 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_xin_to_da.append(
             SynapticBundle(cfg_xin, [self._xin_relay], da_list))
 
-        # ── B.06: Somatosensory relay → DA (thermal pathway) ──
-        # Relay neurons compute ∇²T (Laplacian) via lateral inhibition.
-        # Front/back/left/right asymmetry in relay activation encodes
-        # temperature gradient direction relative to body orientation.
-        # When approaching heat: front relay fires more → DA↑ (structural).
-        # No explicit dot-product math — directionality emerges from relay
-        # activation differences propagating through this bundle.
-        # BIO: spinal relay → VTA pathway (thermotaxis in simple organisms).
-        # REF: AI编程自足文档 步骤1 B.06; analysis_concept_evolution §5
-        # STRUCTURAL-DEBT HC-002: all-to-all topology suppresses directional gradient.
-        # relay_neurons = all 4 patches → all 3 DA (全对全). When body moves,
-        # one side's +ΔT cancels another's -ΔT → DA tonic. RC-4 slow_relay
-        # is a workaround; root fix requires V2.0 address-based sub-circuits.
-        # See docs/technical_debt_hardcoding.md HC-002, DEG-001.
-        relay_neurons = [self.somatosensory.relays[pid]
-                         for pid in self.somatosensory.patch_ids]
-        cfg_soma = BundleConfig(
-            bundle_id="soma_to_da",
-            learning_rule="stdp",
-            initial_weight=0.5,
-            weight_max=2.0,
-            stdp_lr=0.002,
-            synapse_gain=1.0,
-            bundle_role="feedforward",
-            remodel_cost_kappa=0.001,
-        )
-        self.bundles_soma_to_da.append(
-            SynapticBundle(cfg_soma, relay_neurons, da_list))
-
-        # ── RC-4: Slow relay neurons — thermal derivative (phasic DA) ──
-        # Problem: soma_to_da is all-to-all; sum of all patch temps is ~constant
-        # as body moves → DA stays TONIC (0.24) → DA post_trace ≈ 0 →
-        # STDP ltp ≈ 0 → weights frozen at hash initialization values.
-        #
-        # Fix: subtract slowly-adapting thermal baseline from fast relay signal.
-        #   fast relay (τ=20) tracks temperature level T
-        #   slow relay (τ = C×R = 50×10 = 500 sim-units ≈ 500k steps at dt=0.001)
-        #              tracks background temperature T_avg
-        #   Net DA input ≈ fast - slow ∝ dT/dt (derivative signal)
-        # During approach (T continuously rising): fast > slow → DA phasic ↑
-        # DA post_trace becomes non-zero → STDP can encode gradient direction
-        #
-        # BIO: SA-II (slowly adapting type II) thermoreceptor interneurons subtract
-        #      background temperature to encode dT/dt (temperature change rate).
-        #      REF: Duclaux & Kenshalo 1980 Fig.4 — SA-II fiber adaptation τ = 5–30s
-        #           (mid-value τ_bio = 15s, range from cat dorsal-horn WDR recordings)
-        #      REF: Morin & Bushnell 1998 Prog. Brain Res. 113:303
-        # FIX-004 ABANDONED on V1 architecture (2026-07-01):
-        #   Attempted SA-II τ=15s (C=15.0) and τ=30s (C=30.0) — both FAIL.
-        #   Root cause: direction error established at step 10k BEFORE slow_relay
-        #   has any effect (sr_R/rl_R=0.030× at 10k with C=30). True cause is
-        #   HC-002 (all-to-all soma_to_da): vestibular transients in first 10k steps
-        #   set wL>wR, driving body left, corrupting thermal gradient signal.
-        #   SA-II τ is the wrong biological analogy; this circuit needs navigational
-        #   background subtraction τ (minutes), not fiber adaptation τ (seconds).
-        #   C=300.0 is retained as the validated working value. See analysis report
-        #   cell-cell/工作报告/FIX004_analysis_2026-07-01.md and HC-001 (RECLASSIFIED).
-        # V_ss = relay.act × 1.0 (r_leak=1.0, inertia=1.0) — same scale as relay
-        # activation = vmem (linear, via multi-channel mode):
-        #   Using channel name "pass_thru" (non-"default") forces multi-channel mode
-        #   where activation = raw vmem, bypassing the quadratic MOSFET formula.
-        #   This is critical: default simple mode gives activation=(vmem-v_th)² (tiny),
-        #   which would never exceed the threshold in the slow_to_da inhibitory path.
-        for pid in self.somatosensory.patch_ids:
-            cfg_slow = NeuronConfig(
-                neuron_id=f"slow_relay_{pid}",
-                capacitance=300.0,   # NAV: background thermal subtraction τ≈5min (navigational timescale)
-                r_leak=1.0,          # V_ss = relay.act × 1.0 (scale-matched to relay)
-                inertia=1.0,         # no amplification: scaled_current = I_ext
-                vdd=1.0,
-                r_supply=0.1,
-                spiking=False,
-                channels=[ChannelConfig(  # multi-channel mode: activation = vmem (linear)
-                    name="pass_thru",     # non-"default" name triggers multi-channel path
-                    v_threshold=0.0,
-                    gm=0.001,             # near-zero: negligible ionic current drain
-                    tau_gate=0.0,
-                    reversal=0.0,
-                    sign=1.0,
-                )],
-                leak_conductance=0.0,     # disable double-leak in multi-channel mode
-                use_voltage_regulator=False,
-            )
-            self._slow_relays[pid] = Neuron(cfg_slow)
-
-        # relay → slow_relay (fixed pass-through, no STDP)
-        for pid in self.somatosensory.patch_ids:
-            b = SynapticBundle(
-                BundleConfig(
-                    bundle_id=f"relay_to_slow_{pid}",
-                    learning_rule="frozen",
-                    initial_weight=1.0,
-                    synapse_gain=1.0,
-                    bundle_role="feedforward",
-                ),
-                sources=[self.somatosensory.relays[pid]],
-                targets=[self._slow_relays[pid]],
-            )
-            self._bundles_relay_to_slow.append(b)
-
-        # slow_relay → DA (fixed inhibitory: subtract thermal baseline)
-        # synapse_gain=-1.0 × initial_weight=0.5 → net: -0.5 × slow_relay per patch
-        # Cancels tonic component; residual = dT/dt signal → phasic DA
-        for pid in self.somatosensory.patch_ids:
-            b = SynapticBundle(
-                BundleConfig(
-                    bundle_id=f"slow_to_da_{pid}",
-                    learning_rule="frozen",     # fixed: structural baseline subtraction
-                    initial_weight=0.5,          # symmetric to soma_to_da fast excitation
-                    synapse_gain=-1.0,           # INHIBITORY: subtract baseline
-                    bundle_role="feedforward",
-                ),
-                sources=[self._slow_relays[pid]],
-                targets=da_list,
-            )
-            self._bundles_slow_to_da.append(b)
-
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
         self._growth_log.append(
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
-            f"bundles=shadow_to_da+xin_to_da+soma_to_da"
-            f"+slow_relay×{len(self._slow_relays)}+relay_to_slow+slow_to_da (RC-4)"
+            f"bundles=shadow_to_da+xin_to_da"
         )
 
     # ── Override get_all_neurons/bundles to include DA components ──
 
     def get_all_neurons(self):
-        """Include DA neurons, Xin relay, and SomatosensoryChain in neuron census.
+        """Include DA neurons, Xin relay, and somatosensory in neuron census.
 
         Noether probe, entropy ledger, and vascular energy delivery
-        all enumerate neurons via this method. DA neurons must be
+        all enumerate neurons via this method. Every neuron must be
         included for correct energy/weight conservation checks.
-        V01: SomatosensoryChain (12 neurons) now included — no more blind spot.
+
+        Prior to P1-FIX: somatosensory chain (therm_, noci_, relay_)
+        was excluded → invisible to ledger, no vascular energy delivery,
+        Noether conservation balance incomplete. EXP-016b confirmed
+        zero behavioral impact from nociceptor parameter changes.
         """
         neurons = super().get_all_neurons()
         neurons.extend(self.da_neurons.values())
         neurons.append(self._xin_relay)
+        # P1-FIX: somatosensory chain neurons (therm_, noci_, relay_)
         neurons.extend(self.somatosensory.get_all_neurons())
-        neurons.extend(self._slow_relays.values())  # RC-4: slow relay census
+        # P2-FIX: shadow sandbox neurons (s_enc, s_col, s_mot) — visible to ledger/Noether
+        if self.shadow_sandbox._initialized:
+            neurons.extend(self.shadow_sandbox.neurons.values())
         return neurons
 
     def get_all_bundles(self):
-        """Include DA bundles and SomatosensoryChain bundles in bundle census.
+        """Include DA input bundles and somatosensory bundles in census.
 
         Noether weight balance check, Xin bookkeeping, and sprout/prune
-        all enumerate bundles via this method. DA bundles must be
+        all enumerate bundles via this method. All bundles must be
         included for correct entropy ledger accounting.
-        V01: SomatosensoryChain bundles now included.
+
+        Prior to P1-FIX: somatosensory bundles (thermo_to_relay,
+        noci_to_relay, lateral) were excluded → weight entropy blind,
+        Xin tension not accumulated, metabolic tax not applied.
         """
         bundles = super().get_all_bundles()
         bundles.extend(self.bundles_shadow_to_da)
         bundles.extend(self.bundles_xin_to_da)
-        bundles.extend(self.bundles_soma_to_da)
+        # P1-FIX: somatosensory chain bundles
         bundles.extend(self.somatosensory.get_all_bundles())
-        bundles.extend(self._bundles_relay_to_slow)  # RC-4: slow relay bundles
-        bundles.extend(self._bundles_slow_to_da)
         return bundles
 
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────

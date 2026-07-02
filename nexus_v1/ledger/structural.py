@@ -30,7 +30,7 @@ from .toprxin import TOPRXinSnapshot
 
 @dataclass
 class RecursionCycle:
-    """One T/O/P/R/Xin recursive cycle triggered by a structural event.
+    """TYPE:INFRA — One T/O/P/R/Xin recursive cycle triggered by a structural event.
 
     A sprout starts a new cycle.
     A prune or apoptosis ends a cycle.
@@ -50,7 +50,7 @@ class RecursionCycle:
 
 
 class RecursionTracker:
-    """Maps structural events to T/O/P/R/Xin recursive cycles.
+    """TYPE:INFRA — Maps structural events to T/O/P/R/Xin recursive cycles.
 
     Each sprout = new recursion: T(new bundle transmits) → O(target sees new input)
     → P(ξ accumulates) → R(STDP adjusts) → Xin(DA if ξ persists)
@@ -189,7 +189,7 @@ class RecursionTracker:
 # ─────────────────────────────────────────────────────────────────────
 
 class UltrametricSpace:
-    """Ultrametric distance on the recursion ancestry tree.
+    """TYPE:INFRA — Ultrametric distance on the recursion ancestry tree.
 
     Phase 7: Candidate math framework operating at the structural level.
     While ds²/ν describes signal flow WITHIN a fixed structure,
@@ -363,7 +363,7 @@ class UltrametricSpace:
 # ─────────────────────────────────────────────────────────────────────
 
 class StructuralEntropy:
-    """Complexity of the recursion tree.
+    """TYPE:INFRA — Complexity of the recursion tree.
 
     Measures how diverse the structural evolution has been.
     High entropy = diverse branching at many depths.
@@ -456,7 +456,7 @@ class StructuralEntropy:
 # ─────────────────────────────────────────────────────────────────────
 
 class StructuralBridge:
-    """Bridge between ultrametric (structural) and ds²/ν (signal) spaces.
+    """TYPE:INFRA — Bridge between ultrametric (structural) and ds²/ν (signal) spaces.
 
     Core question: does structural proximity (small d_u) predict
     similar signal flow behavior (similar weight changes)?
@@ -581,7 +581,7 @@ class StructuralBridge:
 
 @dataclass
 class SerialModificationLog:
-    """Track serial modifications to the same structural pathway.
+    """TYPE:INFRA — Track serial modifications to the same structural pathway.
 
     When the same pathway receives N consecutive parameter modifications
     without improvement, it triggers GUIDED CONSTRUCTION mode — meaning
@@ -624,7 +624,7 @@ class SerialModificationLog:
 
 
 class GuidedConstructionAuditor:
-    """Entropy ledger Section 7: 引导性构建审计.
+    """TYPE:INFRA — Entropy ledger Section 7: 引导性构建审计.
 
     Rules:
       1. DIFFERENTIATION_REQUIRED: When serial modifications hit

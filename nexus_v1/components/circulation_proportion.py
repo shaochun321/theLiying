@@ -47,7 +47,7 @@ from .semiconductor import Capacitor, MOSFET
 
 @dataclass
 class CirculationProportionConfig:
-    """Configuration for the circulation proportion circuit."""
+    """TYPE:HYBRID — Configuration for the circulation proportion circuit."""
     # Capacitance for amplitude integrators (larger = slower, smoother)
     # BIO: hypothalamic integration time constant ~5-10 seconds
     # τ = RC = 200 * 1.0 = 200 steps at dt=0.001 → 0.2 seconds
@@ -75,7 +75,7 @@ class CirculationProportionConfig:
 
 
 class CirculationProportionCircuit:
-    """Structural carrier for homeostatic circulation ratios.
+    """TYPE:HYBRID — Structural carrier for homeostatic circulation ratios.
 
     Three capacitors integrate amplitude signals. Their voltages
     naturally represent the time-averaged amplitudes. The ratios

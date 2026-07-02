@@ -60,7 +60,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class VitalOscillatorConfig:
-    """Configuration for the vital oscillator (tri-heart).
+    """TYPE:HYBRID — Configuration for the vital oscillator (tri-heart).
 
     Default frequencies chosen for mutual incommensurability:
         f_x / f_y = 200/211 (coprime)
@@ -91,7 +91,7 @@ class VitalOscillatorConfig:
 
 
 class VitalOscillator:
-    """Three-frequency self-sustaining oscillator — the organism's heartbeat.
+    """TYPE:HYBRID — Three-frequency self-sustaining oscillator — the organism's heartbeat.
 
     Wraps three independent ResonantOscillator (Van der Pol) cores with
     slightly different frequencies. Their phase relationships drift

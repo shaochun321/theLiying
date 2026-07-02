@@ -55,7 +55,7 @@ from typing import Optional
 
 @dataclass
 class LiquidMetalRouter:
-    """Reconfigurable connection with activity-dependent topology.
+    """TYPE:HYBRID — Reconfigurable connection with activity-dependent topology.
 
     Models a liquid metal channel that can open, close, or
     partially conduct based on correlated activity between

@@ -41,7 +41,7 @@ def _std(values: List[float]) -> float:
 
 @dataclass
 class NoetherViolation:
-    """A detected conservation violation."""
+    """TYPE:INFRA — A detected conservation violation."""
     law: str           # which law was violated
     tick: int          # when
     magnitude: float   # how badly (0 = no violation)
@@ -49,7 +49,7 @@ class NoetherViolation:
 
 
 class NoetherProbe:
-    """Discrete Noether conservation verifier (T4).
+    """TYPE:INFRA — Discrete Noether conservation verifier (T4).
 
     Attach to a VariantCircuit and call check() each step.
     Accumulates violations and provides a summary report.
