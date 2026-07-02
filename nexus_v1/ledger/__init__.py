@@ -23,6 +23,7 @@ from .structural import (RecursionTracker, RecursionCycle,
 from .energy_ledger import EntropyLedger
 from .noether_probe import NoetherProbe
 from .component_registry import ComponentRegistry, ComponentEntry
+from .nu_probe import NuProbe, NuSnapshot, NuReport
 
 __all__ = [
     'WeightEntropyProbe', 'EntropySnapshot',
@@ -33,4 +34,5 @@ __all__ = [
     'EntropyLedger',
     'NoetherProbe',
     'ComponentRegistry', 'ComponentEntry',
+    'NuProbe', 'NuSnapshot', 'NuReport',
 ]

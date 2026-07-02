@@ -288,6 +288,7 @@ class VariantCircuit(HebbianCircuit):
         self.world = World()
         self.thermal_membrane = ThermalMembrane()
         self.muscle_system = MuscleSystem(gain=0.1, delay=2)
+        self._patch_temps: dict = {}  # updated each step; exposed for DR5 metric
 
         # ── Variant: Somatosensory chain (4-patch thermal sensing) ──
         # Parallel to vestibular chain: Thermoreceptor + Nociceptor + SomatoRelay
@@ -699,6 +700,7 @@ class VariantCircuit(HebbianCircuit):
         # ── Somatosensory chain: 4-patch spatial temperature sensing ──
         # 1. Sample skin patches at body surface positions
         patch_temps = self.world.body.sample_skin(self.world, dt)
+        self._patch_temps = patch_temps  # exposed for DR5 metric in experiment scripts
 
         # 2. Step the somatosensory chain (Thermo + Noci + Relay)
         self.somatosensory.step(patch_temps, dt)
