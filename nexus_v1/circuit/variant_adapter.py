@@ -2134,6 +2134,20 @@ class VariantCircuit(HebbianCircuit):
         """Alias for bundles_relay_to_da — backward compat with Phase 5-8 scripts."""
         return self.bundles_relay_to_da
 
+    # ── V2.0 Spatial scaffold ──────────────────────────────────────
+
+    @property
+    def neuron_positions(self):
+        """Map neuron_id → (x, y, z) position in mm (or None if unpositioned).
+
+        REF: NeuronConfig.position field added in V2.0 spatial scaffold (commit b2597b3).
+        Foundation for V2.0 features:
+          - Distance matrix D[i][j] = d_ij for τ_ij synaptic delay
+          - P_S = η_s × (dw/dt)² × d_ij distance-penalized STDP
+        None entries = neurons without assigned anatomical position.
+        """
+        return {n.config.neuron_id: n.config.position for n in self.get_all_neurons()}
+
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────
 
     # Transition thresholds
