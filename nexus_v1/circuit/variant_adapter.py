@@ -46,6 +46,7 @@ from ..components.muscle import MuscleSystem
 from ..somatosensory.chain import SomatosensoryChain
 from ..components.energy_store import EnergyStore
 from ..components.vital_oscillator import VitalOscillator
+from ..components.cpg_neuron import CPGNeuron
 from ..components.circulation_proportion import CirculationProportionCircuit
 from ..components.spinal_reflex import SpinalReflexArc
 from ..components.agc import AutomaticGainControl
@@ -540,6 +541,12 @@ class VariantCircuit(HebbianCircuit):
         self._soma_proj: Dict[str, Neuron] = {}          # lamina I proj neurons (4 patches)
         self._bundles_relay_to_proj: List[SynapticBundle] = []  # relay → proj (frozen)
         self.bundles_relay_to_da: List[SynapticBundle] = []
+
+        # CPG → DA oscillator (lazy init alongside DA circuit)
+        # BIO: VTA pacemaker interneuron → 2 Hz rhythmic drive to DA neurons
+        # Keeps DA.post_trace > 0 at steady state → relay_to_da STDP stays active.
+        self._da_cpg: CPGNeuron | None = None
+        self.bundles_cpg_to_da: List[SynapticBundle] = []
 
         # P2-HC007: relay→enc STDP bundles (replace HC-007 direct injection)
         # BIO: STT → VPL thalamus → S1 cortex (thalamo-cortical thermal encoding)
@@ -1292,6 +1299,17 @@ class VariantCircuit(HebbianCircuit):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
 
+        # ── CPG → DA: advance pacemaker and propagate rhythmic drive ──
+        # Advances 2Hz VdP oscillator; injects low-amplitude AC into DA neurons.
+        # Keeps DA.post_trace = |d(activation)/dt| > 0 at steady state.
+        if self._da_cpg is not None:
+            self._da_cpg.step(dt)
+            for bundle in self.bundles_cpg_to_da:
+                currents = bundle.propagate()
+                for j, tgt in enumerate(bundle.targets):
+                    if j < len(currents) and tgt.id in da_input_currents:
+                        da_input_currents[tgt.id] += currents[j]
+
         # ── Step DA neurons ──
         # DA neuron energy: withdraw from EnergyStore (not magic refill).
         # Rate-limited: max 0.01 per step per neuron (prevents store drain).
@@ -1329,6 +1347,9 @@ class VariantCircuit(HebbianCircuit):
             bundle.compute_xin(dt)
         # relay_to_proj is frozen (no STDP) but track ν for ledger visibility
         for bundle in self._bundles_relay_to_proj:
+            bundle.compute_xin(dt)
+        # cpg_to_da is frozen (innate pacemaker) — only Xin tracking needed
+        for bundle in self.bundles_cpg_to_da:
             bundle.compute_xin(dt)
         # P2-HC007: STDP on relay→enc bundles (thermal thalamo-cortical learning)
         # TIMING: after super().step() so enc_reg.post_trace is updated (enc_reg stepped above).
@@ -1974,6 +1995,32 @@ class VariantCircuit(HebbianCircuit):
             self.bundles_relay_to_da.append(
                 SynapticBundle(cfg_relay, [proj], da_list))
 
+        # ── 4. CPG → DA (VTA pacemaker oscillation, frozen) ──
+        # BIO: VTA interneurons provide 2 Hz intrinsic rhythmic drive to DA neurons
+        #      (Grace & Bunney 1984). Keeps DA.post_trace = |d(act)/dt| > 0 at
+        #      steady state so relay_to_da STDP continues during d<12 proximity.
+        # Q1. BIO: VTA pacemaker → rhythmic excitation of DA projection neurons.
+        # Q2. CPGNeuron → bundles_cpg_to_da[frozen] → all da_neurons.
+        # Q3. amplitude=0.05 → activation ∈ [0, 0.10]; w=0.1 (G≈0.111); gain=1.0
+        #     → I_peak ≈ 0.011A; V_DA_osc ≈ 0.011V ∈ ε∈(0.001, 0.024V) ✓
+        self._da_cpg = CPGNeuron(
+            frequency=2.0,     # BIO: 2Hz VTA pacemaker (Grace & Bunney 1984)
+            amplitude=0.05,    # PARAM: limit-cycle ≈ ±0.10 rectified → [0, 0.10]
+            mu=2.0,            # relaxation mode (pulse-like, same as VitalOscillator)
+            neuron_id="vta_cpg",
+        )
+        cfg_cpg = BundleConfig(
+            bundle_id="cpg_to_da",
+            learning_rule="frozen",    # INNATE: VTA intrinsic oscillation anatomy
+            initial_weight=0.1,        # G(0.1)≈0.111; I_peak=0.10×0.111=0.011A ✓
+            weight_max=0.1,            # cap at initial — innate, not plastic
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,    # no remodeling cost — structural innate pathway
+        )
+        self.bundles_cpg_to_da.append(
+            SynapticBundle(cfg_cpg, [self._da_cpg], da_list))
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -1981,7 +2028,7 @@ class VariantCircuit(HebbianCircuit):
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
             f"proj_neurons={len(self._soma_proj)} "
-            f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})+relay_to_da({len(self.bundles_relay_to_da)})"
+            f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})+relay_to_da({len(self.bundles_relay_to_da)})+cpg_to_da({len(self.bundles_cpg_to_da)})"
         )
 
     # ── P2-HC007: relay→enc STDP initialization ──────────────────
@@ -2078,6 +2125,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.somatosensory.get_all_bundles())
         # P2-HC007: relay→enc STDP bundles (thalamo-cortical thermal encoding)
         bundles.extend(self.bundles_relay_to_enc)
+        # CPG → DA pacemaker pathway (frozen, visible for Noether/Xin accounting)
+        bundles.extend(self.bundles_cpg_to_da)
         return bundles
 
     @property
