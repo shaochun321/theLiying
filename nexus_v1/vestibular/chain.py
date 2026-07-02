@@ -359,6 +359,7 @@ class VestibularChain:
             # Layer 2: HairCell (receives MET output via bundle)
             currents = self.bundles_met_to_hc[axis].propagate()
             hc = self.haircell_neurons[axis]
+            _pt_before = hc.pre_trace  # save before step() overwrites with MOSFET trace
             if currents:
                 hc.step(currents[0], dt)
             else:
@@ -368,15 +369,13 @@ class VestibularChain:
             # hc.release_rate is the output of the Ca²⁺ gate
 
             # Layer 4: Afferents (receive release_rate via bundle)
-            # We inject release_rate as the "activation" of haircell
-            # so the bundle can propagate it
-            hc.activation = hc.release_rate  # bridge: release → propagation
-            # Also update pre_trace so bundle.propagate() uses release_rate
-            # (pre_trace was computed from MOSFET output during step())
+            # HC-008 fix: single update — Ca²⁺ release_rate is the STDP pre-signal
+            # BIO: CaV1.3 Ca²⁺ drives vesicle exocytosis at IHC ribbon synapse
+            # REF: Fuchs 2005 J Physiology 567(1):13-19; Nouvian et al. 2006 Nat Neurosci
+            hc.activation = hc.release_rate  # bridge: Ca²⁺ output → bundle propagation
             import math as _math
             _decay = _math.exp(-dt / max(hc.config.trace_tau_pre * 0.001, 0.001))
-            hc.pre_trace = hc.pre_trace * _decay + abs(hc.release_rate)
-            hc.pre_trace = min(hc.pre_trace, 10.0)
+            hc.pre_trace = min(_pt_before * _decay + abs(hc.release_rate), 10.0)
             aff_currents = self.bundles_hc_to_aff[axis].propagate()
             aff_r = self.afferent_regular[axis]
             aff_i = self.afferent_irregular[axis]
