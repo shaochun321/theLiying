@@ -2148,6 +2148,27 @@ class VariantCircuit(HebbianCircuit):
         """
         return {n.config.neuron_id: n.config.position for n in self.get_all_neurons()}
 
+    @property
+    def distance_matrix(self):
+        """Pairwise distance matrix D[nid_a][nid_b] = d_mm for positioned neurons.
+
+        Only includes neurons where position != None (currently 24 vestibular neurons).
+        O(n²) with n=24 positioned neurons → 576 pairs, computed on access.
+        REF: Highstein & Holstein 2006 labyrinth geometry (positions from neuron_positions).
+        Used for V2.0 τ_ij = d_ij / (v_cond × dt) conduction delay scaffold.
+        """
+        import math as _math
+        positions = {nid: p for nid, p in self.neuron_positions.items() if p is not None}
+        nids = list(positions.keys())
+        matrix = {}
+        for a in nids:
+            pa = positions[a]
+            matrix[a] = {
+                b: _math.sqrt(sum((pa[k] - positions[b][k]) ** 2 for k in range(3)))
+                for b in nids
+            }
+        return matrix
+
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────
 
     # Transition thresholds
