@@ -72,12 +72,12 @@ Axes: `yaw, pitch, roll` (canals) + `oto_x, oto_y, oto_z` (otoliths) + `therm`. 
 
 **VestibularChain signal path (critical — proposals often get this wrong):** `VestibularChain.step()` returns `None`. Neurons fire inside the chain; signals propagate via `SynapticBundle.propagate()` in `HebbianCircuit.step()` through the full Enc→Col→Motor cascade — there is no direct "motor output" from the vestibular chain. Tests access motor activity by reading `Motor` neuron states after `circuit.step()`.
 
-**VestibularChainV2** (`vestibular/chain_v2.py`, TYPE:HYBRID): extends `VestibularChain` with FIFO axonal delays (MET→HC=2 steps, HC→Aff=2 steps) and soft saturation `I/(1+I×r_supply)`. 12 FIFOs total (2 per axis × 6 axes). Key methods: `spike_cost()` (Aff energy cost), `fifo_signal_rms()` (diagnostic; replaces fill_rate which is always 1.0), `last_gain` (G_eff after each step). `VestibularNetworkLayer` provides 36-address topology, `l_total()` distance, and `gain_coeff()` returning G_eff=14.7 at full energy for Aff→Enc.
-
-**Phase 1/2 integration** (`VESTIBULAR_MODE` constant in `circuit/variant_adapter.py`):
-- `"V1_ONLY"` (default): only v1 chain, `self._vestibular_v2 = None`
-- `"V2_PARALLEL_LOG"`: Phase 1 — `VestibularChainV2` runs as `self._vestibular_v2` in shadow, no motor contribution; `self._v2_last_state` records `last_gain/spike_cost/fifo_rms` each step
-- `"V2_ACTIVE_DRIVE"`: Phase 2 — `VestibularChainV2()` passed to `HebbianCircuit.__init__(vestibular=...)` at startup; this is an init-time decision, **not a runtime hot-swap** (bundles wire to neurons at construction, cannot change sources after init)
+**Phase 4 components** (all instantiated in `VariantCircuit.__init__`, accessible as attributes):
+- `self.agc` — AutoGainControl (de-mean → multiply → RMS clamp on Langevin noise)
+- `self.binding_layer` — TemporalBindingLayer (τ_w=30 steps, vestibular axes only)
+- `self.yolk_sac` — YolkSac (λ=0.002/step, initial 200 units; metabolic energy reserve)
+- `self.da_gate` — DADifferentialGate (η_da=7.5, clip=5.0; gating DA signal by differentiation)
+- `self._efference_supp_count/total/ratio` — Efference suppression monitoring (INFRA)
 
 ## Working norms (from RULES.md — the project charter)
 
@@ -298,20 +298,38 @@ Noether 违规出现时立即打印 `violation_counts` 明细（如 `kcl_charge`
 
 ---
 
-## Current state (as of 2026-06-25, STDP cold-start experiment Phase 1 complete)
+## Current state (as of 2026-07-02, post-integration)
 
-**Active working directory: `cell-cc-other/`** (not the root `nexus_v1/`). Run all tests from there:
+**Working directory: `j:\cell-cc`** (single source of truth; `cell-cc-other/` is now historical backup).
 ```bash
-cd /j/cell-cc/cell-cc-other && PYTHONIOENCODING=utf-8 python -m nexus_v1.tests.test_regression
+cd /j/cell-cc && PYTHONIOENCODING=utf-8 python -m nexus_v1.tests.test_regression
 ```
 
-**Five patches committed (`92a04d8`) in `cell-cc-other/`, regression 21/21 PASS:**
-- Patch A: AGC→Langevin (de-mean → AGC multiply → RMS clamp)
-- Patch B: TemporalBindingLayer (`τ_w=30` steps, vestibular axes only) — `self.binding_layer`
-- Patch C: YolkSac (`λ=0.002`/step, initial 200 units) — `self.yolk_sac`
-- Patch D: DADifferentialGate (`η_da=7.5`, clip=5.0) — `self.da_gate`
-- Patch E: Efference suppression ratio monitoring (INFRA) — `self._efference_supp_count/total/ratio`
-- Phase 1: `process_hunger()` disabled (returns zero + DeprecationWarning)
+**Regression: 21/21 PASS. Contracts: 15/15 PASS.**
 
-**Next step: Phase 3 — 1M step long-run experiment** to verify thermotaxis emergence via STDP.
-See `cell-cell/当前状态.md` for full handoff context and TODO list.
+### Experiment timeline
+
+| Phase | Location | Steps | Key result |
+|-------|----------|-------|------------|
+| Phase 3 (1M STDP cold-start) | cell-cc-other | 1M | STDP ✓ (Δw=0.40); metabolic collapse @270k |
+| Phase 4 (directional cold-start) | cell-cc-other | 500k | Brief split @180k; fill=0 @270k; 1/4 PASS |
+| Phase 4-B/C (physical fix + DA gate) | cell-cc-other | 500k | col→motor coupling identified as P0 |
+| Phase 5 Round 1–4 | root | 500k | Round 4: 5/6 PASS, Δy=+64 (y-axis thermotaxis) |
+| Phase 5 v2 (muscle gain ×3, oto ×2) | root | 500k | 5/6 PASS; DR5 metric issue discovered |
+| Phase 6/7 (two-source verify) | root | 500k | 5/6 PASS, DR1↔DR2 anti-correlation confirmed |
+| Phase 8 (RC-4 phasic DA→STDP) | root | 500k | 6/6 PASS; wR>wL directionality confirmed |
+
+### P0 hardcoding audit (2026-07-02)
+60 HC violations catalogued in `docs/technical_debt_hardcoding.md`. CRITICAL fixes applied:
+- HC-005 (G_ORIENT yaw inject) — deleted
+- HC-006 (feed_alignment dot-product) — replaced with local sensor contrast
+- HC-013 (bc_current `\n` escape bug in hebbian.py) — fixed
+- HC-018 (thermal_gradient writes to motion_state) — deleted
+- DR5 metric — redefined to use `c._patch_temps` patch differential (circuit-observable)
+
+### Open issues
+- T3.2 occasional flap (therm Column vs vest Column, noise-sensitive) — non-critical
+- signal_path test PARTIAL (Release rate=0 in run_test.py) — pre-existing
+- HC-007/016/017/022/023/024 (V2.0 cleanup) — registered, not yet fixed
+
+See `cell-cell/00_Dashboard/` for design decisions and `cell-cell/当前状态.md` for handoff context.
