@@ -541,6 +541,12 @@ class VariantCircuit(HebbianCircuit):
         self._bundles_relay_to_proj: List[SynapticBundle] = []  # relay → proj (frozen)
         self.bundles_relay_to_da: List[SynapticBundle] = []
 
+        # P2-HC007: relay→enc STDP bundles (replace HC-007 direct injection)
+        # BIO: STT → VPL thalamus → S1 cortex (thalamo-cortical thermal encoding)
+        # encoding_neurons (from super().__init__) and somatosensory.relays both ready now.
+        self.bundles_relay_to_enc: List[SynapticBundle] = []
+        self._init_relay_to_enc()
+
         # ── World 2.0: Cylindrical heat source + thermal mouth ──
         # BIO: hydrothermal vent (Kelley et al. 2002) + chemosynthetic feeding.
         # DESIGN: Single cylindrical source at Z=25 (body Z-plane, Phase 1 lock).
@@ -710,12 +716,31 @@ class VariantCircuit(HebbianCircuit):
         # 2. Step the somatosensory chain (Thermo + Noci + Relay)
         self.somatosensory.step(patch_temps, dt)
 
+        # ── P2-HC007: relay→enc STDP bundle propagation ──
+        # Replaces: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt) (direct injection)
+        # With: bundle current fed through mechanical_inputs → HebbianCircuit injects it.
+        # Net injection identical to HC-007 at w=0; STDP grows w → stronger therm encoding.
+        # TIMING: after somatosensory.step() (relay.pre_trace updated) and
+        #         before super().step() (enc_reg.post_trace not yet updated — bundle.learn
+        #         is called after super(), so traces are ordered correctly).
+        _HC007_GAIN = 0.04  # must match EXTRA_AXIS_GAIN in HebbianCircuit
+        _relay_enc_override: dict = {}
+        for bundle in self.bundles_relay_to_enc:
+            currents = bundle.propagate()
+            for j, tgt in enumerate(bundle.targets):
+                if j < len(currents):
+                    # tgt.id = "reg_therm_{pid}"; extract pid
+                    pid = tgt.id[len("reg_therm_"):]
+                    # HebbianCircuit does: enc_reg.step(tonic_val * 0.04, dt)
+                    # so tonic_val = bundle_current / 0.04 → injected = bundle_current ✓
+                    _relay_enc_override[f"therm_{pid}"] = currents[j] / _HC007_GAIN
+
         # 3. Inject relay outputs into mechanical_inputs for extra_axes
-        #    Each patch axis gets: tonic = relay activation, phasic = noci activation
+        #    tonic therm axes: use bundle-driven value (HC-007 fix), others pass through
         mechanical_inputs = dict(mechanical_inputs)  # don't mutate caller's dict
         soma_out = self.somatosensory.get_mechanical_inputs(dt)
         for key, val in soma_out.items():
-            mechanical_inputs[key] = val
+            mechanical_inputs[key] = _relay_enc_override.get(key, val)
 
         # ── 0b. Closed sensorimotor loop: body acceleration → vestibular ──
         # BIO: otolith organs measure linear acceleration (utricle, saccule).
@@ -1304,6 +1329,13 @@ class VariantCircuit(HebbianCircuit):
             bundle.compute_xin(dt)
         # relay_to_proj is frozen (no STDP) but track ν for ledger visibility
         for bundle in self._bundles_relay_to_proj:
+            bundle.compute_xin(dt)
+        # P2-HC007: STDP on relay→enc bundles (thermal thalamo-cortical learning)
+        # TIMING: after super().step() so enc_reg.post_trace is updated (enc_reg stepped above).
+        # relay.pre_trace updated in somatosensory.step() (earlier this frame). ✓
+        for bundle in self.bundles_relay_to_enc:
+            bundle.learn(dt=dt, fill_fraction=self.energy_store.fill_fraction,
+                         da_concentration=self.dopamine.concentration)
             bundle.compute_xin(dt)
 
         # DA modulation moved to _propagate_bundles() override (multiplicative).
@@ -1942,6 +1974,53 @@ class VariantCircuit(HebbianCircuit):
             f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})+relay_to_da({len(self.bundles_relay_to_da)})"
         )
 
+    # ── P2-HC007: relay→enc STDP initialization ──────────────────
+
+    def _init_relay_to_enc(self):
+        """Create relay→enc STDP bundles replacing HC-007 direct injection.
+
+        HC-007 was: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt)
+        This fix routes the signal through a SynapticBundle with STDP so
+        the thalamo-cortical thermal pathway can strengthen with experience.
+
+        Q1. BIO: Spinal relay (lamina V WDR, STT) → VPL thalamus → S1 cortex.
+            REF: Willis 1985 (STT anatomy); Craig 2003 (lamina I→VPL);
+                 Kandel et al. 2013, Principles of Neural Science §23.
+        Q2. relay_{pid} (non-spiking) → bundle → reg_therm_{pid} (non-spiking enc).
+            One 1-to-1 bundle per patch: front/back/left/right.
+        Q3. initial_weight=0.0: G(0) × sg = 0.1 × 0.4 = 0.04 = EXTRA_AXIS_GAIN
+                                (HC-007 parity at w=0 — no behavior change initially).
+            weight_max=0.4: max I = relay.act × 0.166 × 0.4 = relay.act × 0.066
+                            (64% above baseline, safe for enc_reg input range).
+            stdp_lr=0.005: BIO: Bi & Poo 1998, J Neurosci 18:10464 (thalamo-cortical).
+            synapse_gain=0.4: calibrated — G(w=0)=1/r_max=0.1; 0.1×0.4=0.04=EXTRA_AXIS_GAIN.
+        """
+        _EXTRA_AXIS_GAIN = 0.04  # must match HebbianCircuit EXTRA_AXIS_GAIN constant
+        _G_w0 = 0.1              # G(w=0) = 1/r_max = 1/10.0 (Memristor default)
+
+        for pid in self.somatosensory.patch_ids:
+            enc_reg = self.encoding_neurons.get(f"reg_therm_{pid}")
+            relay = self.somatosensory.relays.get(pid)
+            if enc_reg is None or relay is None:
+                continue
+            cfg = BundleConfig(
+                bundle_id=f"relay_to_enc_{pid}",
+                learning_rule="stdp",
+                initial_weight=0.0,                          # G(0)×sg=0.04=EXTRA_AXIS_GAIN ✓
+                weight_max=0.4,                              # caps max thermal injection
+                stdp_lr=0.005,                               # BIO: Bi & Poo 1998
+                synapse_gain=_EXTRA_AXIS_GAIN / _G_w0,      # = 0.4: HC-007 parity at w=0
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.001,
+            )
+            self.bundles_relay_to_enc.append(SynapticBundle(cfg, [relay], [enc_reg]))
+
+        self._growth_log.append(
+            f"RELAY_TO_ENC_INIT step=0 "
+            f"bundles={len(self.bundles_relay_to_enc)} "
+            f"patches={list(self.somatosensory.patch_ids)}"
+        )
+
     # ── Override get_all_neurons/bundles to include DA components ──
 
     def get_all_neurons(self):
@@ -1987,6 +2066,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self._bundles_relay_to_proj)
         # P1-FIX: somatosensory chain bundles
         bundles.extend(self.somatosensory.get_all_bundles())
+        # P2-HC007: relay→enc STDP bundles (thalamo-cortical thermal encoding)
+        bundles.extend(self.bundles_relay_to_enc)
         return bundles
 
     @property
