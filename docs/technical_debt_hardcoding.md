@@ -52,6 +52,25 @@
 - **DEG 关联**: DEG-002
 - **优先级**: 低（当前不可知是否必要）
 
+### HC-005: G_ORIENT=200 硬编码热趋性反射（最高优先级）⚠️ SEMANTIC HARDCODING
+- **位置**: `nexus_v1/circuit/variant_adapter.py` 约第 726 行
+- **代码**:
+  ```python
+  G_ORIENT = 200.0
+  delta_T_orient = self._patch_temps['right'][0] - self._patch_temps['left'][0]
+  mechanical_inputs['yaw'] += delta_T_orient * G_ORIENT
+  ```
+- **问题**: 用 Python 减法直接计算「右侧更热→右转」这一语义结论，绕过所有 SynapticBundle，违反"行为从结构涌现"原则。注释本身写明"T_right > T_left → 热源在右 → 正 yaw"——即把行为目标硬写入代码。
+- **影响（严重）**: Phase 6/7/8 及 Phase 3 中所有热趋性实验结果均受污染：
+  - **DR5≈96%（Phase 6/7）**：被 G_ORIENT 直接制造，不是 STDP 涌现
+  - **DR2 dist 减少**（所有实验）：G_ORIENT 驱动 yaw，body 自然靠近热源
+  - **Phase 8 wR>wL "方向正确"**：G_ORIENT 持续推 body 向 S1 → 右 patch 更热 → STDP 被动跟随
+  - Phase 3 实验证伪：STDP 在没有 G_ORIENT 辅助时（三热源、前庭干扰）学到错误方向（wL>wR）
+- **代码标注**: 需添加 `# HC-005: SEMANTIC HARDCODING — remove in V2.0`
+- **重构路径**: 改为 `SynapticBundle(thermo_to_relay_right, relay_right → motor_yaw_right)` 和 `SynapticBundle(thermo_to_relay_left, relay_left → motor_yaw_left)` 独立束，让方向性从补丁激活差异中物理涌现，用 STDP 习得而非公式计算
+- **V2.0 行动**: 删除此代码块，用 patch-specific thermo→motor 通路替代
+- **优先级**: 最高（污染全部热趋性实验结论）
+
 ### HC-004: Phase 8 soma_to_da 初始权重为 0（未解释行为）
 - **位置**: `nexus_v1/circuit/variant_adapter.py`，`_init_da_circuit()`
 - **问题**: Phase 8 with RC-4 中 `_get_weights()` 在 step=0 返回全 0，而 `initial_weight=0.5` 应产生 hash 扰动后约 0.375–0.625 的值。根因未查清（可能是 da_list 初始化时序问题）
