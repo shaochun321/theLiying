@@ -1,6 +1,17 @@
-STOPPED — fix004_tau_anchoring: ABANDONED
-Two rounds failed (C=15, C=30). Root cause: HC-002 all-to-all topology, not τ value.
-capacitance restored to 300.0. 21/21 regression PASS.
-Awaiting human decision:
-  Q: Remove FIX-004 prerequisite for World 2.0 Phase 3?
-  Analysis: cell-cell/工作报告/FIX004_analysis_2026-07-01.md
+COMPLETED — world2_phase3_tri: 三热源正三角形导航 5/5 PASS (2026-07-02)
+Script: nexus_v1/tests/exp_world2_phase3_tri.py
+DR1 PASS: |wR-wL|=0.075 (方向反向但有学习)
+DR2 PASS: dist reduction 2.85 @300k (G_ORIENT 驱动)
+DR3 PASS: fill@200k=0.454
+DR5 PASS: 70.7% grad·v>0
+DR_fill PASS: fill 从未触零
+
+关键发现:
+  - 导航由 G_ORIENT=200（硬编码热梯度反射）驱动，非 STDP
+  - wR-wL=-0.075（方向错误，HC-002 全对全拓扑）
+  - phasic DA 打破了旧 Phase 3 的对称死锁，但不能修正 HC-002 方向污染
+
+Awaiting next stage decision:
+  Q1: 进行 Phase 4（G_ORIENT 贡献剥离 + 方向正确性验证）?
+  Q2: 直接推进 V2.0 重构（HC-002 根治）?
+  Analysis: cell-cell/工作报告/分析报告-World2.0-Phase3-三热源实验_2026-07-02.md
