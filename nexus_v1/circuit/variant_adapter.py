@@ -534,6 +534,11 @@ class VariantCircuit(HebbianCircuit):
         # BIO: spinal lamina I → parabrachial nucleus → VTA (Dayan & Abbott 2001)
         # Somatosensory relay → DA: STDP-enabled directional reinforcement path.
         # Exposed as bundles_soma_to_da for backward compat with Phase 5-8 scripts.
+        # P1-DIFF: relay neurons (lamina V WDR) are NOT direct sources for DA.
+        # Intermediate lamina I spinoparabrachial projection neurons (母本分化)
+        # receive from relay and provide Zener-bounded calcium_rate to DA bundles.
+        self._soma_proj: Dict[str, Neuron] = {}          # lamina I proj neurons (4 patches)
+        self._bundles_relay_to_proj: List[SynapticBundle] = []  # relay → proj (frozen)
         self.bundles_relay_to_da: List[SynapticBundle] = []
 
         # ── World 2.0: Cylindrical heat source + thermal mouth ──
@@ -1244,6 +1249,18 @@ class VariantCircuit(HebbianCircuit):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
 
+        # ── Step lamina I proj neurons (relay → proj → DA, P1-DIFF) ──
+        # Must be stepped BEFORE relay_to_da propagates, so calcium_rate is current.
+        if self._soma_proj:
+            proj_input_currents = {n.id: 0.0 for n in self._soma_proj.values()}
+            for bundle in self._bundles_relay_to_proj:
+                currents = bundle.propagate()
+                for j, tgt in enumerate(bundle.targets):
+                    if j < len(currents) and tgt.id in proj_input_currents:
+                        proj_input_currents[tgt.id] += currents[j]
+            for neuron in self._soma_proj.values():
+                neuron.step(proj_input_currents.get(neuron.id, 0.0), dt)
+
         for bundle in self.bundles_relay_to_da:
             currents = bundle.propagate()
             for j, tgt in enumerate(bundle.targets):
@@ -1284,6 +1301,9 @@ class VariantCircuit(HebbianCircuit):
         for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da + self.bundles_relay_to_da:
             bundle.learn(dt=dt, fill_fraction=self.energy_store.fill_fraction,
                          da_concentration=self.dopamine.concentration)
+            bundle.compute_xin(dt)
+        # relay_to_proj is frozen (no STDP) but track ν for ledger visibility
+        for bundle in self._bundles_relay_to_proj:
             bundle.compute_xin(dt)
 
         # DA modulation moved to _propagate_bundles() override (multiplicative).
@@ -1838,18 +1858,67 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_xin_to_da.append(
             SynapticBundle(cfg_xin, [self._xin_relay], da_list))
 
-        # ── 3. Soma relay → DA (directional thermal pathway, STDP) ──
-        # BIO: spinal lamina I projection neurons → parabrachial nucleus → VTA.
-        # Warm detection (approach to heat) → DA burst = positive reinforcement.
-        # REF: Dayan & Abbott 2001 Ch.9; Ikemoto & Panksepp 1999 Neurosci Biobehav Rev.
-        # 4 sources × relay_act × w(0.1) × gain(1.0) → modest tonic DA input.
-        # STDP enables differential left/right weight growth when body turns toward heat.
+        # ── 3a. Lamina I spinoparabrachial projection neurons (母本分化) ──
+        # BIO: Spinal lamina I projection neurons distinct from lamina V WDR relay neurons.
+        # REF: Todd 2010, Nat Rev Neurosci; Craig 2003, J Comp Neurol; Dayan & Abbott 2001.
+        # Lamina V WDR relay neurons (relay_neurons) output UNBOUNDED activation (~0-10).
+        # Projecting them directly to DA causes saturation (DA=2.019 observed, EXP-017).
+        # Fix: add intermediate lamina I proj neurons with spiking+CRI → calcium_rate ∈ [0,1].
+        # Zener clamp v_clamp=1.0 guarantees bounded output regardless of relay activation.
+        #
+        # Q1. BIO: lamina I spinoparabrachial neurons project to PBN→VTA (Todd 2010)
+        # Q2. relay → relay_to_proj (frozen) → _soma_proj (spiking+CRI) → relay_to_da (STDP)
+        # Q3. initial_weight=0.3 (innate strong laminar projection);
+        #     v_peak=0.3 (fires when relay_act > ~2.1, i.e., body near heat source);
+        #     C=0.1, R=1.0 → τ=0.1ms (fast follower, tracks relay instantaneously)
+        for pid in self.somatosensory.patch_ids:
+            cfg_proj = NeuronConfig(
+                neuron_id=f"soma_proj_{pid}",
+                capacitance=0.1,      # τ=0.1ms: fast follower of relay
+                r_leak=1.0,
+                inertia=1.0,
+                vdd=1.0,
+                r_supply=0.05,
+                spiking=True,
+                v_peak=0.3,           # fires when relay drives V_ss > 0.3 (near heat)
+                v_reset=0.001,
+                b_adapt=0.0,          # no adaptation: tonic projection
+                use_calcium_rate_integrator=True,
+                cri_r_leak=50.0,      # τ_CRI=50 time-units; smooth rate estimate
+                cri_q_spike=0.2,      # standard charge per spike (matches shadow cols)
+                cri_v_clamp=1.0,      # Zener: calcium_rate ∈ [0, 1] → DA saturation fixed
+                use_voltage_regulator=True,
+                vr_base_rate=0.01,
+                vr_activity_coeff=0.3,
+                vr_max_rate=3.0,
+            )
+            self._soma_proj[pid] = Neuron(cfg_proj)
+
         relay_sources = list(self.somatosensory.relays.values())
-        if relay_sources:
+        proj_list = list(self._soma_proj.values())
+
+        # ── 3b. relay → proj bundles (one per patch, frozen innate pathway) ──
+        for i, pid in enumerate(self.somatosensory.patch_ids):
+            cfg_r2p = BundleConfig(
+                bundle_id=f"relay_to_proj_{pid}",
+                learning_rule="frozen",   # INNATE: lamina V → lamina I anatomy
+                initial_weight=0.3,       # EXP-017: drives V_ss_proj=0.549>v_peak=0.3 ✓
+                weight_max=1.0,
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            self._bundles_relay_to_proj.append(
+                SynapticBundle(cfg_r2p, [relay_sources[i]], [proj_list[i]]))
+
+        # ── 3c. Proj → DA (directional thermal pathway, STDP) ──
+        # Sources are now _soma_proj neurons whose calcium_rate ∈ [0, 1].
+        # Max relay_to_da contribution: 4 × 1.0 × G(0.111) × 1.0 = 0.444 A ✓
+        if proj_list:
             cfg_relay = BundleConfig(
                 bundle_id="relay_to_da",
                 learning_rule="stdp",
-                initial_weight=0.1,   # calibrated: matches therm_therm range (0.08-0.12)
+                initial_weight=0.1,   # calibrated: modest DA input from bounded calcium_rate
                 weight_max=1.0,       # DA sat threshold 0.9, ceiling 1.0 leaves margin
                 stdp_lr=0.005,        # BIO: Bi & Poo 1998 middle (0.001-0.01/spike pair)
                 synapse_gain=1.0,
@@ -1857,7 +1926,7 @@ class VariantCircuit(HebbianCircuit):
                 remodel_cost_kappa=0.001,
             )
             self.bundles_relay_to_da.append(
-                SynapticBundle(cfg_relay, relay_sources, da_list))
+                SynapticBundle(cfg_relay, proj_list, da_list))
 
         self._da_circuit_initialized = True
 
@@ -1865,7 +1934,8 @@ class VariantCircuit(HebbianCircuit):
         self._growth_log.append(
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
-            f"bundles=shadow_to_da+xin_to_da+relay_to_da({len(self.bundles_relay_to_da)})"
+            f"proj_neurons={len(self._soma_proj)} "
+            f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})+relay_to_da({len(self.bundles_relay_to_da)})"
         )
 
     # ── Override get_all_neurons/bundles to include DA components ──
@@ -1887,6 +1957,8 @@ class VariantCircuit(HebbianCircuit):
         neurons.append(self._xin_relay)
         # P1-FIX: somatosensory chain neurons (therm_, noci_, relay_)
         neurons.extend(self.somatosensory.get_all_neurons())
+        # P1-DIFF: lamina I spinoparabrachial projection neurons
+        neurons.extend(self._soma_proj.values())
         # P2-FIX: shadow sandbox neurons (s_enc, s_col, s_mot) — visible to ledger/Noether
         if self.shadow_sandbox._initialized:
             neurons.extend(self.shadow_sandbox.neurons.values())
@@ -1907,6 +1979,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.bundles_shadow_to_da)
         bundles.extend(self.bundles_xin_to_da)
         bundles.extend(self.bundles_relay_to_da)
+        # P1-DIFF: relay → proj bundles (lamina I projection pathway)
+        bundles.extend(self._bundles_relay_to_proj)
         # P1-FIX: somatosensory chain bundles
         bundles.extend(self.somatosensory.get_all_bundles())
         return bundles
