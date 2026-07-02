@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .semiconductor import Capacitor, MOSFET, Memristor, PowerRail
 from .compensation import (
@@ -44,6 +44,14 @@ class ChannelConfig:
 class NeuronConfig:
     """TYPE:BIO — Complete neuron configuration."""
     neuron_id: str = ""
+
+    # Physical spatial position (mm, labyrinth/body frame).
+    # REF: Highstein & Holstein 2006 "The Vestibular System" — labyrinth anatomy.
+    # Used to compute pairwise neuron distance matrix for:
+    #   - Future τ_ij = d_ij / (v_cond × dt) synaptic delay (V2.0 RingBuffer)
+    #   - Future P_S = η_s × (dw/dt)² × d_ij distance-penalized STDP
+    # None = position not yet assigned (abstract or unlocated neuron).
+    position: Optional[Tuple[float, float, float]] = None
 
     # Base parameters
     capacitance: float = 1.0

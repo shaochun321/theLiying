@@ -48,6 +48,35 @@ CANAL_AXES = ["yaw", "pitch", "roll"]
 OTOLITH_AXES = ["oto_x", "oto_y", "oto_z"]
 ALL_AXES = CANAL_AXES + OTOLITH_AXES
 
+# ─────────────────────────────────────────────────────────────────────
+# Spatial positions (mm, vestibule-centered, +x=anterior +y=lateral +z=superior)
+# REF: Goldberg et al. 2012 "The Vestibular System: A Sixth Sense" — Ch.2
+# REF: Gray's Anatomy (2020) — inner ear, labyrinthine anatomy
+#
+# Semicircular canals: radius of curvature ~3 mm; ampullae contain cristae.
+# Otolith organs: utricle (horizontal, gravity/translation) + saccule (vertical).
+# Scarpa's ganglion: soma of primary afferents, ~2 mm medial to ampullae.
+# ─────────────────────────────────────────────────────────────────────
+
+# Ampulla / macula positions (mm): location of MET + HairCell sensory epithelium
+_SENSORY_POS: dict = {
+    # Semicircular canal ampullae
+    'yaw':   ( 1.5,  2.5,  0.0),   # horizontal canal anterior ampulla
+    'pitch': ( 2.5,  0.0,  2.0),   # anterior (superior) canal anterior ampulla
+    'roll':  ( 0.0,  1.5,  2.5),   # posterior canal posterior ampulla
+    # Otolith maculae (utricle + saccule)
+    'oto_x': ( 0.5,  0.0, -1.0),   # utricular macula, x-axis hair cell orientation
+    'oto_y': ( 0.0,  0.5, -1.0),   # utricular macula, y-axis orientation
+    'oto_z': ( 0.0,  0.0, -2.0),   # saccular macula (vertical gravity)
+}
+
+def _afferent_pos(axis: str) -> Tuple[float, float, float] | None:
+    """Scarpa's ganglion position: ~2 mm medial (−x) from sensory epithelium."""
+    base = _SENSORY_POS.get(axis)
+    if base is None:
+        return None
+    return (base[0] - 2.0, base[1], base[2])
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Layer configurations (parameter recipes from the 5-layer chain)
@@ -62,6 +91,7 @@ def _met_config(axis: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"met_{axis}",
+        position=_SENSORY_POS.get(axis),   # BIO: MET channels at ampulla / macula
         capacitance=1.0,         # NORM: 5 pF / 5 pF
         r_leak=5.0,              # NORM: tau_m = 5 ms
         inertia=1.0,
@@ -97,6 +127,7 @@ def _haircell_config(axis: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"hc_{axis}",
+        position=_SENSORY_POS.get(axis),   # BIO: hair cells co-located with MET in cristae
         capacitance=1.0,             # NORM: 5 pF / 5 pF
         r_leak=5.0,                  # NORM: tau_m = 5 ms
         inertia=1.0,
@@ -166,6 +197,7 @@ def _afferent_regular_config(axis: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"aff_reg_{axis}",
+        position=_afferent_pos(axis),   # BIO: soma at Scarpa's ganglion (~2 mm medial)
         capacitance=0.5,
         r_leak=10.0,
         inertia=0.5,
@@ -197,6 +229,7 @@ def _afferent_irregular_config(axis: str) -> NeuronConfig:
     """
     return NeuronConfig(
         neuron_id=f"aff_irr_{axis}",
+        position=_afferent_pos(axis),   # BIO: soma at Scarpa's ganglion (~2 mm medial)
         capacitance=0.3,
         r_leak=8.0,
         inertia=0.3,
