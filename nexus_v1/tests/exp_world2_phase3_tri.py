@@ -70,12 +70,20 @@ def _dist_to_nearest(pos):
 
 
 def _get_weights(circ):
+    # HC-002 fix: bundles_soma_to_da now has one bundle per patch (not one all-to-all).
+    # Each bundle has 1 source (proj_pid); weight_matrix()[0] = that source's DA weights.
     if not circ.bundles_soma_to_da:
         return {}
-    b = circ.bundles_soma_to_da[0]
-    wm = b.weight_matrix()
-    return {pid: sum(wm[i]) / max(len(wm[i]), 1)
-            for i, pid in enumerate(circ.somatosensory.patch_ids)}
+    patch_ids = list(circ.somatosensory.patch_ids)
+    result = {}
+    bundles = circ.bundles_soma_to_da
+    for i, pid in enumerate(patch_ids):
+        if i < len(bundles):
+            wm = bundles[i].weight_matrix()
+            result[pid] = sum(wm[0]) / max(len(wm[0]), 1)  # wm[0] = only source
+        else:
+            result[pid] = 0.0
+    return result
 
 
 def _da_vmem(circ):

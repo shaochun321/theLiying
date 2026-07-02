@@ -1945,24 +1945,34 @@ class VariantCircuit(HebbianCircuit):
                 SynapticBundle(cfg_r2p, [relay_sources[i]], [proj_list[i]]))
 
         # ── 3c. Proj → DA (directional thermal pathway, STDP) ──
-        # Sources are now _soma_proj neurons whose calcium_rate ∈ [0, 1].
-        # Saturation constraint: shadow_to_da+xin_to_da drives DA to ~0.83 V baseline.
-        # Thermal addition must stay within headroom to 1.0 V:
-        #   Max I_da = 4 × 1.0 × G(0.3) × 0.2 = 0.114 A → DA_vm = 0.83 + 0.114 = 0.944 V ✓
-        # (weight_max=0.3 caps STDP growth; synapse_gain=0.2 scales thermal modulation)
-        if proj_list:
+        # HC-002 fix: patch-specific bundles replace all-to-all.
+        # Old: 1 bundle, sources=[4 proj], targets=[3 DA] → single 4×3 weight matrix;
+        #      all patches share one STDP trajectory → direction information lost.
+        # New: 4 bundles, each sources=[1 proj_pid], targets=[3 DA] → 4 independent 1×3
+        #      weight matrices; each patch's STDP evolves separately → direction preserved.
+        #
+        # BIO: VTA DA neurons receive topographically segregated spinal input
+        #      via PBN (parabrachial nucleus) → spatial heat direction preserved.
+        #      REF: Todd 2010 NRN; Schultz 1997 Science 275:1593; Dayan & Abbott 2001 §9.1.
+        #
+        # Q3. Saturation unchanged: max I_da = 4 × 1.0 × G(0.3) × 0.2 = 0.114 A (identical
+        #     to old all-to-all, since total contribution from 4 patch bundles is the same).
+        for pid in self.somatosensory.patch_ids:
+            proj = self._soma_proj.get(pid)
+            if proj is None:
+                continue
             cfg_relay = BundleConfig(
-                bundle_id="relay_to_da",
+                bundle_id=f"relay_to_da_{pid}",
                 learning_rule="stdp",
-                initial_weight=0.1,   # calibrated: modest DA input from bounded calcium_rate
-                weight_max=0.3,       # PROBE: caps at G(0.3)=0.142 → I_da≤0.114A, no saturation
-                stdp_lr=0.005,        # BIO: Bi & Poo 1998 middle (0.001-0.01/spike pair)
-                synapse_gain=0.2,     # thermal modulation ~0.1V on top of 0.83V shadow baseline
+                initial_weight=0.1,   # same as old: modest per-patch DA input
+                weight_max=0.3,       # same cap: G(0.3)=0.142; 4×G(0.3)×0.2=0.114A total ✓
+                stdp_lr=0.005,        # BIO: Bi & Poo 1998 (thalamo-cortical-VTA)
+                synapse_gain=0.2,     # same: thermal modulation ~0.1V on 0.83V baseline
                 bundle_role="feedforward",
                 remodel_cost_kappa=0.001,
             )
             self.bundles_relay_to_da.append(
-                SynapticBundle(cfg_relay, proj_list, da_list))
+                SynapticBundle(cfg_relay, [proj], da_list))
 
         self._da_circuit_initialized = True
 
