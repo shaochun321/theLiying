@@ -125,6 +125,11 @@ for step in range(STEPS):
             if 'left' in w_lr and 'right' in w_lr:
                 wdiff = abs(w_lr['right'] - w_lr['left'])
 
+        pt = c._patch_temps
+        gdv = sum([pt.get('right',(0,))[0]-pt.get('left',(0,))[0], 0.0,
+                   pt.get('front',(0,))[0]-pt.get('back',(0,))[0]][i]*bv[i]
+                  for i in range(min(3,len(bv)))) if pt else 0.0
+
         trajectory.append({
             'step': step,
             'pos': pos,
@@ -134,7 +139,7 @@ for step in range(STEPS):
             'g_eff': g_eff,
             'fill': c.energy_store.fill_fraction,
             'wdiff': wdiff,
-            'gdv': c.motion_state.thermal_gradient_dot_velocity,
+            'gdv': gdv,
         })
 
     if step > 0 and step % PRINT_INTERVAL == 0:

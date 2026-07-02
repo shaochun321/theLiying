@@ -718,15 +718,6 @@ class VariantCircuit(HebbianCircuit):
         mechanical_inputs['pitch'] = mechanical_inputs.get('pitch', 0.0) + eta_ang[1] * ANGULAR_GAIN
         mechanical_inputs['roll']  = mechanical_inputs.get('roll',  0.0) + eta_ang[2] * ANGULAR_GAIN
 
-        # ── V8战术二: 皮肤热梯度 → yaw 趋向反射 ──
-        # BIO: 左右皮肤温差 → 转向反射（类 C. elegans AFD 热趋性）。
-        # T_right > T_left → 热源在右 → 正 yaw（右转朝向热源）。
-        # G_ORIENT=200: ΔT_lr≈0.25（体型几何决定）× 200 = 50 mech-units（¼ × oto_x）。
-        # REF: V8方案 §三 战术二; SpinalReflexArc 对称性设计
-        G_ORIENT = 200.0
-        if 'left' in self._patch_temps and 'right' in self._patch_temps:
-            delta_T_orient = self._patch_temps['right'][0] - self._patch_temps['left'][0]
-            mechanical_inputs['yaw'] = mechanical_inputs.get('yaw', 0.0) + delta_T_orient * G_ORIENT
         # ── C3': Heat source consumption + ecology ──
         # Organism absorbs energy from nearby heat sources (metabolic feeding).
         # BIO: chemolithoautotrophy at hydrothermal vents.
@@ -758,21 +749,9 @@ class VariantCircuit(HebbianCircuit):
         thermal_stability = 1.0 / (1.0 + thermal_err * 10.0)
         body_speed = self.world.body.speed()
 
-        # Feed alignment: direction toward nearest heat source
-        nearest = self.world.get_nearest_heat_source(
-            self.world.body.position)
-        if nearest is not None:
-            dx = [nearest.position[i] - self.world.body.position[i]
-                  for i in range(3)]
-            d_mag = math.sqrt(sum(x * x for x in dx) + 1e-12)
-            heat_dir = [x / d_mag for x in dx]
-            vel = self.world.body.velocity
-            v_mag = math.sqrt(sum(v * v for v in vel) + 1e-12)
-            vel_dir = [v / v_mag for v in vel]
-            alignment = sum(heat_dir[i] * vel_dir[i] for i in range(3))
-            feed_alignment = max(0.0, alignment) * thermal_err
-        else:
-            feed_alignment = 0.0
+        # HC-006 removed: feed_alignment dot-product was semantic hardcoding.
+        # Direction-toward-heat must emerge from patch-specific SynapticBundle structure.
+        feed_alignment = 0.0
 
         # ── Structural circuit: Capacitor integration + MOSFET deviation ──
         # All ratios emerge from component voltages, not software division.
@@ -1049,23 +1028,10 @@ class VariantCircuit(HebbianCircuit):
         # ── DA input bundles: propagate ──
         da_input_currents = {nid: 0.0 for nid in self.da_neurons}
 
-        # ── B.06: Record thermal state in MotionState (observability only) ──
-        # Actual thermal→DA coupling is structural: soma_to_da bundle propagates
-        # relay activation into DA neurons. No math hardcoding here.
-        T_p = {pid: patch_temps[pid][0] for pid in self.somatosensory.patch_ids}
-        grad_T = [
-            T_p.get("right", 0.0) - T_p.get("left", 0.0),
-            0.0,
-            T_p.get("front", 0.0) - T_p.get("back", 0.0),
-        ]
-        vel = list(self.world.body.velocity)
-        grad_dot_v = sum(grad_T[i] * vel[i] for i in range(min(3, len(vel))))
-        mean_dT = sum(abs(patch_temps[pid][1])
-                      for pid in self.somatosensory.patch_ids
-                      ) / len(self.somatosensory.patch_ids)
-        self.motion_state.thermal_potential = mean_dT
-        self.motion_state.thermal_gradient = grad_T
-        self.motion_state.thermal_gradient_dot_velocity = grad_dot_v
+        # HC-018 removed: thermal_gradient/grad_dot_v computed via Python math then
+        # written to motion_state was semantic hardcoding (DR5 read this for PASS/FAIL).
+        # thermal_gradient/thermal_gradient_dot_velocity fields remain in MotionState
+        # (default 0.0) — experiments compute patch-gradient proxy locally from _patch_temps.
 
         for bundle in self.bundles_shadow_to_da:
             currents = bundle.propagate()

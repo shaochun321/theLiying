@@ -103,6 +103,11 @@ for step in range(STEPS):
         bv = c.world.body.velocity
         speed = math.sqrt(sum(v*v for v in bv))
 
+        pt = c._patch_temps
+        gdv = sum([pt.get('right',(0,))[0]-pt.get('left',(0,))[0], 0.0,
+                   pt.get('front',(0,))[0]-pt.get('back',(0,))[0]][i]*bv[i]
+                  for i in range(min(3,len(bv)))) if pt else 0.0
+
         trajectory.append({
             'step': step,
             'pos': pos,
@@ -112,7 +117,7 @@ for step in range(STEPS):
             'w_left': w_lr['left'],
             'w_right': w_lr['right'],
             'wdiff': wdiff,
-            'gdv': c.motion_state.thermal_gradient_dot_velocity,
+            'gdv': gdv,
             'speed': speed,
         })
 

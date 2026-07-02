@@ -201,7 +201,9 @@ def _motor_config(name: str) -> NeuronConfig:
         # Phase 5: V_ss = bc*R = 0.01*5 = 0.05. V_ss(bias)=0.035 << v_peak=0.2.
         # Motor must be driven by Column to spike — not self-sustain.
         # headroom = v_peak - V_ss(bias) = 0.165 → coupler has regulation range.
-        # BIO: spinal motor neurons have low spontaneous rate (~2Hz).\n        use_bias_current=True,\n        bc_current=0.01,
+        # BIO: spinal motor neurons have low spontaneous rate (~2Hz).
+        use_bias_current=True,
+        bc_current=0.01,
         # E. FatigueCapacitor: spike-rate-dependent threshold adaptation
         # Replaces external rate homeostasis (which had section conflicts).
         # τ_fatigue = C*R = 1.0*3.0 = 3s.

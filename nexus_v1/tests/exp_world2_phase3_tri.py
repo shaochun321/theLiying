@@ -141,11 +141,19 @@ for step in range(STEPS):
     d_near = _dist_to_nearest(pos)
     fill = c.energy_store.fill_fraction
 
-    grad = c.world.gradient_at(pos, eps=0.5)
-    dot = sum(g * v for g, v in zip(grad, bv))
-    if dot != 0 or any(abs(v) > 1e-8 for v in bv):
+    # DR5 patch-gradient proxy: what the circuit can actually sense via skin patches.
+    # (world.gradient_at is kept as diagnostic only, not used for PASS/FAIL)
+    pt = c._patch_temps
+    patch_grad = [
+        pt.get('right', (0,))[0] - pt.get('left', (0,))[0],
+        0.0,
+        pt.get('front', (0,))[0] - pt.get('back', (0,))[0],
+    ] if pt else [0.0, 0.0, 0.0]
+    dot_patch = sum(patch_grad[i] * bv[i] for i in range(min(3, len(bv))))
+    dot_gt = sum(g * v for g, v in zip(c.world.gradient_at(pos, eps=0.5), bv))  # diagnostic
+    if dot_patch != 0 or any(abs(v) > 1e-8 for v in bv):
         grad_dot_v_total += 1
-        if dot > 0:
+        if dot_patch > 0:
             grad_dot_v_pos += 1
 
     if fill_zero_step is None and fill <= 0.0:
