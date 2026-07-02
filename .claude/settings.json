@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"[GUARD] cell-cc structure-first rules active. Before ANY new signal path: Q1 biological correlate? Q2 physical structure (Sources->SynapticBundle->Targets, real Neuron objects)? Q3 parameter derivation? Can t answer -> STOP and ask. Red flags that invalidate experiments: _membrane.inject() / dot( / sign( / world.gradient_at() / math.sin/cos inside step() loop. All 60 HC violations catalogued in docs/technical_debt_hardcoding.md. See CLAUDE.md for full rules.\"}}' 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fp=$(jq -r '.tool_input.file_path // empty' 2>/dev/null | tr '\\\\' '/'); [ -z \"$fp\" ] && exit 0; echo \"$fp\" | grep -qE 'nexus_v1/(circuit|components|vestibular|somatosensory)/' || exit 0; echo \"$fp\" | grep -qE 'ledger|oscillator|vital_oscillator' && exit 0; hits=$(grep -nE '_membrane\\.inject\\(|math\\.(sin|cos)\\(' \"$fp\" 2>/dev/null | head -3); [ -n \"$hits\" ] && printf '{\"systemMessage\":\"[HC-GUARD] %s: hardcoding red flag detected (%s). Check CLAUDE.md mandatory 3-questions before proceeding.\"}' \"$(basename \"$fp\")\" \"$(echo \"$hits\" | head -1 | cut -c1-60)\" || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

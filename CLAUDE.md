@@ -129,6 +129,28 @@ Q3. 每个参数的依据是什么？
 
 如果任何一问答不上来 → **停下来，向用户说明缺少什么信息，等待指示**。
 
+## ❌ 硬编码反面案例（2026-07-02 审计教训）
+
+以下模式在历史代码中造成了实验结论全部失效，严禁再次出现：
+
+| 反面案例 | HC | 为何是硬编码 | 正确做法 |
+|---------|-----|------------|---------|
+| `mechanical_inputs['yaw'] += (T_right-T_left) * G_ORIENT` | HC-005 | Python 减法直接算"右侧热→右转"，跳过全部 Bundle/STDP | patch→relay→motor SynapticBundle |
+| `feed_alignment = max(0, dot(heat_dir, vel_dir))` | HC-006 | 点积直接判断"朝热源移动"，Python 变量而非 Neuron | front/back patch 差异→feed relay Bundle |
+| `DR5 = dot(world.gradient_at(pos), velocity)` | HC-012 | benchmark 用电路无法访问的全局梯度特权信息 | 只用 patch 温差（电路可感知的信号）|
+| `enc.step(tonic_val * 5.0, dt)` 绕过 Bundle | HC-007 | 直接注入热觉编码，STDP 第一跳无法学习 | bundles_extra_to_enc SynapticBundle |
+| `neuron._membrane.inject(drive, dt)` 在 `step()` 中 | HC-016/017/023/024 | 绕过 Bundle，Noether/census/STDP 全部失效 | 建 SynapticBundle，让 propagate() 流经 |
+| `if birth > 0: expand; else: contract` | HC-022 | if/sign 替代物理比较器 | MOSFET 比较器电路 |
+| `self.activation = release_rate`（覆盖 MOSFET 输出）| HC-008 | 丢弃半导体物理结果，用 Python 变量代替 | 独立 ReleaseNeuron + Bundle |
+
+**核心红旗**（写代码时自检，命中即停）：
+- `_membrane.inject()` / `.charge =` / `.energy -=` 出现在 `step()` 循环里 → 应走 SynapticBundle
+- `dot(` / `sign(` / `if ... > ...: reward/turn/move` → 语义结论用 Python 算，违反结构优先
+- `math.sin/cos` 用于运动输出 → 应为振荡电路（CompensationOscillator）
+- benchmark 指标读取 `world.` 全局真值 → 应只用电路可感知的传感器信号（patch 温差、ISI 等）
+
+完整违规清单：`docs/technical_debt_hardcoding.md`（HC-001～HC-060，60 条）
+
 ## 🧬 母本分化与元件构建原则
 
 > 权威来源：`cell-cell/专题分析/母本分化与元件构建原则-融合版.md`
