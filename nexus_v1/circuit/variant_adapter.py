@@ -1869,7 +1869,8 @@ class VariantCircuit(HebbianCircuit):
         # Q1. BIO: lamina I spinoparabrachial neurons project to PBN→VTA (Todd 2010)
         # Q2. relay → relay_to_proj (frozen) → _soma_proj (spiking+CRI) → relay_to_da (STDP)
         # Q3. initial_weight=0.3 (innate strong laminar projection);
-        #     v_peak=0.3 (fires when relay_act > ~2.1, i.e., body near heat source);
+        #     v_peak=0.05 (fires when relay.act > 0.05/G(0.3) = 0.35, i.e., d<12 from heat);
+        #     PROBE: relay.act max ≈ 0.84 (d=5), V_ss_proj=0.119 V >> v_peak=0.05 ✓
         #     C=0.1, R=1.0 → τ=0.1ms (fast follower, tracks relay instantaneously)
         for pid in self.somatosensory.patch_ids:
             cfg_proj = NeuronConfig(
@@ -1880,7 +1881,7 @@ class VariantCircuit(HebbianCircuit):
                 vdd=1.0,
                 r_supply=0.05,
                 spiking=True,
-                v_peak=0.3,           # fires when relay drives V_ss > 0.3 (near heat)
+                v_peak=0.05,          # fires when relay.act > 0.35 (d<12 from heat source)
                 v_reset=0.001,
                 b_adapt=0.0,          # no adaptation: tonic projection
                 use_calcium_rate_integrator=True,
@@ -1902,7 +1903,7 @@ class VariantCircuit(HebbianCircuit):
             cfg_r2p = BundleConfig(
                 bundle_id=f"relay_to_proj_{pid}",
                 learning_rule="frozen",   # INNATE: lamina V → lamina I anatomy
-                initial_weight=0.3,       # EXP-017: drives V_ss_proj=0.549>v_peak=0.3 ✓
+                initial_weight=0.3,       # PROBE: relay.act=0.84 → V_ss_proj=0.119>v_peak=0.05 ✓ (d<12)
                 weight_max=1.0,
                 synapse_gain=1.0,
                 bundle_role="feedforward",
@@ -1913,15 +1914,18 @@ class VariantCircuit(HebbianCircuit):
 
         # ── 3c. Proj → DA (directional thermal pathway, STDP) ──
         # Sources are now _soma_proj neurons whose calcium_rate ∈ [0, 1].
-        # Max relay_to_da contribution: 4 × 1.0 × G(0.111) × 1.0 = 0.444 A ✓
+        # Saturation constraint: shadow_to_da+xin_to_da drives DA to ~0.83 V baseline.
+        # Thermal addition must stay within headroom to 1.0 V:
+        #   Max I_da = 4 × 1.0 × G(0.3) × 0.2 = 0.114 A → DA_vm = 0.83 + 0.114 = 0.944 V ✓
+        # (weight_max=0.3 caps STDP growth; synapse_gain=0.2 scales thermal modulation)
         if proj_list:
             cfg_relay = BundleConfig(
                 bundle_id="relay_to_da",
                 learning_rule="stdp",
                 initial_weight=0.1,   # calibrated: modest DA input from bounded calcium_rate
-                weight_max=1.0,       # DA sat threshold 0.9, ceiling 1.0 leaves margin
+                weight_max=0.3,       # PROBE: caps at G(0.3)=0.142 → I_da≤0.114A, no saturation
                 stdp_lr=0.005,        # BIO: Bi & Poo 1998 middle (0.001-0.01/spike pair)
-                synapse_gain=1.0,
+                synapse_gain=0.2,     # thermal modulation ~0.1V on top of 0.83V shadow baseline
                 bundle_role="feedforward",
                 remodel_cost_kappa=0.001,
             )
