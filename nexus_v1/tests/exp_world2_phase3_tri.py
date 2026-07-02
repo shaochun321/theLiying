@@ -109,7 +109,7 @@ print()
 
 hdr = (f"{'step':>6}  {'d_near':>6} {'nr':>2}  {'wL':>6} {'wR':>6} "
        f"{'wF':>6} {'wB':>6}  {'wR-wL':>7} {'wB-wF':>7}  "
-       f"{'fill':>5}  {'DA':>6}  {'sysv':>9} {'chg%':>5}  {'DR5%':>5}")
+       f"{'fill':>5}  {'DA':>6}  {'sysv':>9} {'chg%':>5}  {'DR5%':>5}  {'agc':>4}")
 print(hdr)
 print("-" * len(hdr))
 
@@ -193,12 +193,13 @@ for step in range(STEPS):
         near_idx = dists.index(min(dists)) + 1
 
         elapsed = time.time() - t0
+        agc_g = c.agc.gain  # circuit-level AGC (BG/HPA axis; modulates exploration noise)
         row = (f"{step:>6}  {d_near:>6.3f} S{near_idx}  "
                f"{ws.get('left', 0):>6.4f} {ws.get('right', 0):>6.4f} "
                f"{ws.get('front', 0):>6.4f} {ws.get('back', 0):>6.4f}  "
                f"{wdiff_lr:>+7.4f} {wdiff_fb:>+7.4f}  "
                f"{fill:>5.3f}  {da_v:>6.4f}  "
-               f"{sys_nu:>+9.3f} {cf:>4.0%}  {dr5_now:>5.1f}%  ({elapsed:.0f}s)")
+               f"{sys_nu:>+9.3f} {cf:>4.0%}  {dr5_now:>5.1f}%  {agc_g:>4.2f}  ({elapsed:.0f}s)")
         print(row)
 
     if step > 0 and step % NU_LOG_INTERVAL == 0:
