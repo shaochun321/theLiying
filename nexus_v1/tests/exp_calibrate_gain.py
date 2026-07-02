@@ -1,13 +1,20 @@
-"""Calibrate THERMAL_TRANSDUCTION_GAIN: find relay activation threshold at d=20.
+"""Calibrate THERMAL_TRANSDUCTION_GAIN: scan relay activation vs gain at d=20.
 
-Goal: scan gain values to find gain_min where relay.activation_mean > 0.01
-at body d=20 from heat source (current default gain=0.1 gives relay.vm≈0.02-0.05,
-which is below v_threshold=0.3, so relay is OFF).
+KNOWN RESULT (2026-07-02 calibration scan, 3000-step warmup):
+  gain=0.1 (default) → relay.vm=0.703V, relay.act=0.165 → relay OPEN at d=20.
+  Decision: do NOT increase THERMAL_TRANSDUCTION_GAIN. Default gain=0.1 is sufficient.
+  relay.vm≈0.02-0.05 seen in earlier P2 diagnostics was a cold-start artifact
+  (measured at t≈200 steps; τ=C×R=2.0×10.0=20,000 steps → only 1% of V_ss reached).
+
+Purpose of this script (historical diagnostic tool):
+  - Documents the full gain→relay_act curve across scan range
+  - Can be re-run if relay parameters change (v_threshold, C, R, etc.)
+  - Confirms relay RC warmup behavior: use ≥1200 steps before measuring
 
 Method:
   - Body FIXED at [60,50,25] (d=20 from S1=[80,50,25])
   - Muscles disabled (gain=0) — no body movement
-  - For each gain: 5000 steps, record last 2000 steps average
+  - For each gain: 3000 steps warmup + 2000 steps average
   - Measure: thermo.vm, relay.vm, relay.activation, proj.calcium_rate
 """
 import sys, math, os
