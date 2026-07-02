@@ -530,6 +530,10 @@ class VariantCircuit(HebbianCircuit):
         self._da_circuit_initialized = False
         self.bundles_shadow_to_da: List[SynapticBundle] = []
         self.bundles_xin_to_da: List[SynapticBundle] = []
+        # BIO: spinal lamina I → parabrachial nucleus → VTA (Dayan & Abbott 2001)
+        # Somatosensory relay → DA: STDP-enabled directional reinforcement path.
+        # Exposed as bundles_soma_to_da for backward compat with Phase 5-8 scripts.
+        self.bundles_relay_to_da: List[SynapticBundle] = []
 
         # ── World 2.0: Cylindrical heat source + thermal mouth ──
         # BIO: hydrothermal vent (Kelley et al. 2002) + chemosynthetic feeding.
@@ -1238,6 +1242,12 @@ class VariantCircuit(HebbianCircuit):
                 if j < len(currents) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += currents[j]
 
+        for bundle in self.bundles_relay_to_da:
+            currents = bundle.propagate()
+            for j, tgt in enumerate(bundle.targets):
+                if j < len(currents) and tgt.id in da_input_currents:
+                    da_input_currents[tgt.id] += currents[j]
+
         # ── Step DA neurons ──
         # DA neuron energy: withdraw from EnergyStore (not magic refill).
         # Rate-limited: max 0.01 per step per neuron (prevents store drain).
@@ -1269,7 +1279,7 @@ class VariantCircuit(HebbianCircuit):
         # Don't call dopamine.step() — concentration is set structurally.
 
         # ── STDP on DA input bundles ──
-        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da:
+        for bundle in self.bundles_shadow_to_da + self.bundles_xin_to_da + self.bundles_relay_to_da:
             bundle.learn(dt=dt, fill_fraction=self.energy_store.fill_fraction,
                          da_concentration=self.dopamine.concentration)
             bundle.compute_xin(dt)
@@ -1757,11 +1767,13 @@ class VariantCircuit(HebbianCircuit):
         Called lazily from _update_neuromodulation on first step.
         Shadow layer neurons don't exist at __init__ time.
 
-        Creates two bundle pathways:
-          1. Shadow col → DA neurons (tonic/baseline, BCM STDP)
-          2. Xin relay → DA neurons (phasic bursts, fast STDP)
+        Creates three bundle pathways:
+          1. Shadow col → DA neurons (tonic/baseline, frozen)
+          2. Xin relay → DA neurons (phasic bursts, frozen)
+          3. Soma relay → DA neurons (directional thermal, STDP-learning)
+             BIO: spinal lamina I → parabrachial nucleus → VTA
 
-        Both pathways use real SynapticBundles — eligible for:
+        All pathways use real SynapticBundles — eligible for:
         - STDP weight adaptation (learns what signals predict "need for DA")
         - Sprout/prune (structural optimization via hebbian._structural_growth)
         - Entropy ledger tracking (Noether weight conservation)
@@ -1824,13 +1836,34 @@ class VariantCircuit(HebbianCircuit):
         self.bundles_xin_to_da.append(
             SynapticBundle(cfg_xin, [self._xin_relay], da_list))
 
+        # ── 3. Soma relay → DA (directional thermal pathway, STDP) ──
+        # BIO: spinal lamina I projection neurons → parabrachial nucleus → VTA.
+        # Warm detection (approach to heat) → DA burst = positive reinforcement.
+        # REF: Dayan & Abbott 2001 Ch.9; Ikemoto & Panksepp 1999 Neurosci Biobehav Rev.
+        # 4 sources × relay_act × w(0.1) × gain(1.0) → modest tonic DA input.
+        # STDP enables differential left/right weight growth when body turns toward heat.
+        relay_sources = list(self.somatosensory.relays.values())
+        if relay_sources:
+            cfg_relay = BundleConfig(
+                bundle_id="relay_to_da",
+                learning_rule="stdp",
+                initial_weight=0.1,   # calibrated: matches therm_therm range (0.08-0.12)
+                weight_max=1.0,       # DA sat threshold 0.9, ceiling 1.0 leaves margin
+                stdp_lr=0.005,        # BIO: Bi & Poo 1998 middle (0.001-0.01/spike pair)
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.001,
+            )
+            self.bundles_relay_to_da.append(
+                SynapticBundle(cfg_relay, relay_sources, da_list))
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
         self._growth_log.append(
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
-            f"bundles=shadow_to_da+xin_to_da"
+            f"bundles=shadow_to_da+xin_to_da+relay_to_da({len(self.bundles_relay_to_da)})"
         )
 
     # ── Override get_all_neurons/bundles to include DA components ──
@@ -1871,9 +1904,15 @@ class VariantCircuit(HebbianCircuit):
         bundles = super().get_all_bundles()
         bundles.extend(self.bundles_shadow_to_da)
         bundles.extend(self.bundles_xin_to_da)
+        bundles.extend(self.bundles_relay_to_da)
         # P1-FIX: somatosensory chain bundles
         bundles.extend(self.somatosensory.get_all_bundles())
         return bundles
+
+    @property
+    def bundles_soma_to_da(self):
+        """Alias for bundles_relay_to_da — backward compat with Phase 5-8 scripts."""
+        return self.bundles_relay_to_da
 
     # ── Maturation lifecycle (§3.1 of math spec) ──────────────────
 
