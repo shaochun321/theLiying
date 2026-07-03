@@ -1028,9 +1028,7 @@ class VariantCircuit(HebbianCircuit):
         # Formula: V_RPE = bc_V + I_direct×R = 0.1 + RPE×SCALE×1.0; target V_RPE≈0.6.
         # SCALE = (0.6-0.1)/RPE_peak = 0.5/5.0 = 0.1. D2R keeps max steady-state at ~58%.
         DA_INJECT_SCALE = 0.1
-        if _da_drive > 0:
-            for nid, neuron in self.da_neurons.items():
-                neuron._membrane.inject(_da_drive * DA_INJECT_SCALE, dt)
+        # HC-017 fix: RPE/hunger drive accumulated into da_input_currents (after bundles).
 
         # ── C.04: Deviation → Motor direct activation ──
         # Spinal-level reflex: bypasses slow DA modulation.
@@ -1314,6 +1312,14 @@ class VariantCircuit(HebbianCircuit):
                 for j, tgt in enumerate(bundle.targets):
                     if j < len(currents) and tgt.id in da_input_currents:
                         da_input_currents[tgt.id] += currents[j]
+
+        # HC-017 fix: RPE + hunger DA drive via normal step() pathway (not _membrane.inject).
+        # BIO: VTA RPE → DA burst (Schultz 1997); LH hunger → VTA tonic (Wise 2004).
+        # REF: Schultz 1997 J Neurophysiol 77:1060; Wise 2004 Nat Rev Neurosci 5:483.
+        if _da_drive > 0:
+            rpe_current = _da_drive * DA_INJECT_SCALE
+            for nid in da_input_currents:
+                da_input_currents[nid] += rpe_current
 
         # ── Step DA neurons ──
         # DA neuron energy: withdraw from EnergyStore (not magic refill).
