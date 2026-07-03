@@ -150,19 +150,31 @@
 
 完整细节见：`cell-cell/工作报告/全链路审计综合报告_2026-07-02_Part1.md`
 
+**本次修复状态（2026-07-03）：**
+- HC-009 FIXED (bc6d292) — ThermalInputNeuron/NociInputNeuron 替代直接注入
+- HC-013 FIXED (prior) — bc_current `\n` 转义 Bug 修复（Motor 获得正确基线）
+- HC-014 FIXED (e98e1fb) — thermal_stability 改用 somatosensory relay 输出
+- HC-017 FIXED (b29d566) — RPE/hunger DA drive 改用 da_input_currents 累积
+- HC-024 FIXED (a6980ce) — 死代码 hunger_drives loop 删除
+
+**DEFERRED（结构复杂度高，暂缓）：**
+- HC-015: vestibular chain if/else 是防御性索引，非语义硬编码，暂保留
+- HC-016: Motor deviation inject 使用 1/dt dt-invariant 技巧，Bundle 路径等效需新设计
+- HC-023: Motor lateral inhibition 需要内抑制中间神经元结构，需新 Bundle 设计
+
 | HC-ID | 严重度 | 类别 | 位置 | 问题简述 |
 |-------|--------|------|------|---------|
-| HC-014 | HIGH | SEMANTIC_MATH | variant_adapter.py:756 | thermal_stability = 1/(1+err×10) 注入 CPC |
-| HC-015 | HIGH | DIRECT_INJECT | vestibular/chain.py:340 | if/else dispatch 绕过 apply_to_targets |
-| HC-016 | HIGH | DIRECT_INJECT | variant_adapter.py:802 | 稳态偏差直接注入所有 Motor 神经元 |
-| HC-017 | HIGH | DIRECT_INJECT | variant_adapter.py:793 | CPC 偏差直接注入 DA 神经元膜 |
+| ~~HC-014~~ | ~~HIGH~~ | ~~SEMANTIC_MATH~~ | ~~variant_adapter.py:756~~ | **FIXED (e98e1fb)** thermal_stability 改用 relay 输出 |
+| HC-015 | HIGH | DIRECT_INJECT | vestibular/chain.py:340 | if/else dispatch 绕过 apply_to_targets（DEFERRED） |
+| HC-016 | HIGH | DIRECT_INJECT | variant_adapter.py:802 | 稳态偏差直接注入所有 Motor 神经元（DEFERRED，1/dt 技巧） |
+| ~~HC-017~~ | ~~HIGH~~ | ~~DIRECT_INJECT~~ | ~~variant_adapter.py:793~~ | **FIXED (b29d566)** RPE/hunger → da_input_currents |
 | HC-018 | HIGH | SEMANTIC_MATH | variant_adapter.py:1052 | grad_T 和 grad_dot_v 存入 MotionState（DR5 来源）|
 | HC-019 | HIGH | LOGIC_REPLACES_CIRCUIT | hebbian.py:799 | activity_match=0.3 过滤 sprout 候选（替代 STDP 筛选）|
 | HC-020 | HIGH | GOAL_HARDCODED | hebbian.py:306 | therm 轴专用 _thermal_column_config（字符串匹配）|
 | HC-021 | HIGH | LOGIC_REPLACES_CIRCUIT | shadow_sandbox.py:381 | abs(xi) 抹除 Xin 符号（半波整流器用 Python 替代）|
 | HC-022 | HIGH | LOGIC_REPLACES_CIRCUIT | bundle.py:559 | if birth>0 决定 expand/contract（应为 MOSFET 比较器）|
-| HC-023 | HIGH | DIRECT_INJECT | variant_adapter.py:563 | 跨轴 Motor 侧抑制用 Python 算术+直接注入膜 |
-| HC-024 | HIGH | DIRECT_INJECT | variant_adapter.py:957 | binding→motor Python 权重矩阵+直接注入（无 Bundle）|
+| HC-023 | HIGH | DIRECT_INJECT | variant_adapter.py:563 | 跨轴 Motor 侧抑制用 Python 算术+直接注入膜（DEFERRED，需侧抑制中间神经元 Bundle） |
+| ~~HC-024~~ | ~~HIGH~~ | ~~DIRECT_INJECT~~ | ~~variant_adapter.py:957~~ | **FIXED (a6980ce)** 死代码删除（drives 全 0.0） |
 | HC-025 | HIGH | LOGIC_REPLACES_CIRCUIT | motor_decision.py:213 | CPG 用 sin(phi) 数学公式替代振荡电路 |
 | HC-026 | HIGH | LOGIC_REPLACES_CIRCUIT | hebbian.py:957+variant:642 | _motor_efficacy Python 前向模型门控有丝分裂 |
 | HC-027 | HIGH | UNGROUNDED_PARAM | variant_adapter.py:697,715 | OTOLITH_GAIN=500, ANGULAR_GAIN=50（无 BIO:）|
