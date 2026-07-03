@@ -44,6 +44,8 @@ from ..components.thermal_mouth import ThermalMouth
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
 from ..somatosensory.chain import SomatosensoryChain
+from ..somatosensory.transducer_neurons import (
+    ThermalDeltaNeuron, make_thermo_delta_to_da_bundle)
 from ..components.energy_store import EnergyStore
 from ..components.vital_oscillator import VitalOscillator
 from ..components.cpg_neuron import CPGNeuron
@@ -548,6 +550,12 @@ class VariantCircuit(HebbianCircuit):
         self._da_cpg: CPGNeuron | None = None
         self.bundles_cpg_to_da: List[SynapticBundle] = []
 
+        # Warm-onset → DA: ThermalDeltaNeuron per patch (lazy init alongside DA)
+        # BIO: Type II AMH (Aδ) → LPB → VTA warm-onset DA burst.
+        # REF: Norris et al. 2021 Nat Neurosci — LPB→VTA thermal reward pathway.
+        self.thermo_delta_neurons: Dict[str, 'ThermalDeltaNeuron'] = {}
+        self.bundles_thermo_delta_to_da: List[SynapticBundle] = []
+
         # P2-HC007: relay→enc STDP bundles (replace HC-007 direct injection)
         # BIO: STT → VPL thalamus → S1 cortex (thalamo-cortical thermal encoding)
         # encoding_neurons (from super().__init__) and somatosensory.relays both ready now.
@@ -722,6 +730,14 @@ class VariantCircuit(HebbianCircuit):
 
         # 2. Step the somatosensory chain (Thermo + Noci + Relay)
         self.somatosensory.step(patch_temps, dt)
+
+        # ── Warm-onset transducers: step ThermalDeltaNeurons from dT per patch ──
+        # BIO: Type II AMH (Aδ) fire on positive dT/dt (body entering warm field).
+        # Lazy: neurons exist only after _init_da_circuit() (first call triggers it).
+        if self.thermo_delta_neurons:
+            for pid, dn in self.thermo_delta_neurons.items():
+                dT_raw = patch_temps.get(pid, (0.0, 0.0, 0.0))[1]
+                dn.step(dT_raw, dt)
 
         # ── P2-HC007: relay→enc STDP bundle propagation ──
         # Replaces: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt) (direct injection)
@@ -1306,6 +1322,17 @@ class VariantCircuit(HebbianCircuit):
                     if j < len(currents) and tgt.id in da_input_currents:
                         da_input_currents[tgt.id] += currents[j]
 
+        # ── Warm-onset → DA: propagate ThermalDelta bundles into da_input_currents ──
+        # BIO: LPB→VTA warm-onset path; innate frozen weights (see _init_da_circuit).
+        # Provides phasic DA burst correlated with relay activity during warm approach:
+        #   relay (pre, tonic) → warm entry → ThermalDelta → DA (post) → LTP ✓
+        if self.bundles_thermo_delta_to_da:
+            for bundle in self.bundles_thermo_delta_to_da:
+                currents = bundle.propagate()
+                for j, tgt in enumerate(bundle.targets):
+                    if j < len(currents) and tgt.id in da_input_currents:
+                        da_input_currents[tgt.id] += currents[j]
+
         # HC-017 fix: RPE + hunger DA drive via normal step() pathway (not _membrane.inject).
         # BIO: VTA RPE → DA burst (Schultz 1997); LH hunger → VTA tonic (Wise 2004).
         # REF: Schultz 1997 J Neurophysiol 77:1060; Wise 2004 Nat Rev Neurosci 5:483.
@@ -1354,6 +1381,9 @@ class VariantCircuit(HebbianCircuit):
             bundle.compute_xin(dt)
         # cpg_to_da is frozen (innate pacemaker) — only Xin tracking needed
         for bundle in self.bundles_cpg_to_da:
+            bundle.compute_xin(dt)
+        # thermo_delta_to_da is frozen (innate LPB→VTA) — only Xin tracking needed
+        for bundle in self.bundles_thermo_delta_to_da:
             bundle.compute_xin(dt)
         # P2-HC007: STDP on relay→enc bundles (thermal thalamo-cortical learning)
         # TIMING: after super().step() so enc_reg.post_trace is updated (enc_reg stepped above).
@@ -2018,12 +2048,32 @@ class VariantCircuit(HebbianCircuit):
             learning_rule="frozen",    # INNATE: VTA intrinsic oscillation anatomy
             initial_weight=0.1,        # G(0.1)≈0.111; I_peak=0.10×0.111=0.011A ✓
             weight_max=0.1,            # cap at initial — innate, not plastic
-            synapse_gain=1.0,
+            # EXP-BASE-200K: CPG 2Hz phasic DA caused 82% LTD in relay_to_da (tonic
+            # relay vs phasic CPG → anti-correlated STDP). Reduce 10× to suppress LTD
+            # while retaining 10% residual to keep post_trace > 0 during quiet periods.
+            synapse_gain=0.1,
             bundle_role="feedforward",
             remodel_cost_kappa=0.0,    # no remodeling cost — structural innate pathway
         )
         self.bundles_cpg_to_da.append(
             SynapticBundle(cfg_cpg, [self._da_cpg], da_list))
+
+        # ── 5. Warm-onset → DA: ThermalDeltaNeuron per skin patch (frozen) ──
+        # BIO: Type II AMH (Aδ) warm-onset fibers → Lamina I → LPB → VTA DA.
+        #      Fires when body enters warm field (dT/dt > 0); drives phasic DA
+        #      correlated with relay activation → relay_to_da STDP → LTP.
+        # REF: Norris et al. 2021 Nat Neurosci 24:1407 — LPB→VTA thermal reward.
+        # REF: LaMotte & Campbell 1978 J Neurophysiol 41:924 — Type II AMH.
+        # Q2. ThermalDeltaNeuron[pid] → frozen bundle → all da_neurons.
+        # Q3. See make_thermo_delta_to_da_bundle() docstring for derivation.
+        _SKIN_POS = {'front': (2, 0, 0), 'back': (-2, 0, 0),
+                     'left': (0, -2, 0), 'right': (0, 2, 0)}
+        for pid in self.somatosensory.patch_ids:
+            pos = _SKIN_POS.get(pid, (0.0, 0.0, 0.0))
+            dn = ThermalDeltaNeuron(patch_id=pid, position=pos)
+            self.thermo_delta_neurons[pid] = dn
+            self.bundles_thermo_delta_to_da.append(
+                make_thermo_delta_to_da_bundle(pid, dn, da_list))
 
         self._da_circuit_initialized = True
 
@@ -2106,6 +2156,8 @@ class VariantCircuit(HebbianCircuit):
         # P2-FIX: shadow sandbox neurons (s_enc, s_col, s_mot) — visible to ledger/Noether
         if self.shadow_sandbox._initialized:
             neurons.extend(self.shadow_sandbox.neurons.values())
+        # Warm-onset transducers (thermo_delta_{pid}) — LPB→VTA arm
+        neurons.extend(self.thermo_delta_neurons.values())
         return neurons
 
     def get_all_bundles(self):
@@ -2131,6 +2183,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.bundles_relay_to_enc)
         # CPG → DA pacemaker pathway (frozen, visible for Noether/Xin accounting)
         bundles.extend(self.bundles_cpg_to_da)
+        # Warm-onset → DA (frozen, LPB→VTA innate pathway)
+        bundles.extend(self.bundles_thermo_delta_to_da)
         return bundles
 
     @property

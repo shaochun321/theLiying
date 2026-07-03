@@ -231,3 +231,97 @@ def make_transducer_bundle_noci(patch_id: str,
         sources=[noci_input],
         targets=[nociceptor],
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ThermalDeltaNeuron — warm-onset (dT/dt > 0) transducer for VTA reward
+# ─────────────────────────────────────────────────────────────────────────────
+
+# BIO: Type II AMH (A-δ fibers) respond specifically to warming (dT/dt > 0).
+# Project: dorsal horn Lamina I → parabrachial nucleus (LPB) → VTA DA neurons.
+# REF: Norris et al. 2021 Nat Neurosci — LPB→VTA pathway for thermal reward.
+# REF: LaMotte & Campbell 1978 J Neurophysiol — Type II AMH warm-onset firing.
+# SEMI: MOSFET half-wave rectification — only positive dT conducts (warming).
+#       Cooling (dT < 0) is blocked; handled separately by TRPA1/NociInputNeuron.
+#
+# Gain calibrated from SomatosensoryChain.NOCI_DT_GAIN = 200 (chain.py L377-382):
+#   I_warmth = dT × WARM_ONSET_GAIN = 5e-5 × 200 = 0.01 at baseline approach rate.
+_WARM_ONSET_GAIN: float = 200.0
+
+
+class ThermalDeltaNeuron(Neuron):
+    """TYPE:BIO|SEMI — Warm-onset thermoreceptor transducer for VTA reward signal.
+
+    BIO: Type II AMH (A-δ) fibers at skin surface detect dT/dt > 0 (approach
+         to warm stimulus). Project via Lamina I → lateral parabrachial nucleus
+         (LPB) → VTA dopaminergic neurons, driving DA burst on warm-field entry.
+    REF: Norris et al. 2021 Nat Neurosci 24:1407 — LPB→VTA thermal reward.
+    REF: LaMotte & Campbell 1978 J Neurophysiol 41:924 — Type II AMH warm-onset.
+    SEMI: MOSFET half-wave: activation = max(0, dT × WARM_ONSET_GAIN).
+    PHYS: step() bypasses RC (SkinPatch already applies τ=5s integration).
+    """
+
+    _TRACE_DECAY: float = 0.99
+
+    def __init__(self, patch_id: str,
+                 position: tuple = (0.0, 0.0, 0.0)) -> None:
+        config = NeuronConfig(
+            neuron_id=f"thermo_delta_{patch_id}",
+            position=position,
+            capacitance=0.001,
+            r_leak=1.0,
+            inertia=0.0,
+            vdd=2.0,
+            r_supply=0.01,
+        )
+        super().__init__(config)
+
+    def step(self, dT_raw: float, dt: float = 1.0) -> float:
+        """Update from raw skin temperature derivative (signed dT per step).
+
+        Args:
+            dT_raw: patch_temps[pid][1] — raw dT per timestep (signed).
+            dt:     timestep (seconds; used for trace decay).
+
+        Returns:
+            activation = max(0, dT_raw × WARM_ONSET_GAIN)
+                         (MOSFET half-wave: zero output on cooling)
+        """
+        self.activation = max(0.0, dT_raw * _WARM_ONSET_GAIN)
+        self.pre_trace = (self.pre_trace * self._TRACE_DECAY
+                          + abs(self.activation))
+        self.pre_trace = min(self.pre_trace, 10.0)
+        self._activation_ema += 0.01 * (abs(self.activation) - self._activation_ema)
+        self._prev_activation = self.activation
+        return self.activation
+
+
+def make_thermo_delta_to_da_bundle(patch_id: str,
+                                    delta_neuron: 'ThermalDeltaNeuron',
+                                    da_neurons: list) -> SynapticBundle:
+    """Create frozen bundle: ThermalDeltaNeuron → all DA neurons.
+
+    Frozen (innate): LPB→VTA thermal projection is anatomically hardwired.
+    REF: Norris et al. 2021 — LPB→VTA exists in naive (unlearned) animals.
+
+    Q3 Parameter derivation:
+      initial_weight=0.1: G(0.1)≈0.111; I_peak=0.05×0.111×1.0≈0.0056A.
+        Matches CPG bundle amplitude (cpg_bundle w=0.1, sg=0.1→after cut: 0.00056A).
+        Target: warm-onset DA burst ~5× stronger than residual CPG → phasic drive.
+      synapse_gain=1.0: unit; calibrated against relay_to_da sg=0.2 but 3× relays.
+      weight_max=0.1: frozen at initial (innate anatomy, not plastic).
+      EXP-BASE-200K: warm approach dT≈0.00025/step → activation=0.05 → I=0.0056A ✓
+    """
+    return SynapticBundle(
+        config=BundleConfig(
+            bundle_id=f"thermo_delta_to_da_{patch_id}",
+            learning_rule="frozen",
+            initial_weight=0.1,
+            weight_max=0.1,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        ),
+        sources=[delta_neuron],
+        targets=da_neurons,
+    )
