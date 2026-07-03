@@ -562,7 +562,7 @@ class VariantCircuit(HebbianCircuit):
         # REF: Mori & Ohshima 1995 Nature 376:344 (C. elegans AFD→AIY→SMB circuit).
         # SEMI: MOSFET threshold; two neurons compete (push-pull) via yaw_torque diff.
         # Q1. BIO: crossed thermosensory interneuron (relay → contralateral yaw motor)
-        # Q2. relay['left'] → [frozen] → yaw_ccw; relay['right'] → [frozen] → yaw_cw
+        # Q2. thermo_inputs['left'] → [frozen] → yaw_ccw; thermo_inputs['right'] → [frozen] → yaw_cw
         # Q3. w=0.3: relay.act≈0.4@T=8 → G(0.3)×1.0×0.4≈0.056A → V_ss≈0.28 → act≈0.28
         self.yaw_ccw_neuron: Neuron = Neuron(NeuronConfig(
             neuron_id="yaw_ccw",
@@ -2188,41 +2188,39 @@ class VariantCircuit(HebbianCircuit):
         )
 
     def _init_yaw_bundles(self):
-        """HC-016 A: relay[left/right] → yaw_ccw/cw neurons via frozen SynapticBundles.
+        """HC-016 A: thermo_input[left/right] → yaw_ccw/cw neurons via frozen SynapticBundles.
 
-        Replaces direct T_left−T_right Python subtraction with structural push-pull:
-        left relay → yaw_ccw_neuron (turn CCW/left when left is warm)
-        right relay → yaw_cw_neuron  (turn CW/right when right is warm)
-        Torque = (yaw_ccw.activation − yaw_cw.activation) × YAW_GAIN
+        Replaces direct T_left−T_right Python subtraction with structural push-pull.
+        Uses ThermalInputNeuron (raw thermoreceptor), NOT relay neurons — relay neurons
+        have lateral inhibition from front/back that corrupts left-right direction signal.
 
-        Q1. BIO: crossed spinal thermotaxis reflex. Left thermal afferents project to
-            contralateral interneurons → CCW turning toward heat source.
-            REF: Mori & Ohshima 1995 Nature 376:344 (C. elegans AFD→AIY→SMB);
-                 Kandel et al. 2013 PoNS Ch.23 (spinal crossed reflex arcs).
-        Q2. somatosensory.relays['left']  → [frozen, sg=1.0] → yaw_ccw_neuron
-            somatosensory.relays['right'] → [frozen, sg=1.0] → yaw_cw_neuron
-        Q3. initial_weight=0.3: relay.act≈0.4@T=8 → G(0.3)≈0.142 → I≈0.057A
-            → V_ss_yaw≈0.28 (r_leak=5). Torque≈0.28×0.1=0.028 rad/step at ΔT=8.
-            Existing code: (8−0)×0.1×dt=8e-4 angular_velocity/step (lower gain
-            through inertia=10). New path has different magnitude — calibrate
-            YAW_GAIN empirically; 0.1 preserved as anchor.
+        Q1. BIO: thermoreceptive Aδ/C-fibers project via DIRECT spinal reflex arc to
+            contralateral motor neurons (spinoreticular pathway, bypassing thalamus).
+            This is the INNATE reflex; relay pathway handles associative learning separately.
+            REF: Mori & Ohshima 1995 Nature 376:344 (C. elegans thermotaxis reflex);
+                 Kandel et al. 2013 PoNS Ch.23 (crossed spinal reflex arcs).
+        Q2. thermo_inputs['left']  → [frozen, sg=1.0] → yaw_ccw_neuron (CCW when left warm)
+            thermo_inputs['right'] → [frozen, sg=1.0] → yaw_cw_neuron  (CW when right warm)
+        Q3. initial_weight=0.3: thermo.act≈0.3@T=4 → G(0.3)≈0.142 → I≈0.043A
+            → V_ss_yaw≈0.21 (r_leak=5). Net torque at ΔT=4: 0.21×0.1=0.021 ≈ existing
+            T_diff×0.1 at ΔT=2 (≈0.2 after inertia). YAW_GAIN=0.1 preserved (EXP-W2-003).
         """
-        relay_left = self.somatosensory.relays.get("left")
-        relay_right = self.somatosensory.relays.get("right")
-        if relay_left is None or relay_right is None:
+        thermo_left = self.somatosensory.thermo_inputs.get("left")
+        thermo_right = self.somatosensory.thermo_inputs.get("right")
+        if thermo_left is None or thermo_right is None:
             return
 
         cfg_left = BundleConfig(
-            bundle_id="relay_left_to_yaw_ccw",
+            bundle_id="thermo_left_to_yaw_ccw",
             learning_rule="frozen",
-            initial_weight=0.3,    # Q3: relay.act×G(0.3)×1.0≈0.057A → V_ss≈0.28
+            initial_weight=0.3,    # Q3: thermo.act×G(0.3)×1.0≈0.043A → V_ss≈0.21
             weight_max=0.3,
             synapse_gain=1.0,
             bundle_role="feedforward",
             remodel_cost_kappa=0.0,
         )
         cfg_right = BundleConfig(
-            bundle_id="relay_right_to_yaw_cw",
+            bundle_id="thermo_right_to_yaw_cw",
             learning_rule="frozen",
             initial_weight=0.3,
             weight_max=0.3,
@@ -2230,8 +2228,8 @@ class VariantCircuit(HebbianCircuit):
             bundle_role="feedforward",
             remodel_cost_kappa=0.0,
         )
-        self.bundle_left_to_yaw = SynapticBundle(cfg_left, [relay_left], [self.yaw_ccw_neuron])
-        self.bundle_right_to_yaw = SynapticBundle(cfg_right, [relay_right], [self.yaw_cw_neuron])
+        self.bundle_left_to_yaw = SynapticBundle(cfg_left, [thermo_left], [self.yaw_ccw_neuron])
+        self.bundle_right_to_yaw = SynapticBundle(cfg_right, [thermo_right], [self.yaw_cw_neuron])
 
     # ── Override get_all_neurons/bundles to include DA components ──
 
