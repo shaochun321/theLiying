@@ -21,9 +21,9 @@ from nexus_v1.circuit.variant_adapter import VariantCircuit
 from nexus_v1.components.world import HeatSource, Body, World
 from nexus_v1.ledger import NuProbe
 
-STEPS        = 500_000
+STEPS        = 200_000
 DT           = 0.001
-LOG_INTERVAL = 50_000
+LOG_INTERVAL = 20_000
 
 # ── World setup ───────────────────────────────────────────────────────────────
 src = HeatSource(position=[70.0, 50.0, 25.0], energy=50_000.0,

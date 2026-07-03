@@ -678,7 +678,7 @@ class SynapticBundle:
             # _XIN_POLARITY_GATE conducts for birth > 0 (underprediction → expand);
             # subthreshold for birth ≤ 0 (overprediction → contract).
             # SEMI: v_threshold=0 → natural sign gate, no Python comparator.
-            if _XIN_POLARITY_GATE.conductance(birth) > 0:
+            if _XIN_POLARITY_GATE.conduct(birth) > 0:
                 # Underprediction → expand: this bundle needs more connections
                 # Sets a flag that hebbian._structural_growth can read
                 self._expand_request = True
