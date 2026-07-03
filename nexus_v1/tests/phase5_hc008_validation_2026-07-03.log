@@ -1,0 +1,83 @@
+================================================================================
+World 2.0 Phase 5 -- HC-008 compatibility validation (radius=30, HC-008 retained)
+Hypothesis: Phase 4b regression was energy dynamics (radius=50), NOT HC-008
+================================================================================
+S1=[80.0, 50.0, 25.0]  S2=[35.0, 76.0, 25.0]  S3=[35.0, 24.0, 25.0]
+body=[60.0, 50.0, 25.0]  dist_nearest=20.00  radius=30.0
+HC-008 fix: RETAINED in VariantCircuit (Ca-based pre_trace, hc_to_aff frozen)
+
+   step  d_near nr      wL     wR     wF     wB    wR-wL   wB-wF   fill      DA       sysv  chg%   DR5%    vis   cyc   agc
+--------------------------------------------------------------------------------------------------------------------------
+      0  20.000 S1  0.0000 0.0000 0.0000 0.0000  +0.0000 +0.0000  0.500  0.0001     -0.000   0%    0.0%      0     0  1.00  (0s)
+ 100000  19.457 S1  0.0999 0.1017 0.1018 0.0947  +0.0018 -0.0070  0.486  0.7682  +7103.214  68%  100.0%      1     1  1.14  (610s)
+ 200000  22.853 S3  0.0986 0.1017 0.1017 0.0947  +0.0031 -0.0070  0.275  0.8288   +603.382  51%   75.2%      1     1  1.39  (1344s)
+
+  nu top-3 at step 200000:
+    col_roll_to_move_z                       v=-3891.93373  xi=-63.0923
+    noci_to_relay_left                       v=+779.87461  xi=-464.4809
+    lateral_front_to_left                    v=+760.74108  xi=-448.9636
+
+ 300000  17.518 S1  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.213  0.7796  +21044.501  60%   67.5%      2     2  5.00  (2154s)
+ 400000  31.536 S2  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.097  0.7724  +11506.041  70%   68.6%      2     3  5.00  (3072s)
+
+  nu top-3 at step 400000:
+    noci_to_relay_right                      v=+1518.21630  xi=-1131.3751
+    lateral_front_to_right                   v=+1515.31650  xi=-1118.5911
+    lateral_back_to_right                    v=+1515.09005  xi=-1117.6499
+
+ 500000  13.347 S3  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.000  0.7772  +34492.951  71%   60.4%      2     3  5.00  (3985s)
+ 600000   7.662 S1  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.000  0.7766  +75556.221  73%   60.3%      2     4  5.00  (4912s)
+
+  nu top-3 at step 600000:
+    noci_to_relay_left                       v=+9674.15780  xi=-1753.0194
+    lateral_front_to_left                    v=+9634.82755  xi=-1742.6756
+    lateral_back_to_left                     v=+9631.85484  xi=-1741.8961
+
+ 700000  18.056 S2  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.000  0.7746  -7784.056  32%   60.5%      2     4  5.00  (5812s)
+ 800000  22.727 S3  0.0861 0.1017 0.1017 0.0947  +0.0156 -0.0070  0.000  0.7753  +50482.183  76%   61.9%      2     4  5.00  (6721s)
+
+  nu top-3 at step 800000:
+    noci_to_relay_right                      v=+6672.37069  xi=-2012.4365
+    lateral_front_to_right                   v=+6661.04271  xi=-2003.8671
+    lateral_back_to_right                    v=+6660.20282  xi=-2003.2362
+
+ 900000  24.705 S1  0.0777 0.1017 0.1017 0.0947  +0.0240 -0.0070  0.000  0.7752  +80052.685  76%   61.5%      2     5  5.00  (7638s)
+
+Done: 1,000,000 steps in 8553.5s (117/s)
+
+================================================================================
+Phase 5 DR Judgment  [Phase 4 REF: 5/7 PASS  |  Phase 4b REF: 2/7 FAIL]
+================================================================================
+
+Final state (step 1,000,000):
+  body pos: [40.14, 2.94, 25.0]
+  dist_nearest: 21.682  (init: 20.000)
+  fill: 0.0000
+  wR-wL@600k: +0.0156  wB-wF@600k: -0.0070
+  wR-wL@final: +0.0240  wB-wF@final: -0.0070
+  approach cycles: 5
+  sources visited: 2 (S1:True, S2:False, S3:True)
+  fill_zero_step: 440999
+  [PASS] DR1 |wR-wL|>0.005 or |wB-wF|>0.005 @600k  (wR-wL=+0.0156  wB-wF=-0.0070)
+  [PASS] DR2 dist reduction>3.0 @600k  (reduction=12.338 (init=20.00 -> @600k=7.661768467041696))
+  [FAIL] DR3 fill>0.05 @800k  (fill@800k=0.0000)
+  [PASS] DR4 visit >=2 sources (d<15)  (visited=2 (S1:True, S2:False, S3:True))
+  [FAIL] DR5 thermotaxis patch_grad.v>60%  (DR5=58.6%)
+  [PASS] DR_cycles approach_count>=3  (cycles=5)
+  [FAIL] DR_fill fill>0 throughout  (fill_zero=@440999)
+
+------------------------------------------------------------
+NuProbe final state
+  [PASS] NP1: thermo bundles charging  (thermo_to_relay_front=19.5326, thermo_to_relay_back=28.0890, thermo_to_relay_left=3759.7994)
+  approach_count = 5
+  charging_fraction = 75.0%
+  system_nu_ema = +34868.3147
+
+================================================================================
+Interpretation:
+  FAILURE: Multi-source navigation did not recover.
+  -> Possible HC-008 indirect effect OR unknown variable.
+  -> Need deeper investigation before proceeding to V2.0.
+
+Total DR: 4/7 FAIL
+================================================================================
