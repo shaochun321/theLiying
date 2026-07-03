@@ -531,14 +531,17 @@ class ShadowSandbox:
         }
 
         # 1a. Xin from main system -> encoding neurons (§1.3)
-        # NOTE: abs(xi) because shadow cares about prediction error MAGNITUDE,
-        # not sign. Negative Xin would push V below MOSFET threshold (0.3)
-        # and produce zero activation — defeating contraction dynamics.
+        # HC-021 fix: pass signed xi (not abs). Shadow enc MOSFET (v_th=0.3)
+        # acts as half-wave rectifier: positive xi → activation (underprediction);
+        # negative xi → subthreshold → no activation (overprediction silent).
+        # BIO: cortical shadow should be active on prediction failures, quiet on
+        # prediction successes. abs() was defeating this direction-sensitivity.
+        # PHYS: MOSFET provides natural half-wave rectification — Python abs() is
+        # the HC violation.
         #
         # MOTHER-DIFFERENTIATION: No global Xin normalization.
         # Each shadow enc neuron has its OWN DivisiveNormalizationReceptor
         # (component I) inside neuron.step() that adapts to its input range.
-        # This replaces the global max(|xi|) normalization (anti-pattern).
         # BIO: each cortical neuron normalizes independently via local
         # GABAergic interneuron pool, not a global signal.
         xin_abs_all = []
@@ -547,9 +550,9 @@ class ShadowSandbox:
             targets = self._xin_routing.get(b.id, [])
             for nid in targets:
                 if nid in accumulated_currents:
-                    # Raw abs(xi) × XIN_GAIN — DN receptor handles normalization
-                    accumulated_currents[nid] += abs(xi) * self.XIN_GAIN
-            xin_abs_all.append(abs(xi))
+                    # HC-021 fix: signed xi × XIN_GAIN; MOSFET handles rectification
+                    accumulated_currents[nid] += xi * self.XIN_GAIN
+            xin_abs_all.append(abs(xi))  # abs for free-energy K=Σxi² (sign irrelevant)
 
         # 1b. Bundle propagation → target neurons
         for bid, bundle in self.bundles.items():

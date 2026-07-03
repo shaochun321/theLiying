@@ -178,7 +178,7 @@
 | HC-025 | HIGH | LOGIC_REPLACES_CIRCUIT | motor_decision.py:213 | CPG 用 sin(phi) 数学公式替代振荡电路 |
 | HC-026 | HIGH | LOGIC_REPLACES_CIRCUIT | hebbian.py:957+variant:642 | _motor_efficacy Python 前向模型门控有丝分裂 |
 | HC-027 | HIGH | UNGROUNDED_PARAM | variant_adapter.py:697,715 | OTOLITH_GAIN=500, ANGULAR_GAIN=50（无 BIO:）|
-| HC-028 | HIGH | DIRECT_INJECT | somatosensory/chain.py:372 | relay 电流 Python 手动求和后直接注入 |
+| ~~HC-028~~ | ~~HIGH~~ | ~~DIRECT_INJECT~~ | ~~somatosensory/chain.py:372~~ | **RESOLVED-BY-HC-009 (bc6d292)** relay 已通过 bundle propagate() 累积 → 单次 step()，等同 da_input_currents 合规模式 |
 | HC-029 | HIGH | GOAL_HARDCODED | world.py:163 | MIN_ALIVE=2 保证始终有热源（生存目标写死）|
 | HC-030 | HIGH | LOGIC_REPLACES_CIRCUIT | neuron.py:593 | I²R 用钳位前电流计算，高估耗散 |
 | HC-031 | MEDIUM | DIRECT_INJECT | variant_adapter.py:866 | 振荡器直接覆盖膜电荷 `_membrane.charge = new_charge` |

@@ -10,7 +10,7 @@ import math
 from dataclasses import dataclass, field
 from typing import List
 
-from ..components.semiconductor import Memristor
+from ..components.semiconductor import Memristor, MOSFET as _MOSFET
 from ..components.neuron import Neuron
 from ..components.temporal_coupler import TemporalCoupler
 
@@ -108,6 +108,16 @@ class BundleConfig:
     # η_ltd: realtime LTD rate (not DA-gated — forgetting is always on).
     # BIO: AMPA receptor endocytosis is constitutive (Ehlers 2000).
     eligibility_ltd_rate: float = 0.01
+
+
+# HC-022 fix: zero-crossing MOSFET comparator for Xin sign discrimination.
+# Replaces `if birth > 0` Python comparator in fruit() method.
+# SEMI: MOSFET(v_th=0) → conducts for positive birth (underprediction → expand),
+#       off for negative/zero birth (overprediction → contract).
+# BIO: sign of accumulated prediction error determines map expansion direction.
+# REF: Merzenich 1984 — use-dependent cortical reorganization.
+# PARAMS: v_threshold=0.0 (zero-crossing); gm=1.0 (unit conductance).
+_XIN_POLARITY_GATE = _MOSFET(v_threshold=0.0, gm=1.0)
 
 
 class SynapticBundle:
@@ -664,7 +674,11 @@ class SynapticBundle:
             self.config.fruit_tension_at_birth = 0.0
             self._fruit_age = 0
 
-            if birth > 0:
+            # HC-022 fix: MOSFET zero-crossing comparator (replaces Python `if birth > 0`).
+            # _XIN_POLARITY_GATE conducts for birth > 0 (underprediction → expand);
+            # subthreshold for birth ≤ 0 (overprediction → contract).
+            # SEMI: v_threshold=0 → natural sign gate, no Python comparator.
+            if _XIN_POLARITY_GATE.conductance(birth) > 0:
                 # Underprediction → expand: this bundle needs more connections
                 # Sets a flag that hebbian._structural_growth can read
                 self._expand_request = True
