@@ -960,10 +960,15 @@ class VariantCircuit(HebbianCircuit):
                 self.motor_neurons[mkey]._membrane.inject(drive, dt)
 
         # ── C3': Homeostatic circulation coupling (structural carrier) ──
-        # Raw signals from existing sensors (physical measurements):
-        thermal_err = abs(self.thermal_membrane._prev_T
-                         - self.thermal_membrane._methylation)
-        thermal_stability = 1.0 / (1.0 + thermal_err * 10.0)
+        # HC-014 fix: thermal_stability from somatosensory relay circuit output.
+        # Old: Python sigmoid of raw physics vars (_prev_T, _methylation).
+        # New: relay neuron average activation — high relay = warm skin = less stable.
+        # BIO: preoptic area integrator receives spinal relay input coding thermal load;
+        #      high thermal load → suppressed homeostatic channel → DA excitation.
+        # REF: Nakamura & Morrison 2008 Nat Neurosci — preoptic thermosensory neurons.
+        relay_vals = [soma_output[pid]["relay_activation"] for pid in soma_output]
+        soma_relay_avg = sum(relay_vals) / max(len(relay_vals), 1)
+        thermal_stability = max(0.0, 1.0 - soma_relay_avg)
         body_speed = self.world.body.speed()
 
         # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
