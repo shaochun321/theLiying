@@ -82,6 +82,7 @@ def create_shadow_config(neuron_id: str, layer: str = "encoding") -> NeuronConfi
     params = base.get(layer, base["encoding"])
     return NeuronConfig(
         neuron_id=neuron_id,
+        region=0x05,    # REGION_SHADOW: microcircuit-attached to main layer (0x03), 1 mm distance
         capacitance=params["capacitance"],
         r_leak=params["r_leak"],
         v_rest=0.0,

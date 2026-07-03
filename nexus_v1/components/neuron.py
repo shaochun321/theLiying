@@ -53,6 +53,12 @@ class NeuronConfig:
     # None = position not yet assigned (abstract or unlocated neuron).
     position: Optional[Tuple[float, float, float]] = None
 
+    # Brain region code for topology auditing and delay routing.
+    # 0x00 = unassigned; 0x01 = spinal; 0x02 = brainstem;
+    # 0x03 = main layer; 0x04 = hypothalamus; 0x05 = shadow
+    # Set via VariantCircuit._assign_regions() after all neurons are created.
+    region: int = 0x00
+
     # Base parameters
     capacitance: float = 1.0
     r_leak: float = 5.0

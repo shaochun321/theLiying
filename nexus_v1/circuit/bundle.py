@@ -523,7 +523,19 @@ class SynapticBundle:
         """Predict-compare: accumulate Xin tension (§7.2).
 
         Prediction: ŷ_j = Σ_i W_ij × a_i(t-dt)
-        Residual: ξ += mean_j(ŷ_j - a_j(t)) × dt
+        Residual  : R(t) = mean_j(ŷ_j - a_j(t))   [V, per-synapse]
+
+        Xin tension — PI form, dim [V]:
+            ξ(t+dt) = ξ(t) · exp(-dt/τ_I) + k_p · R(t) · dt
+            k_p  = 1.0  [dimensionless, proportional gain]
+            τ_I  = XIN_LEAK_TAU = 1000 s  [integration time constant]
+                   BIO: eligibility-trace decay scale (Izhikevich 2007).
+                   NOTE: 1000 s is a numerical-stability choice, not a
+                   biologically precise value.
+
+        Dim check:
+            P term: [dimensionless] × [V] × [s] / [s] = [V]  ✓
+            I term: [V] × exp(-[s]/[s])                = [V]  ✓
 
         NOTE: Residual is normalized by N_targets to prevent fan-in bias.
         Without normalization, a 7×3 cross bundle accumulates 21× faster
@@ -545,11 +557,11 @@ class SynapticBundle:
         n_targets = max(len(self.targets), 1)
         total_residual /= n_targets
 
-        # Accumulate tension with leak (prevents unbounded growth)
-        # BIO: prediction error habituates — sustained mismatches gradually
-        # accepted. Without leak, Xin diverges over long runs (>200k steps).
-        # τ_leak = 1000s → very slow decay, preserves structural dynamics.
-        XIN_LEAK_TAU = 1000.0  # seconds
+        # Accumulate tension with leak (prevents unbounded growth).
+        # Physical identity: τ_I — Xin integration time constant [s].
+        # BIO: eligibility-trace decay (Izhikevich 2007); 1000 s chosen
+        #      for numerical stability, not biological precision.
+        XIN_LEAK_TAU = 1000.0  # τ_I [s] — PI integration time constant
         leak_factor = math.exp(-dt / XIN_LEAK_TAU)
         xin_leaked = self.config.xin_tension * (1.0 - leak_factor)
         self.config.xin_tension = self.config.xin_tension * leak_factor + total_residual * dt

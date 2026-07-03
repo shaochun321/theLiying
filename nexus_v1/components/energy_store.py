@@ -26,10 +26,17 @@ BIO: glycogen stores in liver/muscle + blood glucose buffer.
   This component models the aggregate reserve, not individual pools.
 
 PHYS: Capacitor with max charge (Q_max). Deposit = charge, withdraw = discharge.
+  Capacitor parameters derived from metabolic budget:
+    C = capacity = 1000.0  [F equiv, charge = energy unit]
+    R_leak: τ = R×C; basal_drain = Q×dt/τ at Q=Q_init
+      → R = Q_init × dt / (basal_drain × C)
+      → R = (500 × 0.001) / (0.0001 × 1000) = 5.0 [Ω equiv]
+  REF: Bergman 1989 Am J Physiol (hepatic glycogen kinetics)
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 
@@ -82,12 +89,25 @@ class EnergyStoreConfig:
     # BIO: hypoglycemia impairs brain function
     starvation_threshold: float = 0.1
 
+    # Capacitor leak resistance [Ω equiv]
+    # PHYS: derived from basal_drain at Q_init=capacity×initial_fill
+    #   dQ/step(linear) = basal_drain × dt = 0.0001 × 0.001 = 1e-7
+    #   dQ/step(RC)     = Q × dt / (R × C)
+    #   → R = Q_init × dt / (dQ_target × C)
+    #   → R = 500 × 0.001 / (1e-7 × 1000) = 5000 [Ω equiv]
+    # BIO: hepatic glucose output rate ≈ 10 μmol/kg/min at rest (Bergman 1989)
+    r_leak: float = 5000.0
+
 
 class EnergyStore:
     """TYPE:SEMI — External energy reservoir — the organism's 'battery'.
 
     Sits between World (food acquisition) and internal metabolism.
     Can be replaced/upgraded without changing internal wiring.
+
+    Physical basis: Capacitor (semiconductor.py) stores charge Q = energy.
+    V = Q/C = fill_fraction; deposit/withdraw map to inject/drain.
+    External API (fill_fraction, deposit, withdraw, tick) unchanged.
 
     Usage:
         store = EnergyStore()
@@ -101,22 +121,28 @@ class EnergyStore:
             config = EnergyStoreConfig()
         self.config = config
 
-        # Current energy level
-        self._level: float = config.capacity * config.initial_fill
-        # Noether tracking
+        # Physical storage: Capacitor primitive
+        # charge [Q] ≡ energy_level; voltage [V] = Q/C = fill_fraction
+        # C = capacity (so that V_max = Q_max/C = 1.0 = full)
+        from nexus_v1.components.semiconductor import Capacitor
+        self._cap = Capacitor()
+        self._cap.capacitance = config.capacity
+        self._cap.charge = config.capacity * config.initial_fill
+
+        # Noether tracking — preserved from original for audit compatibility
         self._total_deposited: float = 0.0
         self._total_withdrawn: float = 0.0
         self._total_basal_drain: float = 0.0
 
     @property
     def level(self) -> float:
-        """Current energy stored."""
-        return self._level
+        """Current energy stored (= capacitor charge Q)."""
+        return self._cap.charge
 
     @property
     def fill_fraction(self) -> float:
-        """Fill level as fraction [0, 1]."""
-        return self._level / max(self.config.capacity, 1e-8)
+        """Fill level as fraction [0, 1] (= capacitor voltage V = Q/C)."""
+        return self._cap.voltage
 
     @property
     def is_starving(self) -> bool:
@@ -125,6 +151,9 @@ class EnergyStore:
 
     def deposit(self, amount: float) -> float:
         """Store energy from external source (feeding).
+
+        PHYS: inject charge into capacitor (dQ = amount after efficiency & cap).
+        Maps to Capacitor.inject(current=stored, dt=1.0) with dt=1 so dQ=stored.
 
         Args:
             amount: raw energy absorbed from heat source.
@@ -135,17 +164,19 @@ class EnergyStore:
         if amount <= 0:
             return 0.0
         effective = amount * self.config.deposit_efficiency
-        space = self.config.capacity - self._level
-        # P2.1: Fixed power supply cap (constant current source).
-        # The universe can only deliver this much per step.
+        space = self.config.capacity - self._cap.charge
         cap = self.config.max_deposit_per_step
         stored = min(effective, space, cap)
-        self._level += stored
-        self._total_deposited += stored
+        if stored > 0:
+            # PHYS: inject charge; dt=1 so dQ = current × 1 = stored
+            self._cap.inject(stored, dt=1.0)
+            self._total_deposited += stored
         return stored
 
     def withdraw(self, requested: float) -> float:
         """Draw energy for internal use (vascular delivery, neuron refill).
+
+        PHYS: extract charge from capacitor (negative inject).
 
         Args:
             requested: amount of energy needed.
@@ -155,21 +186,22 @@ class EnergyStore:
         """
         if requested <= 0:
             return 0.0
-        delivered = min(requested, self._level)
-        self._level -= delivered
-        self._total_withdrawn += delivered
+        delivered = min(requested, self._cap.charge)
+        if delivered > 0:
+            self._cap.inject(-delivered, dt=1.0)
+            self._total_withdrawn += delivered
         return delivered
 
     def tick(self, dt: float = 0.001):
         """Basal metabolic drain — organism costs energy just to exist.
 
-        Called once per step. Drains a small fixed amount.
+        PHYS: RC leak of capacitor (exponential decay with τ = R_leak × C).
         BIO: resting metabolic rate consumes glucose continuously.
         """
-        drain = self.config.basal_drain * dt
-        actual = min(drain, self._level)
-        self._level -= actual
-        self._total_basal_drain += actual
+        q_before = self._cap.charge
+        self._cap.leak(self.config.r_leak, dt)
+        drained = q_before - self._cap.charge
+        self._total_basal_drain += drained
 
     def delivery_factor(self) -> float:
         """Scaling factor for vascular energy delivery.
@@ -183,13 +215,12 @@ class EnergyStore:
         frac = self.fill_fraction
         if frac >= 0.3:
             return 1.0
-        # Gradual degradation below 30%
         return max(0.0, frac / 0.3)
 
     def summary(self) -> dict:
         """State for monitoring and Noether audit."""
         return {
-            "level": round(self._level, 4),
+            "level": round(self._cap.charge, 4),
             "capacity": self.config.capacity,
             "fill_fraction": round(self.fill_fraction, 4),
             "is_starving": self.is_starving,
@@ -201,7 +232,9 @@ class EnergyStore:
                 self._total_deposited
                 - self._total_withdrawn
                 - self._total_basal_drain
-                - self._level
+                - self._cap.charge
                 + self.config.capacity * self.config.initial_fill,
                 6),
+            # KCL imbalance on Capacitor itself (semiconductor-level audit)
+            "cap_kcl_imbalance": round(self._cap.kcl_imbalance, 8),
         }

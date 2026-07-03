@@ -139,7 +139,8 @@ def run_test_suite():
     # ── Test Group 3: Column Differentiation ──
     print("Phase 5: Column differentiation...")
     col_vest = c.column_neurons['oto_x']._activation_ema
-    col_therm = c.column_neurons['therm_front']._activation_ema
+    col_therm_front = c.column_neurons['therm_front']._activation_ema
+    col_therm_back  = c.column_neurons['therm_back']._activation_ema
 
     results.append(_TestResult(
         "T3.1 Vestibular column active",
@@ -148,12 +149,23 @@ def run_test_suite():
         "> 0.3",
     ))
 
+    # T3.2 (updated 2026-07-04): After HC-009 (ThermalInputNeuron) the thermal signal
+    # pathway is complete. The heat source direction relative to body varies with the
+    # random trajectory, so the correct invariant is DIRECTION-INDEPENDENT SPATIAL
+    # DIFFERENTIATION: the most-active thermal column should be > 5× the least-active.
+    # This tests the complete chain (SkinPatch → ThermalInputNeuron → relay → encoding
+    # → column) while remaining robust to which direction the body faces.
+    col_therm_all = {k: c.column_neurons[k]._activation_ema
+                     for k in ['therm_front', 'therm_back', 'therm_left', 'therm_right']}
+    _therm_max = max(col_therm_all.values())
+    _therm_min = min(col_therm_all.values())
+    _therm_ratio = _therm_max / max(_therm_min, 1e-4)
     results.append(_TestResult(
-        "T3.2 Thermal column < vestibular",
-        col_therm < col_vest,
-        f"therm={col_therm:.4f} vest={col_vest:.4f}",
-        "therm < vest",
-        "(column should differentiate based on encoding input)",
+        "T3.2 Thermal column spatial differentiation",
+        _therm_ratio > 5.0,
+        f"max={_therm_max:.4f} min={_therm_min:.4f} ratio={_therm_ratio:.1f}x",
+        "max/min ratio > 5x",
+        "(most-active therm column > 5× least-active; direction-independent)",
     ))
 
     # ── Test Group 4: Motor / Weight Topology ──
@@ -409,11 +421,14 @@ def test_encoding_selectivity(circuit_10k):
 
 
 def test_column_differentiation(circuit_10k):
-    """T3: Vestibular column differentiates from thermal."""
+    """T3: Vestibular active; thermal columns spatially differentiated (direction-independent)."""
     col_vest = circuit_10k.column_neurons['oto_x']._activation_ema
-    col_therm = circuit_10k.column_neurons['therm_front']._activation_ema
     assert col_vest > 0.3
-    assert col_therm < col_vest
+    # T3.2: most-active therm column > 5× least-active (direction-independent)
+    therm_vals = [circuit_10k.column_neurons[k]._activation_ema
+                  for k in ['therm_front', 'therm_back', 'therm_left', 'therm_right']]
+    therm_ratio = max(therm_vals) / max(min(therm_vals), 1e-4)
+    assert therm_ratio > 5.0, f"Thermal spatial ratio too low: {therm_ratio:.1f}x"
 
 
 def test_motor_topology(circuit_10k):

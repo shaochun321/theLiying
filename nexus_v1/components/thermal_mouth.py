@@ -55,9 +55,9 @@ class ThermalMouth:
             body.position[2] + lz,
         ]
 
-    def step(self, world, body, energy_store, ecm_temp: float = 0.15,
+    def step(self, world, body, ecm_temp: float = 0.15,
              dt: float = 0.001) -> float:
-        """Update mouth temperature and deposit metabolic energy.
+        """Update mouth temperature and compute raw thermal intake.
 
         PHYS: dT_mouth/dt = (T_env - T_mouth)/tau_heat - (T_mouth - T_body)/tau_cool
         FIX-PHASE1-002: T_body = ecm_temp, dynamically passed from variant_adapter.
@@ -65,7 +65,11 @@ class ThermalMouth:
         FIX-PHASE1-001: deduct total_heat_flux from heat source, not just eta fraction.
           98% waste heat still extracted from vent, maintaining energy conservation.
 
-        Returns energy deposited into EnergyStore this step.
+        NOTE: EnergyStore.deposit() is NO LONGER called here.
+        DigestiveInterface.tick() handles the thermal→chemical transduction step.
+        ThermalMouth is now a pure thermal-domain component (no electrochemical side effects).
+
+        Returns raw energy_intake (before DigestiveInterface conversion).
         """
         pos = self.world_position(body)
         T_env = world.temperature_at(pos)
@@ -82,9 +86,9 @@ class ThermalMouth:
         self.energy_intake = self.eta * total_heat_flux
 
         if self.energy_intake > 0:
-            energy_store.deposit(self.energy_intake)
             # FIX-PHASE1-001: absorb total heat flux from heat source.
             # eta controls ATP yield, but all extracted heat comes from source.
+            # Noether: heat source loses total_heat_flux, not just eta fraction.
             for src in getattr(world, 'cylindrical_sources', []):
                 if src.alive:
                     src.absorb(total_heat_flux)

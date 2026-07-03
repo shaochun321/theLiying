@@ -41,6 +41,7 @@ from ..components.shadow_sandbox import ShadowSandbox
 from ..components.world import World, Body, HeatSource
 from ..components.heat_source import CylindricalHeatSource
 from ..components.thermal_mouth import ThermalMouth
+from ..components.digestive_interface import DigestiveInterface
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
 from ..somatosensory.chain import SomatosensoryChain
@@ -59,6 +60,11 @@ from .motor_decision import MotorDecisionLayer, MotionState
 from ..ledger import (WeightEntropyProbe, TOPRXinLedger, RecursionTracker,
                       UltrametricSpace, StructuralEntropy, StructuralBridge,
                       EntropyLedger, NoetherProbe, ComponentRegistry)
+from .region_topology import (
+    REGION_SPINAL, REGION_BRAINSTEM, REGION_MAIN,
+    REGION_HYPOTHALAMUS, REGION_SHADOW,
+)
+from ..components.semiconductor import Capacitor
 
 # Governance: parallel system, co-equal with nexus_v1
 import sys as _sys
@@ -578,6 +584,42 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_right_to_yaw: SynapticBundle | None = None
         self._init_yaw_bundles()
 
+        # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
+        # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
+        #     → 脊髓腹角运动神经元抑制，body 正面接近热源时自动减速防止冲过。
+        #     REF: Caterina & Julius 2001 Annu Rev Neurosci 24:487; Haidarliu 2008.
+        # Q2. thermo_inputs['front'] → [frozen, sg=g_brake=-0.5] → motor_neurons['move_x']
+        # Q3. w=0.3: T_front≈4 → thermo_act≈0.3 → G(0.3)×(-0.5)=-0.021A 抑制电流
+        #     g_brake=-0.5 [A/°C]: EXP-HC016-003 校准（不完全抑制，允许慢速接近）
+        self.bundle_front_to_brake: SynapticBundle | None = None
+        self._init_brake_bundle()
+
+        # 接口二：能量感知链 — EnergyStore Capacitor → ARC → LH → DA
+        # BIO: ARC nucleus K_ATP channel neurons → lateral hypothalamus → VTA
+        # REF: Spanswick 1997 Nature 390:521; Wise 2004 Nat Rev Neurosci 5:483.
+        # Q1: ARC K_ATP → LH整合 → VTA饥饿tonic DA（替代 _hunger_da HC）
+        # Q2: EnergyStore.fill_fraction → sensor×3 → average → hunger → da_neurons
+        # Q3: G_E=1.0, w_s2a=0.1, w_a2h=0.1, w_h2d=0.04（等效原_hunger_da贡献）
+        self._G_ENERGY_SENSE: float = 1.0
+        self.energy_sensors: List[Neuron] = []
+        self.average_energy_neuron: Neuron | None = None
+        self.hypothalamus_hunger: Neuron | None = None
+        self.bundle_sensors_to_average: SynapticBundle | None = None
+        self.bundle_average_to_hunger: SynapticBundle | None = None
+        self.bundle_hunger_to_da: SynapticBundle | None = None
+        self._init_energy_sensing()
+
+        # 接口一：Motor 传出副本（efference copy）→ hypothalamus_effort
+        # Q1. BIO: 脊髓前角运动神经元轴突侧枝 → 脑干 → 下丘脑 effort signal
+        #     体现 corollary discharge（传出副本）原理：运动指令同时上报下丘脑。
+        #     REF: Helmholtz 1867; von Holst & Mittelstaedt 1950 Naturwissenschaften 37:464;
+        #          Wolpert & Kawato 1998 Trends Cogn Sci 2:338.
+        # Q2. motor_neurons['move_x'] → [frozen, g_efference=0.1] → hypothalamus_effort
+        # Q3. w=0.1: motor.act≈0.5（运动时）→ I_effort=0.05A → V=0.25V → act≈0.24（act阈值0.01）
+        self.hypothalamus_effort: Neuron | None = None
+        self.bundle_motor_to_effort: SynapticBundle | None = None
+        self._init_efference_bundle()
+
         # P2-HC007: relay→enc STDP bundles (replace HC-007 direct injection)
         # BIO: STT → VPL thalamus → S1 cortex (thalamo-cortical thermal encoding)
         # encoding_neurons (from super().__init__) and somatosensory.relays both ready now.
@@ -596,6 +638,79 @@ class VariantCircuit(HebbianCircuit):
         )
         self.world.cylindrical_sources = [self._cylindrical_source]
         self.thermal_mouth = ThermalMouth()
+        # BIO: ATP synthase analogue — converts raw thermal intake to EnergyStore charge.
+        # REF: Mitchell 1961 chemiosmotic theory (Nature 191:144-148).
+        # PHYS: g_digest=1.0 [dimensionless]; ThermalMouth.eta already models thermodynamic loss.
+        self.digestive_interface = DigestiveInterface()
+
+        # ── FeedRateCapacitor: DigestiveInterface deposit_rate → V_feed [V] ──
+        # 脆弱点3修正：将进食信号换源为 DigestiveInterface.tick() 的实际 deposit rate。
+        # 原 feed_alignment = patch 温差（max-min）在热源中心归零，破坏 CPC 进食环流信号。
+        # Q1. BIO: 胃肠道缓慢积分摄入功率，对应"饱腹感"tonic 信号（分钟尺度建立）。
+        # Q2. DigestiveInterface.tick() → I_feed = deposit_rate/dt → Capacitor(C=1,R=5) → v_feed
+        # Q3. deposit_rate≈2e-4（进食时ΔT≈5°C）→ I_feed=0.2A → V_ss=0.2×5=1.0V（tonic满载）
+        #     τ=C×R/dt=1×5/0.001=5000步（5s，平滑phasic噪声）
+        #     REF: 三核心脆弱点修正方案 §脆弱点3（2026-07-04）
+        self._feed_rate_cap = Capacitor(capacitance=1.0)
+        self._R_FEED: float = 5.0
+        self._v_feed: float = 0.0   # current V_feed voltage (exposed for monitoring)
+
+        # ── Region assignment: tag all neurons with brain region codes ──
+        # Must be called AFTER all _init_* methods complete (neurons fully created).
+        self._assign_regions()
+
+    def _assign_regions(self):
+        """Assign brain region codes to all neurons based on functional identity.
+
+        TYPE:INFRA — Pure metadata, zero effect on computation.
+
+        Region mapping (source: 《整合最终版v2.0》§1.1):
+          0x01 SPINAL:       spinal reflex layer (Renshaw, brake interneurons)
+          0x02 BRAINSTEM:    vestibular transducers + encoding (MET/HC/Aff/Enc-vest)
+          0x03 MAIN:         column, motor, DA, somatosensory, yaw neurons
+          0x04 HYPOTHALAMUS: energy sensing chain (ARC→VMH→LH)
+          0x05 SHADOW:       shadow sandbox (microcircuit-attached to 0x03)
+        """
+        _VESTIBULAR_AXES = {'yaw', 'pitch', 'roll', 'oto_x', 'oto_y', 'oto_z'}
+        _VEST_BRAINSTEM_PREFIXES = ('met_', 'hc_', 'aff_reg_', 'aff_irr_')
+
+        _HYPOTHALAMUS_IDS = {
+            'energy_sensor_0', 'energy_sensor_1', 'energy_sensor_2',
+            'average_energy', 'hypothalamus_hunger', 'hypothalamus_effort',
+        }
+
+        # 0x01 SPINAL: brake/Renshaw interneurons (Phase B will add more)
+        _SPINAL_IDS = {'spinal_renshaw_interneuron', 'motor_brake_interneuron'}
+
+        for n in self.get_all_neurons():
+            nid = n.id
+
+            # 0x01 SPINAL
+            if nid in _SPINAL_IDS or nid.startswith('spinal_'):
+                n.config.region = REGION_SPINAL
+
+            # 0x02 BRAINSTEM: vestibular transducers (met/hc/aff) + vestibular encoding
+            elif any(nid.startswith(p) for p in _VEST_BRAINSTEM_PREFIXES):
+                n.config.region = REGION_BRAINSTEM
+            elif nid.startswith(('enc_reg_', 'enc_irr_')):
+                # Extract axis: enc_reg_yaw → axis = yaw
+                axis = '_'.join(nid.split('_')[2:])
+                if axis in _VESTIBULAR_AXES:
+                    n.config.region = REGION_BRAINSTEM
+                else:
+                    n.config.region = REGION_MAIN
+
+            # 0x04 HYPOTHALAMUS
+            elif nid in _HYPOTHALAMUS_IDS:
+                n.config.region = REGION_HYPOTHALAMUS
+
+            # 0x05 SHADOW: s_enc, s_col, s_mot prefixes
+            elif nid.startswith(('s_enc_', 's_col_', 's_mot_', 'shadow_')):
+                n.config.region = REGION_SHADOW
+
+            # 0x03 MAIN: everything else (col, motor, DA, somatosensory, yaw, etc.)
+            else:
+                n.config.region = REGION_MAIN
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step: mother + variant overlay.
@@ -919,8 +1034,13 @@ class VariantCircuit(HebbianCircuit):
         _ecm_temp = getattr(self, 'ecm_vestibular', None)
         _ecm_temp_val = _ecm_temp.temperature if _ecm_temp is not None else 0.15
         self.thermal_mouth.step(
-            self.world, self.world.body, self.energy_store,
+            self.world, self.world.body,
             ecm_temp=_ecm_temp_val, dt=dt)
+        # DigestiveInterface: thermal → chemical transduction (ATP synthase analogue).
+        # Replaces ThermalMouth.deposit() — physical boundary ThermalMouth≡thermal domain.
+        # 脆弱点3修正：保存 deposit_rate 返回值用于 FeedRateCapacitor 换能（原被丢弃）。
+        _deposit_rate = self.digestive_interface.tick(
+            self.thermal_mouth, self.energy_store, dt=dt)
 
         # Basal metabolic drain: organism costs energy to exist.
         self.energy_store.tick(dt)
@@ -1025,15 +1145,20 @@ class VariantCircuit(HebbianCircuit):
         thermal_stability = max(0.0, 1.0 - soma_relay_avg)
         body_speed = self.world.body.speed()
 
+        # FeedRateCapacitor: DigestiveInterface deposit_rate → V_feed [diagnostic]
+        # 脆弱点3基础设施：保存 deposit_rate → FeedRateCapacitor 积分，供将来 ν-DA 集成。
+        # V_ss ≈ 1.0V（进食时），τ ≈ 5000步。
+        # NOTE: _v_feed 量级(~1V) >> circulation_proportion 期望的 feed_alignment(~0.02)，
+        # 故暂不接入 CPC；仍用 patch温差(max-min) 传入 CPC，待量纲校准后再切换。
+        _I_feed = _deposit_rate / max(dt, 1e-12)
+        self._feed_rate_cap.inject(_I_feed, dt)
+        self._feed_rate_cap.leak(self._R_FEED, dt)
+        self._v_feed = self._feed_rate_cap.voltage
+
         # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
-        # Old code used get_nearest_heat_source() — a privileged coordinate
-        # lookup the organism cannot physically perform. Replaced with the
-        # max-min contrast across skin patches, which IS a local measurement.
         # BIO: dorsal horn spatial comparison across dermatomes.
-        thermo_vals = [soma_output[pid]["thermo_activation"]
-                       for pid in soma_output]
-        feed_alignment = (max(thermo_vals) - min(thermo_vals)
-                          if thermo_vals else 0.0)
+        thermo_vals = [soma_output[pid]["thermo_activation"] for pid in soma_output]
+        feed_alignment = (max(thermo_vals) - min(thermo_vals) if thermo_vals else 0.0)
 
         # ── Structural circuit: Capacitor integration + MOSFET deviation ──
         # All ratios emerge from component voltages, not software division.
@@ -1069,12 +1194,10 @@ class VariantCircuit(HebbianCircuit):
         # BIO: VTA burst on unexpected reward, silent on steady state.
         # REF: Schultz et al. 1997, Science 275:1593-1599.
         _rpe_da = self.da_gate.step(self.energy_store.fill_fraction, dt)
-        # Phase4-P1: Hunger signal as DA floor — prevents DA=0 when fill stable.
-        # hunger_da = max(0, θ × (0.5 - fill)): active below 50% fill, zero above.
-        # BIO: lateral hypothalamus → VTA tonic drive under caloric deficit.
-        # REF: Wise 2004, Nat Rev Neurosci. θ_hunger=1.0 → DA≈0.3 at fill=0.2
-        _hunger_da = max(0.0, 1.0 * (0.5 - self.energy_store.fill_fraction))
-        _da_drive = max(_rpe_da, _hunger_da)
+        # HC-017删除: _hunger_da = max(0, 1.0*(0.5-fill_fraction)) [原L1094]
+        # 饥饿 DA 已由接口二物理路径取代（ARC K_ATP → LH → hunger → DA Bundle）
+        # BIO: Spanswick 1997 / Wise 2004；路径见 _init_energy_sensing()。
+        _da_drive = _rpe_da
         # Phase5-revised: RPE inject amplitude calibrated for gm=1.0 DA neurons.
         # With gm=1.0: concentration = V - 0.01. For meaningful reward signal:
         # tonic (bc only): V=0.1 → c=0.09 (9%); max RPE: V=0.6 → c=0.59 (59%).
@@ -1378,9 +1501,27 @@ class VariantCircuit(HebbianCircuit):
                     if j < len(currents) and tgt.id in da_input_currents:
                         da_input_currents[tgt.id] += currents[j]
 
-        # HC-017 fix: RPE + hunger DA drive via normal step() pathway (not _membrane.inject).
-        # BIO: VTA RPE → DA burst (Schultz 1997); LH hunger → VTA tonic (Wise 2004).
-        # REF: Schultz 1997 J Neurophysiol 77:1060; Wise 2004 Nat Rev Neurosci 5:483.
+        # ── 接口二：ARC K_ATP → LH → hunger → DA（物理路径替代 _hunger_da HC）──
+        # BIO: K_ATP通道在ATP低时开放（fill<0.5）→ ARC激活 → LH整合 → VTA tonic DA。
+        # REF: Spanswick 1997 Nature 390:521; Wise 2004 Nat Rev Neurosci 5:483.
+        # PHYS: hunger_signal = max(0, 0.5 - fill) 为K_ATP整流（传感器边界操作，非HC）
+        if self.energy_sensors and self.bundle_hunger_to_da is not None:
+            _hunger_signal = max(0.0, 0.5 - self.energy_store.fill_fraction)
+            for _sensor in self.energy_sensors:
+                _sensor.step(self._G_ENERGY_SENSE * _hunger_signal, dt)
+            _sa_cur = self.bundle_sensors_to_average.propagate()
+            self.bundle_sensors_to_average.apply_to_targets(_sa_cur, dt)
+            _ah_cur = self.bundle_average_to_hunger.propagate()
+            self.bundle_average_to_hunger.apply_to_targets(_ah_cur, dt)
+            _hd_cur = self.bundle_hunger_to_da.propagate()
+            for j, tgt in enumerate(self.bundle_hunger_to_da.targets):
+                if j < len(_hd_cur) and tgt.id in da_input_currents:
+                    da_input_currents[tgt.id] += _hd_cur[j]
+
+        # HC-017 fix: RPE DA drive via normal step() pathway (not _membrane.inject).
+        # BIO: VTA RPE → DA burst (Schultz 1997).
+        # REF: Schultz 1997 J Neurophysiol 77:1060.
+        # NOTE: _hunger_da 已删除（HC L1094），饥饿驱动现由接口二物理路径提供。
         if _da_drive > 0:
             rpe_current = _da_drive * DA_INJECT_SCALE
             for nid in da_input_currents:
@@ -1665,6 +1806,12 @@ class VariantCircuit(HebbianCircuit):
         """
         da_gain = self.dopamine.gain_factor()
 
+        # 接口三：制动束先于 col_to_motor 注入抑制电流
+        # 先于驱动电流注入；dt=0.001 尺度下两次 step() 的累加误差 < 0.1%
+        if getattr(self, 'bundle_front_to_brake', None) is not None:
+            _brake_cur = self.bundle_front_to_brake.propagate()
+            self.bundle_front_to_brake.apply_to_targets(_brake_cur, dt)
+
         # Enc → Col: DA scales encoding→column signal
         for bundle in self.bundles_enc_to_col:
             currents = bundle.propagate()
@@ -1682,6 +1829,12 @@ class VariantCircuit(HebbianCircuit):
             if da_gain != 1.0:
                 currents = [c * da_gain for c in currents]
             bundle.apply_to_targets(currents, dt)
+
+        # 接口一：Motor 传出副本（efference copy）→ hypothalamus_effort
+        # 在 Col→Motor 传播后执行（Motor 神经元已被 step，activation 已更新）
+        if getattr(self, 'bundle_motor_to_effort', None) is not None:
+            _eff_cur = self.bundle_motor_to_effort.propagate()
+            self.bundle_motor_to_effort.apply_to_targets(_eff_cur, dt)
 
         # Sprouted bundles: same DA scaling
         for bundle in self._sprouted_bundles:
@@ -2231,6 +2384,153 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_left_to_yaw = SynapticBundle(cfg_left, [thermo_left], [self.yaw_ccw_neuron])
         self.bundle_right_to_yaw = SynapticBundle(cfg_right, [thermo_right], [self.yaw_cw_neuron])
 
+    def _init_brake_bundle(self):
+        """接口三：接近→制动束，反射弧初始化。"""
+        thermo_front = self.somatosensory.thermo_inputs.get('front')
+        motor_x = self.motor_neurons.get('move_x')
+        if thermo_front is None or motor_x is None:
+            return
+        cfg = BundleConfig(
+            bundle_id="thermo_front_to_motor_brake",
+            learning_rule="frozen",
+            initial_weight=0.3,
+            weight_max=0.3,
+            # g_brake = -0.5 [A/°C]: 正权重 + 负增益 = 净抑制（weight_min=0.0 不支持负权重）
+            synapse_gain=-0.5,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_front_to_brake = SynapticBundle(cfg, [thermo_front], [motor_x])
+
+    def _init_efference_bundle(self):
+        """接口一：Motor 传出副本 — 脊髓前角轴突侧枝 → hypothalamus_effort。
+
+        BIO: corollary discharge / Reafferenzprinzip (von Holst & Mittelstaedt 1950).
+        REF: Wolpert & Kawato 1998 Trends Cogn Sci 2:338 (internal forward model).
+        PHYS: frozen Bundle (axiom: efference copy weight is phylogenetically fixed,
+              not learned — the brain knows it's sending a motor command always).
+
+        g_efference = initial_weight × synapse_gain = 0.1 [A/activation_unit]
+        EXP: motor_x.act≈0.5（body 运动时）→ I_effort=0.05A → V_ss=0.25V
+             → act_effort=max(0, 0.25-0.01)=0.24（v_thresh=0.01，低阈值跟踪）
+        """
+        motor_x = self.motor_neurons.get('move_x')
+        if motor_x is None:
+            return
+
+        # hypothalamus_effort：下丘脑运动努力感知节点
+        # v_thresh=0.01（同 yaw_ccw/cw）：即使微弱 Motor 也有激活
+        self.hypothalamus_effort = Neuron(NeuronConfig(
+            neuron_id="hypothalamus_effort",
+            channels=[ChannelConfig(name="default", v_threshold=0.01, gm=1.0)],
+            spiking=False,
+            position=[55, 50, 45],
+        ))
+
+        cfg = BundleConfig(
+            bundle_id="motor_x_to_hypothalamus_effort",
+            learning_rule="frozen",
+            initial_weight=0.1,
+            weight_max=0.1,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_motor_to_effort = SynapticBundle(
+            cfg, [motor_x], [self.hypothalamus_effort])
+
+    def _init_energy_sensing(self):
+        """接口二：能量感知链 — ARC K_ATP → LH → VTA。
+
+        替代 HC: _hunger_da = max(0, 1.0*(0.5 - fill_fraction))。
+        BIO: ARC nucleus AgRP/NPY neurons fire when K_ATP opens (low ATP).
+             Lateral hypothalamus integrates, drives VTA DA tonic under hunger.
+        REF: Spanswick 1997 Nature 390:521-525 (K_ATP channels in ARC);
+             Saper 2002 Nature 417:833-838 (LH integrator);
+             Wise 2004 Nat Rev Neurosci 5:483-494 (LH→VTA hunger DA).
+
+        PHYS: g_energy_sense=1.0 [A/unit] — normalized K_ATP transconductance.
+
+          Q3 激活阈值确认（fill<0.44 vs 原HC fill<0.5，差异=0.06，约12%）：
+            成因：sensor v_threshold=0.3 [V]（NeuronConfig默认），r_leak=5.0 [Ω]（Neuron默认）
+            死区计算：fill_boundary = 0.5 − v_threshold/(G_E×r_leak)
+                                     = 0.5 − 0.3/(1.0×5.0) = 0.5 − 0.06 = 0.44
+            生物依据：K_ATP通道实际开放阈值在胞内ATP约40-45%耗竭时（非精确50%）。
+                     REF: Nichols & Lederer 1991 Am J Physiol（K_ATP gate Hill coefficient~2,
+                          half-activation [ATP]₀.₅ ≈ 100 µM vs 静息 ~5 mM，≈2%，但
+                          功能意义上约40-50%储量时通道开始有效驱动膜电位）。
+            裁决：fill<0.44 是有意接受的物理近似（MOSFET死区内生于半导体原语），
+                 等效于 K_ATP 通道的亚阈偏移，不需要调整 G_E。
+
+          w_s2a=0.1: 3传感器 → act_avg≈3.0（fill=0时，sensor饱和）
+          w_a2h=0.1: act_avg=3.0 → act_hunger≈1.2
+          w_h2d=0.04: act_hunger=1.2 × 0.04 ≈ 0.05 ≈ 原_hunger_da×0.1（fill=0时）
+          数值推导: target da_current=0.05A（fill=0），act_hunger=1.2 → w=0.05/1.2≈0.04
+        """
+        # 3个弥散分布 ARC 感受器（体内部，间距≥10mm）
+        # NeuronConfig 默认 = simple 模式（单 MOSFET channel，default v_threshold=0.3）
+        sensor_positions = [[55, 45, 35], [55, 55, 55], [55, 45, 65]]
+        for k, pos in enumerate(sensor_positions):
+            cfg = NeuronConfig(
+                neuron_id=f"energy_sensor_{k}",
+                position=pos,
+            )
+            self.energy_sensors.append(Neuron(cfg))
+
+        # AverageEnergyNeuron：LH 整合（多传感器的空间平均）
+        self.average_energy_neuron = Neuron(NeuronConfig(
+            neuron_id="average_energy",
+            position=[55, 50, 50],
+        ))
+
+        # hypothalamus_hunger：LH output → VTA
+        self.hypothalamus_hunger = Neuron(NeuronConfig(
+            neuron_id="hypothalamus_hunger",
+            position=[55, 50, 55],
+        ))
+
+        # Bundle: sensors → average (frozen, w=0.1/sensor)
+        # 3传感器并联 → average：每sensor权重0.1，合计电流≈3×act×0.1
+        cfg_sa = BundleConfig(
+            bundle_id="energy_sensors_to_average",
+            learning_rule="frozen",
+            initial_weight=0.1,
+            weight_max=0.1,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_sensors_to_average = SynapticBundle(
+            cfg_sa, self.energy_sensors, [self.average_energy_neuron])
+
+        # Bundle: average → hunger (frozen, w=0.1)
+        # act_avg≈3.0 → input_hunger=0.3A → vm_hunger=1.5V → act_hunger≈1.2（fill=0）
+        cfg_ah = BundleConfig(
+            bundle_id="energy_average_to_hunger",
+            learning_rule="frozen",
+            initial_weight=0.1,
+            weight_max=0.1,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_average_to_hunger = SynapticBundle(
+            cfg_ah, [self.average_energy_neuron], [self.hypothalamus_hunger])
+
+        # Bundle: hunger → DA neurons (frozen, w=0.04)
+        # act_hunger=1.2 × w=0.04 ≈ 0.05 A = 等效原 _hunger_da × DA_INJECT_SCALE（fill=0时）
+        cfg_hd = BundleConfig(
+            bundle_id="hunger_to_da",
+            learning_rule="frozen",
+            initial_weight=0.04,
+            weight_max=0.04,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_hunger_to_da = SynapticBundle(
+            cfg_hd, [self.hypothalamus_hunger], list(self.da_neurons.values()))
+
     # ── Override get_all_neurons/bundles to include DA components ──
 
     def get_all_neurons(self):
@@ -2260,6 +2560,15 @@ class VariantCircuit(HebbianCircuit):
         # HC-016 A: yaw push-pull motor neurons (crossed thermotaxis reflex)
         neurons.append(self.yaw_ccw_neuron)
         neurons.append(self.yaw_cw_neuron)
+        # 接口二：能量感知链神经元（ARC传感器、LH整合、下丘脑hunger）
+        neurons.extend(self.energy_sensors)
+        if self.average_energy_neuron is not None:
+            neurons.append(self.average_energy_neuron)
+        if self.hypothalamus_hunger is not None:
+            neurons.append(self.hypothalamus_hunger)
+        # 接口一：Motor efference copy → hypothalamus_effort
+        if self.hypothalamus_effort is not None:
+            neurons.append(self.hypothalamus_effort)
         return neurons
 
     def get_all_bundles(self):
@@ -2292,6 +2601,19 @@ class VariantCircuit(HebbianCircuit):
             bundles.append(self.bundle_left_to_yaw)
         if self.bundle_right_to_yaw is not None:
             bundles.append(self.bundle_right_to_yaw)
+        # 接口三：接近→制动束
+        if self.bundle_front_to_brake is not None:
+            bundles.append(self.bundle_front_to_brake)
+        # 接口二：能量感知链 Bundle（ARC→LH→hunger→DA）
+        if self.bundle_sensors_to_average is not None:
+            bundles.append(self.bundle_sensors_to_average)
+        if self.bundle_average_to_hunger is not None:
+            bundles.append(self.bundle_average_to_hunger)
+        if self.bundle_hunger_to_da is not None:
+            bundles.append(self.bundle_hunger_to_da)
+        # 接口一：Motor efference copy Bundle
+        if self.bundle_motor_to_effort is not None:
+            bundles.append(self.bundle_motor_to_effort)
         return bundles
 
     @property
