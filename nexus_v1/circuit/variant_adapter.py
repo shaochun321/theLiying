@@ -949,15 +949,8 @@ class VariantCircuit(HebbianCircuit):
             pid: soma_output[pid]["thermo_activation"]
             for pid in soma_output
         }
-        # PHASE 1: Hardcoded thermotaxis reflex disabled — STDP cold-start experiment.
-        # Motor is now driven exclusively by Langevin noise (AGC-modulated).
-        # Thermotaxis must emerge from STDP weight learning, not hardcoded reflex.
-        # hunger_drives = self.spinal_reflex.process_hunger(...)  # [PHASE 1 DISABLED]
-        hunger_drives = {'x': 0.0, 'y': 0.0, 'z': 0.0}  # zero drives
-        # (loop below is intentionally kept — drives are all zero, no injection occurs)
-        for mkey, drive in hunger_drives.items():
-            if drive != 0.0 and mkey in self.motor_neurons:
-                self.motor_neurons[mkey]._membrane.inject(drive, dt)
+        # HC-024 removed: hunger reflex drives were all 0.0 (PHASE 1 DISABLED).
+        # Motor is driven by Langevin noise (AGC-modulated); thermotaxis from STDP only.
 
         # ── C3': Homeostatic circulation coupling (structural carrier) ──
         # HC-014 fix: thermal_stability from somatosensory relay circuit output.
