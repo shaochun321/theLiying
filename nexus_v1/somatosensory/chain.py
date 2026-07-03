@@ -35,6 +35,10 @@ from typing import Dict, List, Tuple
 
 from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
 from ..circuit.bundle import SynapticBundle, BundleConfig
+from .transducer_neurons import (
+    ThermalInputNeuron, NociInputNeuron,
+    make_transducer_bundle_thermo, make_transducer_bundle_noci,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -242,10 +246,30 @@ class SomatosensoryChain:
         self.nociceptors: Dict[str, Neuron] = {}
         self.relays: Dict[str, Neuron] = {}
 
+        # HC-009 fix: transducer bridge neurons (ThermalInputNeuron / NociInputNeuron)
+        # Replace direct injection with bundle-mediated transduction.
+        # BIO: TRPV3/TRPM8 (thermo) and TRPV1/TRPA1 (noci) channels at skin surface.
+        self.thermo_inputs: Dict[str, ThermalInputNeuron] = {}
+        self.noci_inputs: Dict[str, NociInputNeuron] = {}
+
         for pid in patch_ids:
             self.thermoreceptors[pid] = Neuron(_thermoreceptor_config(pid))
             self.nociceptors[pid] = Neuron(_nociceptor_config(pid))
             self.relays[pid] = Neuron(_relay_config(pid))
+            pos = _SKIN_POS.get(pid, (0.0, 0.0, 0.0))
+            self.thermo_inputs[pid] = ThermalInputNeuron(pid, position=pos)
+            self.noci_inputs[pid] = NociInputNeuron(pid, position=pos)
+
+        # ── Transducer bundles: ThermalInput → Thermoreceptor (plasticity=False) ──
+        # BIO: TRPV3/TRPM8 transduction coefficient is evolution-fixed.
+        # REF: Part 2 feedback report 2026-07-03, §1.4 — three-layer argument.
+        self.bundles_transducer_thermo: Dict[str, SynapticBundle] = {}
+        self.bundles_transducer_noci: Dict[str, SynapticBundle] = {}
+        for pid in patch_ids:
+            self.bundles_transducer_thermo[pid] = make_transducer_bundle_thermo(
+                pid, self.thermo_inputs[pid], self.thermoreceptors[pid])
+            self.bundles_transducer_noci[pid] = make_transducer_bundle_noci(
+                pid, self.noci_inputs[pid], self.nociceptors[pid])
 
         # ── Bundles: Thermoreceptor → Relay ──
         self.bundles_thermo_to_relay: Dict[str, SynapticBundle] = {}
@@ -373,31 +397,37 @@ class SomatosensoryChain:
                 skin temperature, not the raw environment temperature.
             dt: time step
         """
-        # ── 1. Sensory transduction ──
+        # ── 1. Sensory transduction (HC-009 fix: via bundle, not direct injection) ──
         for pid in self.patch_ids:
             vals = patch_temps.get(pid, (0.0, 0.0, 0.0))
             T = vals[0]
             dT = vals[1] if len(vals) > 1 else 0.0
             damage = vals[2] if len(vals) > 2 else 0.0
 
-            # Thermoreceptor: T_skin scaled by THERMAL_TRANSDUCTION_GAIN before injection.
-            # Raw T_skin [0-5] would produce V_ss=21V (saturated); scaled → V_ss≈2.1V.
-            self.thermoreceptors[pid].step(T * self.THERMAL_TRANSDUCTION_GAIN, dt)
+            # Step 1a: update transducer bridge neurons from raw physical signals.
+            # ThermalInputNeuron: T_skin → activation (TRPV3/TRPM8 open-channel mapping)
+            self.thermo_inputs[pid].step(T, dt)
 
-            # Nociceptor: DUAL-CHANNEL input
-            #   Channel A: dT/dt → rapid thermal gradient detection
-            #     BIO: TRPV1 thermosensitivity — C-fibers detect dT/dt
-            #     even at safe absolute temperatures. This is how the
-            #     organism senses thermal APPROACH before tissue damage.
-            #   Channel B: damage_integral → tissue injury alarm
-            #     BIO: TRPV1/TRPA1 activation by damage products
-            #     (bradykinin, prostaglandins) at T > 43°C.
-            # EXP-016 fix: original code used ONLY damage (= 0 at safe
-            # distances) → nociceptor blind → DA collapse → boiling frog.
+            # NociInputNeuron: pre-scale noci signal (TRPV1/TRPA1 sensitivity)
+            #   Channel A: |dT/dt| × NOCI_DT_GAIN — C-fiber dT/dt detector
+            #   Channel B: damage × 10.0 — tissue injury via bradykinin/PGE2
+            # BIO: EXP-016 rationale: noci must respond to dT/dt (approach signal)
+            #      not just damage (too late when already injured).
             noci_dT_input = abs(dT) * self.NOCI_DT_GAIN
             noci_damage_input = damage * 10.0
             noci_total = noci_dT_input + noci_damage_input
-            self.nociceptors[pid].step(noci_total, dt)
+            self.noci_inputs[pid].step(noci_total, dt)
+
+            # Step 1b: propagate transducer bundles → thermoreceptor / nociceptor input.
+            # plasticity=False: transduction gain is evolution-fixed (Desai et al. 2005).
+            thermo_currents = self.bundles_transducer_thermo[pid].propagate()
+            noci_currents = self.bundles_transducer_noci[pid].propagate()
+
+            # Step 1c: drive downstream sensory neurons from bundle current.
+            thermo_input_current = thermo_currents[0] if thermo_currents else 0.0
+            noci_input_current = noci_currents[0] if noci_currents else 0.0
+            self.thermoreceptors[pid].step(thermo_input_current, dt)
+            self.nociceptors[pid].step(noci_input_current, dt)
 
         # ── 2. Sensory → Relay propagation ──
         for pid in self.patch_ids:
@@ -491,10 +521,12 @@ class SomatosensoryChain:
         return result
 
     def get_all_neurons(self) -> List[Neuron]:
-        """Get all neurons in the chain."""
+        """Get all neurons in the chain (including transducer bridge neurons)."""
         neurons = []
         for pid in self.patch_ids:
             neurons.extend([
+                self.thermo_inputs[pid],      # HC-009 fix: transducer bridge (new)
+                self.noci_inputs[pid],         # HC-009 fix: transducer bridge (new)
                 self.thermoreceptors[pid],
                 self.nociceptors[pid],
                 self.relays[pid],
@@ -502,8 +534,10 @@ class SomatosensoryChain:
         return neurons
 
     def get_all_bundles(self) -> List[SynapticBundle]:
-        """Get all bundles in the chain."""
+        """Get all bundles in the chain (including frozen transducer bundles)."""
         bundles = []
+        bundles.extend(self.bundles_transducer_thermo.values())   # HC-009 fix: new
+        bundles.extend(self.bundles_transducer_noci.values())     # HC-009 fix: new
         bundles.extend(self.bundles_thermo_to_relay.values())
         bundles.extend(self.bundles_noci_to_relay.values())
         bundles.extend(self.bundles_lateral.values())
