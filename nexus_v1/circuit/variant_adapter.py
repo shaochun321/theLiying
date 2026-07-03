@@ -2019,10 +2019,20 @@ class VariantCircuit(HebbianCircuit):
             cfg_relay = BundleConfig(
                 bundle_id=f"relay_to_da_{pid}",
                 learning_rule="stdp",
-                initial_weight=0.1,   # same as old: modest per-patch DA input
-                weight_max=0.3,       # same cap: G(0.3)=0.142; 4×G(0.3)×0.2=0.114A total ✓
+                # BIO: three-factor eligibility-trace Hebbian learning (Izhikevich 2007
+                # Cereb Cortex 17:2443; Gerstner et al. 2018 Nat Neurosci 21:555).
+                # DA gates LTP via eligibility trace E(pre,post); LTD also DA-gated,
+                # so weights are frozen during DA-quiet periods (prevents constitutive
+                # erasure by two-factor STDP decay when body is stationary near source).
+                use_eligibility_trace=True,
+                eligibility_tau=300.0,           # default ~300ms trace window
+                eligibility_gain=1.0,             # default
+                eligibility_ltd_rate=0.01,        # DA-dep LTD, negligible when DA quiet
+                decay_rate_by_stage=(0.001, 0.0005, 0.0001),  # has dt factor in elig-mode
+                initial_weight=0.1,
+                weight_max=0.3,       # G(0.3)=0.142; 4×G(0.3)×0.2=0.114A total ✓
                 stdp_lr=0.005,        # BIO: Bi & Poo 1998 (thalamo-cortical-VTA)
-                synapse_gain=0.2,     # same: thermal modulation ~0.1V on 0.83V baseline
+                synapse_gain=0.2,     # thermal modulation ~0.1V on 0.83V baseline
                 bundle_role="feedforward",
                 remodel_cost_kappa=0.001,
             )
