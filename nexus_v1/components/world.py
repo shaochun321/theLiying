@@ -107,8 +107,19 @@ class SkinPatch:
     # ── Thermal physics parameters ──
     heat_capacity: float = 10.0       # C_th: thermal mass (J/K analog)
     conductance: float = 2.0          # k: thermal conductance (W/K analog)
-    # BIO: skin thermal time constant τ = C/k = 10/2 = 5 steps
-    # This means the patch needs ~5 steps to equilibrate with environment.
+    # BIO: skin thermal time constant τ = C/(k × dt) = 10/(2 × 0.001) = 5000 steps = 5s.
+    # (τ is in SECONDS not steps; comment previously said "5 steps" — that was wrong.)
+    # REF: thermal diffusivity α≈0.14mm²/s in soft tissue (Elwassif 2006);
+    #      1mm penetration depth → τ = d²/(2α) ≈ 3.6s → 5s is correct order.
+
+    # ── Thermal noise (Langevin / Fluctuation-Dissipation) ──
+    # σ² = 2 × G × k_B × T_env² / C²  (K²/s, continuous)
+    # Discrete: noise = N(0, sigma) × sqrt(dt)
+    # Numerical estimate: σ ≈ 5.8×10⁻¹³ K/√s (10mm² patch, 0.5mm skin, 300K).
+    # Negligible for behavior (12 orders below patch ΔT); implemented for Noether.
+    # BIO: Johnson-Nyquist thermal noise in tissue resistive elements.
+    # REF: Johnson 1928 / Nyquist 1928 — fluctuation-dissipation theorem.
+    langevin_sigma: float = 5.8e-13   # K/sqrt(s); from FDT derivation (see above)
 
     # ── State variables (physical, not semantic) ──
     current_temperature: float = field(default=0.1, repr=False)  # T_skin
@@ -161,6 +172,13 @@ class SkinPatch:
         q_dot = self.conductance * (T_env - self.current_temperature)
         # Thermal capacity integration: dT = q/C × dt
         self.current_temperature += (q_dot / max(self.heat_capacity, 0.01)) * dt
+
+        # Langevin thermal noise (Fluctuation-Dissipation Theorem, SDE discretization)
+        # dT_noise = N(0, σ) × √dt  [NOT × dt — SDE Itô convention]
+        # At σ=5.8e-13 K/√s, magnitude ≈10⁻¹⁴ K/step → negligible for behavior,
+        # required for Noether heat-budget legitimacy.
+        noise = random.gauss(0.0, self.langevin_sigma) * math.sqrt(dt)
+        self.current_temperature += noise
 
         # Tissue damage integral (Arrhenius-type accumulation)
         if self.current_temperature > self.damage_threshold:
