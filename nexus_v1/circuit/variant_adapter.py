@@ -2560,6 +2560,7 @@ class VariantCircuit(HebbianCircuit):
         for pid in self.somatosensory.patch_ids:
             cfg_proj = NeuronConfig(
                 neuron_id=f"soma_proj_{pid}",
+                region=REGION_SPINAL,  # BIO: lamina I dorsal horn, spinoparabrachial tract
                 capacitance=0.1,      # τ=0.1ms: fast follower of relay
                 r_leak=1.0,
                 inertia=1.0,
@@ -2687,6 +2688,7 @@ class VariantCircuit(HebbianCircuit):
         for pid in self.somatosensory.patch_ids:
             pos = _SKIN_POS.get(pid, (0.0, 0.0, 0.0))
             dn = ThermalDeltaNeuron(patch_id=pid, position=pos)
+            dn.config.region = REGION_BRAINSTEM  # BIO: LPB→VTA warm-onset, parabrachial nucleus
             self.thermo_delta_neurons[pid] = dn
             self.bundles_thermo_delta_to_da.append(
                 make_thermo_delta_to_da_bundle(pid, dn, da_list))
