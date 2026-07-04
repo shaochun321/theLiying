@@ -480,7 +480,7 @@ class VariantCircuit(HebbianCircuit):
         # Default values from L2.08 screening (FULL PASS baseline).
         # L2.09 parameter sweep overrides these post-construction.
         self.vital_damage_k: float = 0.5       # Loop A: cardiac depression sensitivity
-        self.repair_energy_rate: float = 0.005  # Loop B: repair metabolic tax
+        self.repair_energy_rate: float = 0.001  # Loop B: repair metabolic tax (instantaneous rate)
         self.k_barrier: float = 2.0             # Loop D: ECM barrier half-saturation
         self.breach_conductance: float = 0.1    # Loop D: breach heat transfer rate
 
@@ -1427,10 +1427,17 @@ class VariantCircuit(HebbianCircuit):
         # L2:SELECTION — Tissue repair requires ATP (thermodynamic necessity).
         # BIO: Wound healing consumes 20-50% additional metabolic energy
         #      (Arnold & Barbul 2006: "Nutrition and Wound Healing").
-        # DESIGN: total_damage → additional energy drain from EnergyStore.
-        #         This creates thermodynamic pressure: damage costs real energy.
-        # EMERGE: System should learn to avoid states that increase drain.
-        repair_cost = _total_damage * self.repair_energy_rate * dt
+        # FIX: Use instantaneous damage RATE (Σ excess_T per patch × dt), NOT
+        #      cumulative integral — the integral grows without bound, making
+        #      repair_cost diverge over time and overwhelm food intake.
+        # PHYS: repair_cost ∝ current thermal stress, not accumulated history.
+        #       At T_max≈6.4 (12 patches, excess≈3.4): repair≈40.8×rate/step.
+        #       repair_energy_rate=0.001 → repair≈41% of food intake (Arnold range).
+        _dmg_threshold = 3.0  # matches SkinPatch.damage_threshold
+        _instant_excess = sum(
+            max(0.0, patch_temps[pid][0] - _dmg_threshold) for pid in patch_temps
+        )
+        repair_cost = _instant_excess * self.repair_energy_rate * dt
         if repair_cost > 0:
             self.energy_store.withdraw(repair_cost)
 
