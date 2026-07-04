@@ -380,12 +380,12 @@ class VariantCircuit(HebbianCircuit):
         self.muscle_system = MuscleSystem(gain=0.1, delay=2)
         self._patch_temps: dict = {}  # updated each step; exposed for DR5 metric
 
-        # ── Variant: Somatosensory chain (4-patch thermal sensing) ──
-        # Parallel to vestibular chain: Thermoreceptor + Nociceptor + SomatoRelay
-        # per skin patch. Relay output feeds encoding layer via extra_axes.
+        # ── Variant: Somatosensory chain (12-patch thermal sensing) ──
+        # 3 rings × 4 dirs (top/mid/bot × front/right/back/left).
+        # Relay output feeds encoding layer via extra_axes (therm_{pid}).
+        # BIO: Basbaum et al. 2009 Cell 139:267 — body-surface spatial receptive fields.
         self.somatosensory = SomatosensoryChain(
-            patch_ids=["front", "back", "left", "right"],
-            lateral_gain=0.3,   # Phase4: 0.05→0.3, amplifies patch contrast via S0 InhibitorySynapse
+            lateral_gain=0.3,   # Phase4: amplifies patch contrast via soma lateral inhibition bundles
         )
 
         # ── Variant: EnergyStore (external reservoir) ──
