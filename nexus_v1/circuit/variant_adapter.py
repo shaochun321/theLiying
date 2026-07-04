@@ -550,6 +550,12 @@ class VariantCircuit(HebbianCircuit):
         self._bundles_relay_to_proj: List[SynapticBundle] = []  # relay → proj (frozen)
         self.bundles_relay_to_da: List[SynapticBundle] = []
 
+        # P0-B: Relay-layer lateral inhibition (Winner-Take-All)
+        # BIO: retinal horizontal cells / olfactory bulb granule cells antagonistic surround.
+        # REF: Hartline & Ratliff 1957 J Gen Physiol — lateral inhibition in Limulus.
+        # Frozen cross-inhibition: prevents simultaneous LTP on all relay_to_da pathways.
+        self.bundles_relay_lateral_inh: List[SynapticBundle] = []
+
         # CPG → DA oscillator (lazy init alongside DA circuit)
         # BIO: VTA pacemaker interneuron → 2 Hz rhythmic drive to DA neurons
         # Keeps DA.post_trace > 0 at steady state → relay_to_da STDP stays active.
@@ -878,6 +884,24 @@ class VariantCircuit(HebbianCircuit):
         # 1. Sample skin patches at body surface positions
         patch_temps = self.world.body.sample_skin(self.world, dt)
         self._patch_temps = patch_temps  # exposed for DR5 metric in experiment scripts
+
+        # ── Relay lateral inhibition pre-inject (P0-B: Winner-Take-All) ──
+        # Inject inhibitory currents from previous step into competing relay membranes
+        # BEFORE somatosensory.step() — relay.step() then starts from suppressed voltage.
+        # 1-step delay is standard in discrete-time recurrent networks; synaptic delay
+        # ≈ 1ms matches DT=0.001 s (BIO: spinal interneuron conduction, Brown & Franz 1969).
+        # Current path: bundle.propagate() → Capacitor.inject() (not semantic HC).
+        if self.bundles_relay_lateral_inh:
+            _lat_acc: dict = {}
+            for _bundle in self.bundles_relay_lateral_inh:
+                _currents = _bundle.propagate()
+                for _j, _tgt in enumerate(_bundle.targets):
+                    if _j < len(_currents):
+                        _lat_acc[_tgt.id] = _lat_acc.get(_tgt.id, 0.0) + _currents[_j]
+            for _pid, _I in _lat_acc.items():
+                _relay = self.somatosensory.relays.get(_pid.replace('relay_', ''))
+                if _relay is not None and abs(_I) > 1e-12:
+                    _relay._membrane.inject(_I, dt)
 
         # 2. Step the somatosensory chain (Thermo + Noci + Relay)
         self.somatosensory.step(patch_temps, dt)
@@ -2247,7 +2271,9 @@ class VariantCircuit(HebbianCircuit):
         #     → I_peak ≈ 0.011A; V_DA_osc ≈ 0.011V ∈ ε∈(0.001, 0.024V) ✓
         self._da_cpg = CPGNeuron(
             frequency=2.0,     # BIO: 2Hz VTA pacemaker (Grace & Bunney 1984)
-            amplitude=0.05,    # PARAM: limit-cycle ≈ ±0.10 rectified → [0, 0.10]
+            amplitude=0.005,   # PHASE-B: 10× reduction (0.05→0.005). Retains post_trace
+                               # baseline during body-away periods without dominating DA;
+                               # ThermalDeltaNeuron (dT/dt>0) provides the causal burst.
             mu=2.0,            # relaxation mode (pulse-like, same as VitalOscillator)
             neuron_id="vta_cpg",
         )
@@ -2283,6 +2309,41 @@ class VariantCircuit(HebbianCircuit):
             self.bundles_thermo_delta_to_da.append(
                 make_thermo_delta_to_da_bundle(pid, dn, da_list))
 
+        # ── 6. Relay-layer lateral inhibition (Winner-Take-All) ──
+        # P0-B Phase B structural fix: cross-inhibition between relay channels.
+        # Q1. BIO: horizontal-cell / granule-cell antagonistic surround inhibition.
+        #     REF: Hartline & Ratliff 1957 J Gen Physiol; Shepherd 1972 Physiol Rev.
+        #     In skin: spinal interneurons mediate lateral inhibition between
+        #     spatially adjacent relay (WDR) neurons (Brown & Franz 1969 J Physiol).
+        # Q2. relay_{src} (non-spiking) → BundleConfig(frozen, gain=-1.0) → relay_{tgt}.
+        #     Four antipodal pairs: rl, lr, fb, bf.
+        # Q3. initial_weight=0.3: G(0.3)≈0.142; at relay_src.act=1.3 (hot side):
+        #     I_inh = 1.3 × 0.142 × (-1.0) ≈ -0.18 A  → suppresses relay_tgt.
+        #     Adjust to -2.0 if WTA not clean enough in 100k verification.
+        _LATERAL_INH_PAIRS = [
+            ('relay_lateral_inh_rl', 'right', 'left'),
+            ('relay_lateral_inh_lr', 'left',  'right'),
+            ('relay_lateral_inh_fb', 'front', 'back'),
+            ('relay_lateral_inh_bf', 'back',  'front'),
+        ]
+        _relays = self.somatosensory.relays
+        for bid, src_pid, tgt_pid in _LATERAL_INH_PAIRS:
+            src_n = _relays.get(src_pid)
+            tgt_n = _relays.get(tgt_pid)
+            if src_n is None or tgt_n is None:
+                continue
+            cfg_inh = BundleConfig(
+                bundle_id=bid,
+                learning_rule="frozen",
+                initial_weight=0.3,
+                weight_max=0.3,
+                synapse_gain=-1.0,      # inhibitory: suppresses competing relay channel
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            self.bundles_relay_lateral_inh.append(
+                SynapticBundle(cfg_inh, [src_n], [tgt_n]))
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -2290,7 +2351,9 @@ class VariantCircuit(HebbianCircuit):
             f"DA_CIRCUIT_INIT step={self._step_count} "
             f"shadow_cols={len(shadow_cols)} da_neurons={len(da_list)} "
             f"proj_neurons={len(self._soma_proj)} "
-            f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})+relay_to_da({len(self.bundles_relay_to_da)})+cpg_to_da({len(self.bundles_cpg_to_da)})"
+            f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})"
+            f"+relay_to_da({len(self.bundles_relay_to_da)})+cpg_to_da({len(self.bundles_cpg_to_da)})"
+            f"+relay_lateral_inh({len(self.bundles_relay_lateral_inh)})"
         )
 
     # ── P2-HC007: relay→enc STDP initialization ──────────────────
@@ -2596,6 +2659,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.bundles_cpg_to_da)
         # Warm-onset → DA (frozen, LPB→VTA innate pathway)
         bundles.extend(self.bundles_thermo_delta_to_da)
+        # P0-B: Relay lateral inhibition (frozen WTA cross-inhibition)
+        bundles.extend(self.bundles_relay_lateral_inh)
         # HC-016 A: relay→yaw frozen bundles (crossed thermotaxis reflex arc)
         if self.bundle_left_to_yaw is not None:
             bundles.append(self.bundle_left_to_yaw)

@@ -48,14 +48,28 @@ def _patch_T():
         return {k: 0.0 for k in ('right','left','front','back')}
     return {pid: round(pt[pid][0], 3) for pid in pt}
 
-def _dr5():
-    pt = c._patch_temps
-    if not pt:
-        return 0.0
-    T_r = pt.get('right', (0,))[0]; T_l = pt.get('left', (0,))[0]
-    T_f = pt.get('front', (0,))[0]; T_b = pt.get('back', (0,))[0]
-    bv = world.body.velocity
-    return (T_r - T_l) * bv[0] + (T_f - T_b) * bv[1]
+_prev_dist_ring = [None] * 1000  # 1000-step ring buffer for DR5 distance comparison
+_dist_ring_idx = 0
+
+def _current_dist():
+    pos = list(world.body.position)
+    return math.sqrt(sum((pos[i] - src.position[i])**2 for i in range(3)))
+
+def _dr5_approaching(current_d):
+    """DR5: fraction of steps where body is closer than 1000 steps ago.
+
+    Replaces patch-temperature dot-product (was 100% false-positive because
+    patch ΔT direction and velocity direction happen to agree even when body
+    moves away from source). Distance-decrease is the only unambiguous
+    thermotaxis criterion.
+    """
+    global _dist_ring_idx
+    past_d = _prev_dist_ring[_dist_ring_idx]
+    _prev_dist_ring[_dist_ring_idx] = current_d
+    _dist_ring_idx = (_dist_ring_idx + 1) % 1000
+    if past_d is None:
+        return False   # not enough history yet
+    return current_d < past_d
 
 
 t0 = time.time()
@@ -86,16 +100,14 @@ for step in range(1, STEPS + 1):
     }
     c.step(signal, dt=DT)
 
-    dv = _dr5()
-    bv = world.body.velocity
-    if dv != 0.0 or any(abs(v) > 1e-8 for v in bv):
-        dr5_tot += 1
-        if dv > 0:
-            dr5_pos += 1
+    _d_now = _current_dist()
+    _approaching = _dr5_approaching(_d_now)
+    dr5_tot += 1
+    if _approaching:
+        dr5_pos += 1
 
     if step % LOG_INTERVAL == 0:
-        pos  = list(world.body.position)
-        d    = math.sqrt(sum((pos[i] - src.position[i])**2 for i in range(3)))
+        d    = _d_now
         yaw_deg = math.degrees(world.body.yaw)
         ccw_act = c.yaw_ccw_neuron.activation
         cw_act  = c.yaw_cw_neuron.activation
