@@ -9,7 +9,9 @@
 
 | ID | 任务描述 | 开始日期 | 备注 |
 |:---|:---|:---|:---|
-| — | 无 | — | — |
+| T-010 | HC-008 ReleaseNeuron（Ca²⁺→IHC重构） | 2026-07-04 | chain.py 接入 CalciumChannel+CalciumDynamics |
+| T-011 | Ca²⁺ Phase B（CalciumChannel 接入 HairCell） | 2026-07-04 | 含于 T-010，pre_trace 修正 |
+| T-012 | DelayedBundle 前庭接入（Aα/C纤维延迟） | 2026-07-04 | hc_to_aff 改 DelayedBundle |
 
 ---
 
@@ -17,10 +19,7 @@
 
 | ID | 任务描述 | 优先级 | 依赖 | 来源文档 |
 |:---|:---|:---|:---|:---|
-| T-021 | P2-8 短程测试：noci 热前锋响应验证 | P2 | T-020✅ | 体感重构两阶段方案 P2-8 |
-| T-022 | 体感 Phase 3：环流耦合清洁化（thermal_stability涌现） | P3 | T-021 | 体感重构两阶段方案§三 |
-| T-023 | 规模泛化 Prep（面积/体积映射代码） | P3 | T-022 | 体感重构两阶段方案§三 |
-| T-024 | 前庭 Phase B（N=1→3 扩展） | P3 | T-023 | 附录§4.1（物理必然） |
+| — | 无 | — | — | — |
 
 ---
 
@@ -28,9 +27,7 @@
 
 | ID | 任务描述 | 暂停原因 | 恢复条件 |
 |:---|:---|:---|:---|
-| T-010 | HC-008 ReleaseNeuron（Ca²⁺→IHC重构） | hc_to_aff 束仍冻结，全替换未到时机 | 前庭 Phase B（N=1→3）启动时 |
-| T-011 | Ca²⁺ Phase B（CalciumChannel 接入 HairCell） | 同 T-010 | hc_to_aff 解冻后 |
-| T-012 | DelayedBundle 前庭接入（Aα/C纤维延迟） | 前庭 N=1→3 前意义不大 | 前庭 Phase B |
+| T-013 | HC-015（待定） | 用户明确暂缓 | 用户指示 |
 | T-013 | HC-015（待定） | 用户明确暂缓 | 用户指示 |
 
 ---
@@ -39,6 +36,10 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| T-024 | 前庭 Phase B（N=1→3 扩展）| 2026-07-04 | ec582fd |
+| T-023 | 规模泛化 Prep（SkinPatch/Body 物理几何属性） | 2026-07-04 | 507921f |
+| T-022 | 体感 Phase 3：环流耦合清洁化 | 2026-07-04 | 1121a72 |
+| T-021 | P2-8 短程测试：noci 热前锋响应验证 | 2026-07-04 | — |
 | T-020 | SomatosensoryChain 12贴片实际激活（T-015遗漏） | 2026-07-04 | 845ebf2 |
 | T-015 | 体感重构 Phase 2：4→12贴片扩展（chain.py常量） | 2026-07-04 | c380be6 |
 | T-014 | HC-011 shadow全连接（if/elif→21束STDP） | 2026-07-04 | 55bd015 |

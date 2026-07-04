@@ -39,6 +39,8 @@ from typing import Dict, List, Tuple
 
 from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
 from ..circuit.bundle import SynapticBundle, BundleConfig
+from ..circuit.bundle_v2 import DelayedBundle, V_COND_AALPHA            # T-012
+from ..components.calcium_channel import CalciumChannel, CalciumDynamics  # T-010
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -134,6 +136,17 @@ _HC_MET_GAINS: tuple = (5.0, 5.0, 4.0)
 # HC→Aff synapse_gain = 20.0 / N_hair_cells (KCL current conservation)
 # Original single-HC synapse_gain=20.0; N=3 → 20.0/3 ≈ 6.67 each
 _HC_AFF_GAIN_TOTAL: float = 20.0
+
+# T-010: Vestibular HC Ca²⁺ calibration (external CalciumChannel + CalciumDynamics)
+# BIO: Faster PMCA extrusion and more Ca²⁺ buffer proteins in vestibular vs auditory IHCs.
+# REF: Holt et al. 1999 J Neurophysiol 82:1756 — vestibular HC Ca²⁺ clearance τ ≈ 10-50 ms
+# NORM: Target release≈0.40 at V_m=0.341 (typical active HC), τ=50ms maintained.
+# Derivation at V_m=0.341: I_Ca = g_max × m∞ × (E_Ca−V_m) = 2.0×0.750×1.159 = 1.738
+#   V_ca_ss = I_Ca × R_ca → R_ca = 0.642 / 1.738 = 0.37 (target V_ca_ss=0.642 for release≈0.40)
+#   C_ca = τ / R_ca = 0.050 / 0.37 = 0.135 (τ = R×C = 50 ms, Burrone & Lagnado 2000)
+_VEST_CA_R: float = 0.37     # vestibular PMCA clearance resistance
+_VEST_CA_C: float = 0.135    # vestibular buffer capacitance; τ = R×C = 50 ms
+_VEST_CA_THRESHOLD: float = 0.01  # release dead-band (same as CalciumDynamics default)
 
 
 def _haircell_config(axis: str) -> NeuronConfig:
@@ -319,11 +332,13 @@ class VestibularChain:
     N=3: 6 axes × (1 MET + 3 HC + 2 Aff) = 36 neurons, 36 bundles
     """
 
-    def __init__(self, axes: List[str] | None = None, n_hair_cells: int = 1):
+    def __init__(self, axes: List[str] | None = None, n_hair_cells: int = 1,
+                 dt: float = 0.001):
         if axes is None:
             axes = ALL_AXES
         self.axes = axes
         self.n_hair_cells = n_hair_cells
+        self._dt = dt   # T-012: stored for DelayedBundle conduction delay computation
 
         # Create neurons per axis
         self.met_neurons: Dict[str, Neuron] = {}
@@ -340,6 +355,11 @@ class VestibularChain:
         self.bundles_met_to_hc_all: Dict[str, List[SynapticBundle]] = {}
         self.bundles_hc_to_aff_all: Dict[str, List[SynapticBundle]] = {}
 
+        # T-010: per-HC external Ca²⁺ objects (CalciumChannel + CalciumDynamics)
+        # Indexed as calcium_channels_all[axis][hc_idx]
+        self.calcium_channels_all: Dict[str, List[CalciumChannel]] = {}
+        self.calcium_dynamics_all: Dict[str, List[CalciumDynamics]] = {}
+
         # KCL: total HC→Aff gain is fixed; each HC contributes 1/N share
         hc_aff_gain = round(_HC_AFF_GAIN_TOTAL / n_hair_cells, 4)
 
@@ -355,10 +375,23 @@ class VestibularChain:
             hc_list: List[Neuron] = []
             met_hc_list: List[SynapticBundle] = []
             hc_aff_list: List[SynapticBundle] = []
+            ca_ch_list: List[CalciumChannel] = []    # T-010
+            ca_dyn_list: List[CalciumDynamics] = []  # T-010
 
             for hc_idx in range(n_hair_cells):
                 hc = Neuron(_haircell_config_n(axis, hc_idx))
                 hc_list.append(hc)
+
+                # T-010: per-HC external Ca²⁺ objects with vestibular calibration
+                # CalciumChannel: Boltzmann gate replaces internal MOSFET Ca²⁺
+                # CalciumDynamics: RC integrator with vestibular-specific clearance
+                # REF: Bao et al. 2003; Holt et al. 1999; Burrone & Lagnado 2000
+                ca_ch = CalciumChannel()          # uses class defaults (V_half=0.308, g_max=2.0)
+                ca_dyn = CalciumDynamics()
+                ca_dyn.R_ca = _VEST_CA_R          # vestibular-calibrated clearance
+                ca_dyn.C_ca = _VEST_CA_C          # τ = R×C = 50 ms
+                ca_ch_list.append(ca_ch)
+                ca_dyn_list.append(ca_dyn)
 
                 # Bundle: MET → HairCell_i
                 # HC_0: STDP (preserves original learning dynamics)
@@ -382,14 +415,15 @@ class VestibularChain:
                 )
                 met_hc_list.append(b_met_hc)
 
-                # Bundle: HairCell_i → Afferents (KCL scaled)
-                # Each HC contributes 1/N of the total Aff drive.
-                # KCL: N × (20.0/N) = 20.0, preserving original Aff current level.
-                # T-024 audit: corrected from plan 1.0/3=0.33 → actual 20.0/3=6.67
-                # REF: Bao et al. 2003 — ribbon synapse = structurally stable
+                # T-012: DelayedBundle for HC→Aff (Aα myelinated vestibular fiber)
+                # BIO: Scarpa's ganglion primary afferents — Aα fiber, v=50 mm/ms
+                # REF: Goldberg et al. 2012 "The Vestibular System" Ch.2
+                # NORM: d≈2mm HC-to-ganglion → τ_steps=round(2/50/1)=0 (no delay at current scale)
+                # KCL: each HC contributes 1/N of total Aff drive; 3×6.67=20.0 preserved
+                # REF: Bao et al. 2003 — ribbon synapse = structurally stable (frozen)
                 b_aff_id = (f"hc_to_aff_{axis}" if n_hair_cells == 1
                             else f"hc_to_aff_{axis}_{hc_idx}")
-                b_hc_aff = SynapticBundle(
+                b_hc_aff = DelayedBundle(
                     config=BundleConfig(
                         bundle_id=b_aff_id,
                         learning_rule="frozen",
@@ -399,6 +433,8 @@ class VestibularChain:
                     ),
                     sources=[hc],
                     targets=[aff_r, aff_i],
+                    v_cond_mm_per_ms=V_COND_AALPHA,
+                    dt=dt,
                 )
                 hc_aff_list.append(b_hc_aff)
 
@@ -411,6 +447,10 @@ class VestibularChain:
             self.haircell_neurons_all[axis] = hc_list
             self.bundles_met_to_hc_all[axis] = met_hc_list
             self.bundles_hc_to_aff_all[axis] = hc_aff_list
+
+            # T-010: per-HC Ca²⁺ objects
+            self.calcium_channels_all[axis] = ca_ch_list
+            self.calcium_dynamics_all[axis] = ca_dyn_list
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step.
@@ -440,18 +480,35 @@ class VestibularChain:
             met_hc_list = self.bundles_met_to_hc_all[axis]
             hc_aff_list = self.bundles_hc_to_aff_all[axis]
 
-            for hc, b_met_hc, b_hc_aff in zip(hc_list, met_hc_list, hc_aff_list):
+            ca_ch_list = self.calcium_channels_all[axis]
+            ca_dyn_list = self.calcium_dynamics_all[axis]
+
+            for _hc_idx, (hc, b_met_hc, b_hc_aff) in enumerate(
+                    zip(hc_list, met_hc_list, hc_aff_list)):
                 currents = b_met_hc.propagate()
                 _pt_before = hc.pre_trace
                 hc.step(currents[0] if currents else 0.0, dt)
 
-                # Layer 3: Ca²⁺ release bridge (same for all HCs)
-                # HC-008 fix: Ca²⁺ release_rate → bundle propagation signal
-                # BIO: CaV1.3 Ca²⁺ drives vesicle exocytosis at IHC ribbon synapse
+                # Layer 3: T-010 Ca²⁺ Phase B — explicit CalciumChannel + CalciumDynamics
+                # Replaces internal release_rate bridge (HC-008 code bridge).
+                # BIO: CaV1.3 Ca²⁺ drives vesicle exocytosis at IHC ribbon synapse.
                 # REF: Fuchs 2005 J Physiology 567(1):13-19; Nouvian et al. 2006
-                hc.activation = hc.release_rate
+                # REF: Bao et al. 2003 J Neurophysiol 90:1195 — CaV1.3 Boltzmann gate
+                # Clamp V_m to physiological range before Boltzmann gate.
+                # When dt=1.0 (regression sim-step convention), HC voltage can
+                # swing far below rest; below V_m≈-20 the exp() overflows.
+                # Physiologically: Ca channel is CLOSED (g≈0) for V_m << V_half=0.308.
+                _vm_safe = max(-0.5, min(hc._membrane.voltage, 2.0))
+                _I_Ca = ca_ch_list[_hc_idx].current(_vm_safe)
+                # Use stored physical dt (self._dt=0.001s), NOT the simulation-step dt.
+                # CalciumDynamics τ=50ms requires dt << τ for Euler stability.
+                # Regression tests pass dt=1.0 (sim-steps), not seconds.
+                ca_dyn_list[_hc_idx].step(_I_Ca, self._dt)
+                _ext_release = ca_dyn_list[_hc_idx].release_rate(_VEST_CA_THRESHOLD)
+                hc.activation = _ext_release        # T-011: Ca²⁺ pre_trace now non-zero
+                hc.release_rate = _ext_release      # sync get_output() release_rate field
                 _decay = _math.exp(-dt / max(hc.config.trace_tau_pre * 0.001, 0.001))
-                hc.pre_trace = min(_pt_before * _decay + abs(hc.release_rate), 10.0)
+                hc.pre_trace = min(_pt_before * _decay + abs(_ext_release), 10.0)
 
                 # Layer 4: Accumulate Aff currents from all N HCs (KCL addition)
                 aff_currents = b_hc_aff.propagate()
