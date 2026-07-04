@@ -132,8 +132,10 @@ class VariantCircuit(HebbianCircuit):
 
     def __init__(self):
         # ── Mother initialization with thermal patch axes ──
-        # 4 skin patches → 4 extra axes in the Hebbian circuit
-        _patch_axes = ["therm_front", "therm_back", "therm_left", "therm_right"]
+        # 12 skin patches (3 rings × 4 dirs) → 12 extra axes in the Hebbian circuit.
+        # BIO: spatial temperature field encoded in 12 receptive fields.
+        from ..somatosensory.chain import PATCH_IDS as _SOMAT_PATCH_IDS
+        _patch_axes = [f"therm_{pid}" for pid in _SOMAT_PATCH_IDS]
         super().__init__(extra_axes=_patch_axes)
 
         # ── Variant: Oscillators for afferent ISI synchronization ──
@@ -2674,8 +2676,14 @@ class VariantCircuit(HebbianCircuit):
         # REF: LaMotte & Campbell 1978 J Neurophysiol 41:924 — Type II AMH.
         # Q2. ThermalDeltaNeuron[pid] → frozen bundle → all da_neurons.
         # Q3. See make_thermo_delta_to_da_bundle() docstring for derivation.
-        _SKIN_POS = {'front': (2, 0, 0), 'back': (-2, 0, 0),
-                     'left': (0, -2, 0), 'right': (0, 2, 0)}
+        _SKIN_POS = {
+            'top_front': (2, 0, +1), 'top_right': (0, -2, +1),
+            'top_back': (-2, 0, +1), 'top_left':  (0,  2, +1),
+            'front': (2, 0, 0), 'back': (-2, 0, 0),
+            'left': (0, 2, 0),  'right': (0, -2, 0),
+            'bot_front': (2, 0, -1), 'bot_right': (0, -2, -1),
+            'bot_back': (-2, 0, -1), 'bot_left':  (0,  2, -1),
+        }
         for pid in self.somatosensory.patch_ids:
             pos = _SKIN_POS.get(pid, (0.0, 0.0, 0.0))
             dn = ThermalDeltaNeuron(patch_id=pid, position=pos)

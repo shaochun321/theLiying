@@ -45,16 +45,31 @@ from .transducer_neurons import (
 # Patch definitions
 # ─────────────────────────────────────────────────────────────────────
 
-PATCH_IDS = ["front", "back", "left", "right"]
+PATCH_IDS = [
+    "top_front", "top_right", "top_back", "top_left",   # top ring (z=+1)
+    "front",     "right",     "back",     "left",        # mid ring (z=0, backward-compat IDs)
+    "bot_front", "bot_right", "bot_back", "bot_left",   # bottom ring (z=-1)
+]
 
 # Adjacency graph: patches that share a body-surface border.
-# front↔left, front↔right, back↔left, back↔right.
-# NOT front↔back (diametrically opposite, not adjacent).
+# Cylindrical topology: same-ring 90° neighbors + cross-ring vertical neighbors.
+# Antipodal patches (180° apart in same ring) are NOT adjacent.
 ADJACENCY = {
-    "front": ["left", "right"],
-    "back":  ["left", "right"],
-    "left":  ["front", "back"],
-    "right": ["front", "back"],
+    # Mid ring: 2 horizontal in-ring + 2 vertical (up to top, down to bot)
+    "front": ["left", "right", "top_front", "bot_front"],
+    "back":  ["left", "right", "top_back",  "bot_back"],
+    "left":  ["front", "back", "top_left",  "bot_left"],
+    "right": ["front", "back", "top_right", "bot_right"],
+    # Top ring: 2 in-ring (90° neighbors) + 1 vertical (down to mid)
+    "top_front": ["top_left", "top_right", "front"],
+    "top_back":  ["top_left", "top_right", "back"],
+    "top_left":  ["top_front", "top_back", "left"],
+    "top_right": ["top_front", "top_back", "right"],
+    # Bot ring: 2 in-ring (90° neighbors) + 1 vertical (up to mid)
+    "bot_front": ["bot_left", "bot_right", "front"],
+    "bot_back":  ["bot_left", "bot_right", "back"],
+    "bot_left":  ["bot_front", "bot_back", "left"],
+    "bot_right": ["bot_front", "bot_back", "right"],
 }
 
 
@@ -69,19 +84,42 @@ ADJACENCY = {
 # ─────────────────────────────────────────────────────────────────────
 
 _SKIN_POS: dict = {
-    # Skin surface (r=2mm) — thermoreceptors and nociceptors
+    # Skin surface (r=2mm) — thermoreceptors and nociceptors.
+    # Body frame: x=front, y=left, z=up.  right → y=-2 (y axis is left-positive).
+    # Top ring (z=+1mm):
+    "top_front": ( 2.0,  0.0, +1.0),
+    "top_right": ( 0.0, -2.0, +1.0),
+    "top_back":  (-2.0,  0.0, +1.0),
+    "top_left":  ( 0.0,  2.0, +1.0),
+    # Mid ring (z=0mm, backward-compatible):
     "front": ( 2.0,  0.0, 0.0),
     "back":  (-2.0,  0.0, 0.0),
-    "left":  ( 0.0, -2.0, 0.0),
-    "right": ( 0.0,  2.0, 0.0),
+    "left":  ( 0.0,  2.0, 0.0),
+    "right": ( 0.0, -2.0, 0.0),
+    # Bottom ring (z=-1mm):
+    "bot_front": ( 2.0,  0.0, -1.0),
+    "bot_right": ( 0.0, -2.0, -1.0),
+    "bot_back":  (-2.0,  0.0, -1.0),
+    "bot_left":  ( 0.0,  2.0, -1.0),
 }
 
 _RELAY_POS: dict = {
-    # Dorsal horn WDR relay (r=1.5mm, 0.5mm internal from skin surface)
+    # Dorsal horn WDR relay (r=1.5mm, 0.5mm internal from skin surface).
+    # Top ring:
+    "top_front": ( 1.5,  0.0, +1.0),
+    "top_right": ( 0.0, -1.5, +1.0),
+    "top_back":  (-1.5,  0.0, +1.0),
+    "top_left":  ( 0.0,  1.5, +1.0),
+    # Mid ring:
     "front": ( 1.5,  0.0, 0.0),
     "back":  (-1.5,  0.0, 0.0),
-    "left":  ( 0.0, -1.5, 0.0),
-    "right": ( 0.0,  1.5, 0.0),
+    "left":  ( 0.0,  1.5, 0.0),
+    "right": ( 0.0, -1.5, 0.0),
+    # Bottom ring:
+    "bot_front": ( 1.5,  0.0, -1.0),
+    "bot_right": ( 0.0, -1.5, -1.0),
+    "bot_back":  (-1.5,  0.0, -1.0),
+    "bot_left":  ( 0.0,  1.5, -1.0),
 }
 
 

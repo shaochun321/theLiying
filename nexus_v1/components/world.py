@@ -209,19 +209,33 @@ class SkinPatch:
         return self.current_temperature - self._prev_temperature
 
 
-def _default_skin_patches(effective_radius: float = 2.0) -> List[SkinPatch]:
-    """Create 4 default skin patches: front, back, left, right.
+def _default_skin_patches(effective_radius: float = 2.0,
+                           z_ring: float = 1.0) -> List[SkinPatch]:
+    """Create 12 skin patches: 3 rings × 4 directions.
 
-    Placed at body effective radius in the body frame.
-    Body frame: x=forward, y=left, z=up.
+    Layout (body frame: x=front, y=left, z=up):
+      Top ring (z=+z_ring): top_front, top_right, top_back, top_left
+      Mid ring (z=0):       front, right, back, left  (backward-compatible IDs)
+      Bot ring (z=-z_ring): bot_front, bot_right, bot_back, bot_left
+
+    BIO: thermoreceptors distributed over body surface for spatial coding.
+    REF: Basbaum et al. 2009 Cell 139:267 — body-surface receptive field distribution.
     """
     r = effective_radius
-    return [
-        SkinPatch(patch_id="front", local_offset=[r, 0.0, 0.0]),
-        SkinPatch(patch_id="back",  local_offset=[-r, 0.0, 0.0]),
-        SkinPatch(patch_id="left",  local_offset=[0.0, r, 0.0]),
-        SkinPatch(patch_id="right", local_offset=[0.0, -r, 0.0]),
-    ]
+    z = z_ring
+    patches = []
+    for ring_prefix, z_val in [("top_", z), ("", 0.0), ("bot_", -z)]:
+        for pid, lx, ly in [
+            ("front", r,    0.0),
+            ("right", 0.0, -r),    # y<0 = right in body frame (y=left)
+            ("back",  -r,   0.0),
+            ("left",  0.0,  r),    # y>0 = left in body frame
+        ]:
+            patches.append(SkinPatch(
+                patch_id=f"{ring_prefix}{pid}",
+                local_offset=[lx, ly, z_val],
+            ))
+    return patches
 
 
 @dataclass
