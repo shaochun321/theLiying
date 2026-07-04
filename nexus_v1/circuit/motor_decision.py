@@ -1,4 +1,4 @@
-"""nexus_v1.circuit.motor_decision — Middle decision layer (placeholder).
+"""nexus_v1.circuit.motor_decision — Middle decision layer.
 
 Architecture:
 
@@ -9,28 +9,25 @@ Architecture:
                                          │
                               MotorDecisionLayer
                               ┌────────────────────┐
-                              │  MotorRhythm (CPG)  │  ← 运动节奏
-                              │  DirectionSelect    │  ← 方向选择
-                              │  SpatialNavigator   │  ← 空间导航
+                              │  MotorRhythm (CPG)  │  ← 运动节奏 (VdP)
+                              │  DirectionSelect    │  ← 方向选择 (PASSTHROUGH)
+                              │  SpatialNavigator   │  ← 空间导航 (PASSTHROUGH)
                               └────────────────────┘
                                          │
                                       Motor → Muscle → Body
 
-Currently: all three sub-layers are PASSTHROUGH (placeholder).
-The Col→Motor STDP bundles still drive the motors directly.
-These stubs receive MotionState but do not yet modify motor output.
-
 BIO references:
-  - MotorRhythm: spinal CPG (Grillner 2006), cerebellum (Ito 1984)
+  - MotorRhythm: spinal CPG (Grillner 2006), lamprey interneurons
   - DirectionSelect: basal ganglia (Mink 1996), action selection
   - SpatialNavigator: hippocampus (O'Keefe 1978), path integration
 """
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
+from ..components.oscillator import ResonantOscillator
 
 
 @dataclass
@@ -113,47 +110,46 @@ class MotionState:
 
 
 class MotorRhythmGenerator:
-    """TYPE:BIO — Central Pattern Generator (CPG) — coupled oscillator model.
+    """TYPE:BIO — Central Pattern Generator (CPG) — Van der Pol oscillator model.
 
-    Three phase oscillators (x, y, z), one per motor axis.
-    Each generates an intrinsic rhythm that modulates motor output.
+    Three independent VdP oscillators, one per motor axis, with 120° initial
+    phase offset. Each generates a rhythmic envelope that modulates motor output.
 
     Architecture (per axis i):
-      dφ_i/dt = ω_i + Σ_j κ sin(φ_j - φ_i - Δφ_ij)  + ε · temporal_i
-                 ↑       ↑                                  ↑
-           intrinsic  phase coupling              entrainment by vestibular
-           frequency  between axes
+      ResonantOscillator_i.step(dt, i_ext=ε·temporal_i)
+           ↓  raw ∈ [-2, +2] (VdP limit cycle)
+      envelope = (raw + 2) / 4  ∈ [0, 1]
+           ↓
+      motor_out_i = motor_in_i × envelope
 
-    Output: motor_out = motor_in × (0.5 + 0.5 · sin(φ_i))
-    When sin(φ)=+1: full power. When sin(φ)=-1: zero.
-    This creates rhythmic pulsing instead of constant drive.
+    Entrainment: vestibular otolith signal injected as i_ext into VdP.
+    BIO: spinal CPG interneurons (Grillner 2006, Science 296:1532).
+    PHYS: Van der Pol relaxation oscillator = LC tank + negative resistance (NDR).
+    REF: Ijspeert 2008, Neural Networks — CPG for locomotion control.
 
-    BIO: spinal CPG (Grillner 2006), lamprey swimming circuits.
-    Ijspeert 2008: "Central pattern generators for locomotion control
-    in animals and robots: A review."
-
-    The CPG is AUTONOMOUS — it generates rhythm even without input.
-    But it is ENTRAINED by vestibular temporal_measure (AC component),
-    so the rhythm locks onto the body's actual motion pattern.
+    FIX: HC-025 — replaced Kuramoto math.sin with VdP ResonantOscillator.
+    Kuramoto coupling (sin(φ_j-φ_i)) was semantic-math (python formula replaces
+    physical oscillator dynamics). VdP produces equivalent rhythmic envelope
+    without any trigonometric hardcoding.
     """
 
-    # ── Oscillator parameters ──
-    INTRINSIC_FREQ: float = 1.0     # Hz (matched to yaw input ~1Hz)
-    COUPLING_K: float = 0.5         # phase coupling strength
-    ENTRAINMENT_EPS: float = 2.0    # entrainment sensitivity
-    # Phase offsets: swim-like pattern (120° between axes)
-    PHASE_OFFSETS = [0.0, 2.094, 4.189]  # 0, 2π/3, 4π/3
+    INTRINSIC_FREQ: float = 1.0   # Hz — lamprey CPG range (Grillner 2006: 0.5-5Hz)
+    ENTRAINMENT_EPS: float = 2.0  # entrainment sensitivity (vestibular → i_ext)
 
     def __init__(self):
         self._active = True
 
-        # Phase of each oscillator [x, y, z] — starts offset
-        self._phases = [0.0, 2.094, 4.189]  # 120° apart
+        # Three VdP oscillators, 120° phase offset — swim-like triphasic pattern
+        # BIO: lamprey spinal CPG segments oscillate at 120° offset (Grillner 2006)
+        # PHYS: ResonantOscillator = VdP, same class used inside VitalOscillator
+        self._osc_x = ResonantOscillator(
+            frequency=self.INTRINSIC_FREQ, mu=2.0, amplitude=1.0, phase_offset=0.0)
+        self._osc_y = ResonantOscillator(
+            frequency=self.INTRINSIC_FREQ, mu=2.0, amplitude=1.0, phase_offset=2.094)
+        self._osc_z = ResonantOscillator(
+            frequency=self.INTRINSIC_FREQ, mu=2.0, amplitude=1.0, phase_offset=4.189)
+        self._oscillators = [self._osc_x, self._osc_y, self._osc_z]
 
-        # Per-axis intrinsic frequency (can adapt)
-        self._freqs = [self.INTRINSIC_FREQ] * 3
-
-        # EMA of temporal input for smooth entrainment
         self._temporal_ema = [0.0, 0.0, 0.0]
 
     def modulate(self, motor_acts: List[float],
@@ -161,64 +157,33 @@ class MotorRhythmGenerator:
         """Apply CPG rhythmic modulation to motor activations.
 
         Pipeline:
-          1. Update oscillator phases (intrinsic + coupling + entrainment)
-          2. Compute rhythmic envelope from phases
-          3. Multiply motor activations by envelope
-
-        Args:
-            motor_acts: [x, y, z] raw motor activation totals
-            state: current motion state (for entrainment)
-            dt: time step (seconds)
+          1. Update entrainment EMA from vestibular otolith
+          2. Step VdP oscillators (with entrainment forcing i_ext)
+          3. Map raw VdP output [-2,+2] → envelope [0,1]
+          4. Multiply motor activations by envelope
 
         Returns:
             Rhythmically modulated motor activations.
         """
-        TWO_PI = 2.0 * math.pi
         axes = ['x', 'y', 'z']
         oto_keys = ['oto_x', 'oto_y', 'oto_z']
 
-        # 1. Entrainment signal: use otolith acceleration (most direct motion signal)
+        # Entrainment signal from otolith (AC motion component)
         for i, key in enumerate(oto_keys):
-            # Try otolith first, fall back to temporal_measure
             temporal_val = abs(state.otolith_acc.get(axes[i], 0.0))
             if temporal_val < 1e-6:
-                # Fall back to vestibular temporal measure
                 for tax in state.temporal_measure:
                     temporal_val = max(temporal_val, state.temporal_measure.get(tax, 0.0))
             self._temporal_ema[i] += 0.01 * (temporal_val - self._temporal_ema[i])
 
-        # 2. Update phases: dφ/dt = ω + coupling + entrainment
-        new_phases = list(self._phases)
-        for i in range(3):
-            # Intrinsic frequency
-            dphi = TWO_PI * self._freqs[i]
-
-            # Phase coupling with neighbors (nearest-neighbor ring)
-            for j in range(3):
-                if i == j:
-                    continue
-                # Kuramoto coupling: κ sin(φ_j - φ_i - Δφ_ij)
-                target_offset = self.PHASE_OFFSETS[j] - self.PHASE_OFFSETS[i]
-                dphi += self.COUPLING_K * math.sin(
-                    self._phases[j] - self._phases[i] - target_offset
-                )
-
-            # Entrainment: temporal signal pushes phase forward
-            # BIO: sensory feedback accelerates the CPG cycle
-            dphi += self.ENTRAINMENT_EPS * self._temporal_ema[i]
-
-            new_phases[i] = (self._phases[i] + dphi * dt) % TWO_PI
-
-        self._phases = new_phases
-
-        # 3. Compute rhythmic envelope and modulate
-        #    envelope = 0.5 + 0.5 * sin(φ) → range [0, 1]
-        #    When sin(φ)=+1 → envelope=1.0 (full power)
-        #    When sin(φ)=-1 → envelope=0.0 (rest phase)
-        #    BIO: alternating contraction/relaxation in swim cycle
+        # Step VdP oscillators with entrainment forcing; map to [0,1] envelope
+        # VdP limit cycle: raw ∈ ≈ [-2, +2]; (raw+2)/4 maps to [0, 1]
+        # Equivalent range to original 0.5 + 0.5*sin(φ) without math hardcoding.
         result = []
-        for i in range(3):
-            envelope = 0.5 + 0.5 * math.sin(self._phases[i])
+        for i, osc in enumerate(self._oscillators):
+            i_ext = self.ENTRAINMENT_EPS * self._temporal_ema[i]
+            raw = osc.step(dt, i_ext=i_ext)
+            envelope = max(0.0, min(1.0, (raw + 2.0) / 4.0))
             result.append(motor_acts[i] * envelope)
 
         return result
@@ -226,8 +191,8 @@ class MotorRhythmGenerator:
     def summary(self) -> dict:
         return {
             'active': self._active,
-            'phases': [round(p, 3) for p in self._phases],
-            'freqs': [round(f, 3) for f in self._freqs],
+            'phases': [round(osc.phase, 3) for osc in self._oscillators],
+            'freqs': [self.INTRINSIC_FREQ] * 3,
             'temporal_ema': [round(t, 6) for t in self._temporal_ema],
         }
 
