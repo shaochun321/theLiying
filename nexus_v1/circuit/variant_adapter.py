@@ -1343,42 +1343,17 @@ class VariantCircuit(HebbianCircuit):
         for _csrc in self.world.cylindrical_sources:
             _csrc.step(dt)
 
-        # ── C3': Thermal energy absorption (feeding) ──
-        # PHYS: Organism converts environmental thermal flux into metabolic
-        # energy — the same temperature field that causes skin damage also
-        # provides sustenance. This is NOT a separate "feeding" channel;
-        # it IS the thermal interaction, viewed from the energy-intake side.
-        #
-        # BIO: chemolithoautotrophy at hydrothermal vents. Organisms like
-        # Riftia pachyptila harvest energy from the thermal/chemical gradient.
-        # The conversion efficiency is a membrane material property.
-        #
-        # COUPLING: temperature_at() and consume_nearby() share the same
-        # (1 - d/r) falloff. By using T_local as the rate, we derive
-        # feeding power directly from the physical field:
-        #   P_feed = T_local × membrane_efficiency × dt
-        # No arbitrary CONSUME_RATE constant needed.
-        #
-        # THERMODYNAMIC BUDGET (self-calibrated):
-        #   T_local at d=5 from source (T_src=5.0): ~3.75
-        #   P_feed = 3.75 × 1.0 × 0.001 = 0.00375/step
-        #   Metabolic expense (measured): ~0.0033/step (vascular withdraw)
-        #   → At d≈5-6, income ≈ expense (equilibrium distance)
-        #   → Closer: net gain (but increasing burn risk)
-        #   → Further: net deficit → eventual starvation
-        T_local = self.world.temperature_at(self.world.body.position)
-        energy_absorbed = self.world.consume_nearby(
-            self.world.body.position, T_local, dt)
-        # Regenerate depleted point sources (deep-sea vent ecology)
+        # ── Step 4: consume_nearby 已移除（R1-Pre PASS 后执行）──
+        # consume_nearby 是旧版简化能量摄入，现由 ThermalMouth + DigestiveInterface
+        # 替代（World 2.0 物理摄食回路）。R1-Pre 验证（50k步 fill>0.1）PASS 后移除。
+        # REF: 饱腹闭环整合方案（反馈整合最终版）Step 4
+        # Regenerate depleted point sources (deep-sea vent ecology — still needed)
         self.world.regenerate_sources()
 
         # ── Energy pipeline: World → EnergyStore ──
         # Patch C: YolkSac discharges BEFORE deposit/tick, so it primes the
         # store for Δfill detection by DADifferentialGate (DA RPE).
         self.yolk_sac.step(self.energy_store, dt)
-        # Consumed energy flows into the external reservoir.
-        # Store handles efficiency loss (digestive efficiency ~90%).
-        self.energy_store.deposit(energy_absorbed)
 
         # ── World 2.0: ThermalMouth energy intake ──
         # BIO: oral thermal exchange organ — chemosynthetic feeding.
@@ -1522,7 +1497,7 @@ class VariantCircuit(HebbianCircuit):
         ms.rho_motor = circ['rho_motor']
         ms.rho_feed = circ['rho_feed']
         ms.homeo_deviation = circ['deviation']
-        ms.energy_absorbed = energy_absorbed
+        ms.energy_absorbed = 0.0  # consume_nearby removed; ThermalMouth handles intake
         ms.fill_fraction = self.energy_store.fill_fraction
 
         ms.yolk_level = self.yolk_sac.level
