@@ -668,11 +668,6 @@ class VariantCircuit(HebbianCircuit):
         # Frozen cross-inhibition: prevents simultaneous LTP on all relay_to_da pathways.
         self.bundles_relay_lateral_inh: List[SynapticBundle] = []
 
-        # P1-B: relay → motor_yaw plasticity cables (STDP, DA-gated directional learning)
-        # BIO: spinal relay (WDR) → contralateral flexor yaw drive; thermal asymmetry
-        # → directional turning learned via DA-gated STDP.
-        self.bundles_relay_to_yaw: List[SynapticBundle] = []
-
         # CPG → DA oscillator (lazy init alongside DA circuit)
         # BIO: VTA pacemaker interneuron → 2 Hz rhythmic drive to DA neurons
         # Keeps DA.post_trace > 0 at steady state → relay_to_da STDP stays active.
@@ -1099,14 +1094,6 @@ class VariantCircuit(HebbianCircuit):
         if self.bundle_right_to_yaw is not None:
             _cur = self.bundle_right_to_yaw.propagate()
             _i_cw = _cur[0] if _cur else 0.0
-        # P1-B: relay → motor_yaw STDP (adds to frozen HC-016 thermo_input→yaw current)
-        for _b_ryaw in self.bundles_relay_to_yaw:
-            _cur_r = _b_ryaw.propagate()
-            if _cur_r:
-                if 'yaw_cw' in _b_ryaw.config.bundle_id:
-                    _i_cw += _cur_r[0]
-                else:
-                    _i_ccw += _cur_r[0]
         self.yaw_ccw_neuron.step(_i_ccw, dt=dt)
         self.yaw_cw_neuron.step(_i_cw, dt=dt)
         _yaw_torque = (self.yaw_ccw_neuron.activation - self.yaw_cw_neuron.activation) * YAW_GAIN
@@ -1726,11 +1713,6 @@ class VariantCircuit(HebbianCircuit):
                          da_concentration=self.dopamine.concentration)
             bundle.compute_xin(dt)
 
-        # P1-B: relay → motor_yaw STDP — learning handled in _propagate_bundles()
-        # together with col_to_motor (motor output gate). Xin tracking here.
-        for bundle in self.bundles_relay_to_yaw:
-            bundle.compute_xin(dt)
-
         # DA modulation moved to _propagate_bundles() override (multiplicative).
         # See below: DA gain_factor scales synapse currents, not injected current.
 
@@ -2130,16 +2112,6 @@ class VariantCircuit(HebbianCircuit):
             b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
                     fill_fraction=fill, da_concentration=da_conc)
 
-        # P1-B: relay → motor_yaw (STDP, eligibility trace, same motor-output gate as col→motor)
-        # TIMING: relay.pre_trace updated in somatosensory.step() (~912); yaw neurons
-        # stepped in yaw block (~991); both before super().step() which calls here. ✓
-        # Using col→motor gate (gate_col × da_lr_mod × g_sync × body_lr) because
-        # yaw is a motor output — same PNN maturation zone as col→motor. DA (da_conc)
-        # gates eligibility-trace LTP directly inside bundle.learn().
-        for b in self.bundles_relay_to_yaw:
-            b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
-                    fill_fraction=fill, da_concentration=da_conc)
-
         # Sprouted bundles: use target layer's gate
         for b in self._sprouted_bundles:
             bid = b.config.bundle_id
@@ -2499,68 +2471,6 @@ class VariantCircuit(HebbianCircuit):
             self.bundles_relay_lateral_inh.append(
                 SynapticBundle(cfg_inh, [src_n], [tgt_n]))
 
-        # P1-B: relay → motor_yaw STDP cables (directional thermotaxis learning arc)
-        # Q1. BIO: spinal relay (WDR, lamina V) → contralateral motor column → yaw flexors.
-        #     Thermal asymmetry → directional turning learned via DA-gated STDP.
-        #     REF: Sherrington 1910 J Physiol; Head & Holmes 1911 Brain (spinal reflex arc).
-        # Q2. relay_right (somatosensory.relays['right']) → [STDP] → yaw_cw_neuron
-        #     relay_left  (somatosensory.relays['left'])  → [STDP] → yaw_ccw_neuron
-        # Q3. initial_weight=0.1 (conservative, matches relay_to_da initial;
-        #     relay.act≈1.3 after WTA → G(0.1)×1.3≈0.118A → V_ss_yaw≈0.59 → turns).
-        #     weight_max=0.3: matches relay_to_da ceiling (EXP-W2-003).
-        #     stdp_lr=0.005: Bi & Poo 1998 Neuron 22:106 (hippocampal STDP rate).
-        _relays_p1 = self.somatosensory.relays
-        _yaw_pairs = [
-            ('relay_right_to_yaw_cw',  'right', self.yaw_cw_neuron),
-            ('relay_left_to_yaw_ccw',  'left',  self.yaw_ccw_neuron),
-        ]
-        for _bid_yaw, _pid_yaw, _tgt_yaw in _yaw_pairs:
-            _src_yaw = _relays_p1.get(_pid_yaw)
-            if _src_yaw is None or _tgt_yaw is None:
-                continue
-            _cfg_yaw = BundleConfig(
-                bundle_id=_bid_yaw,
-                learning_rule="stdp",
-                initial_weight=0.1,
-                weight_max=0.3,
-                stdp_lr=0.005,
-                synapse_gain=1.0,
-                bundle_role="feedforward",
-                remodel_cost_kappa=0.0,
-                use_eligibility_trace=True,
-            )
-            self.bundles_relay_to_yaw.append(SynapticBundle(_cfg_yaw, [_src_yaw], [_tgt_yaw]))
-
-        # P3-B: relay → motor_yaw LTD cross-cables (push-pull braking, frozen)
-        # Q1. BIO: Sherrington 1910 reciprocal inhibition — when agonist contracts,
-        #     antagonist is simultaneously inhibited. Yaw push-pull: right-hot → CW
-        #     drive + hard-wired CCW brake → prevents overshoot past optimal heading.
-        #     REF: Sherrington 1910 J Physiol 40:28.
-        # Q2. relay_right → [frozen, gain=-1.0] → yaw_ccw_neuron
-        #     relay_left  → [frozen, gain=-1.0] → yaw_cw_neuron
-        # Q3. initial_weight=0.2: G(0.2)≈0.11; relay.act≈1.3 (WTA winner):
-        #     I_brake = 1.3 × 0.11 × (-1.0) ≈ -0.14 A
-        #     I_drive (LTP w=0.1) = 1.3 × 0.09 × (+1.0) ≈ +0.12 A
-        #     brake/drive ratio ≈ 1.2×: net stop signal; reversal still possible.
-        _yaw_ltd_pairs = [
-            ('relay_right_to_yaw_ccw_ltd', 'right', self.yaw_ccw_neuron),
-            ('relay_left_to_yaw_cw_ltd',   'left',  self.yaw_cw_neuron),
-        ]
-        for _bid_ltd, _pid_ltd, _tgt_ltd in _yaw_ltd_pairs:
-            _src_ltd = _relays_p1.get(_pid_ltd)
-            if _src_ltd is None or _tgt_ltd is None:
-                continue
-            _cfg_ltd = BundleConfig(
-                bundle_id=_bid_ltd,
-                learning_rule="frozen",
-                initial_weight=0.2,
-                weight_max=0.2,
-                synapse_gain=-1.0,
-                bundle_role="feedforward",
-                remodel_cost_kappa=0.0,
-            )
-            self.bundles_relay_to_yaw.append(SynapticBundle(_cfg_ltd, [_src_ltd], [_tgt_ltd]))
-
         # ── C1: shadow_nu_neuron → DA (free energy gate, frozen) ──
         # shadow_nu_neuron is already created in __init__; create the bundle here
         # because we need da_list (not available at __init__ time in current lazy pattern).
@@ -2586,7 +2496,6 @@ class VariantCircuit(HebbianCircuit):
             f"bundles=shadow_to_da+xin_to_da+relay_to_proj({len(self._bundles_relay_to_proj)})"
             f"+relay_to_da({len(self.bundles_relay_to_da)})+cpg_to_da({len(self.bundles_cpg_to_da)})"
             f"+relay_lateral_inh({len(self.bundles_relay_lateral_inh)})"
-            f"+relay_to_yaw({len(self.bundles_relay_to_yaw)})"
             f"+shadow_nu_to_da(1)"
         )
 
@@ -2902,8 +2811,6 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend(self.bundles_thermo_delta_to_da)
         # P0-B: Relay lateral inhibition (frozen WTA cross-inhibition)
         bundles.extend(self.bundles_relay_lateral_inh)
-        # P1-B: relay → motor_yaw STDP cables
-        bundles.extend(self.bundles_relay_to_yaw)
         # HC-016 A: relay→yaw frozen bundles (crossed thermotaxis reflex arc)
         if self.bundle_left_to_yaw is not None:
             bundles.append(self.bundle_left_to_yaw)
