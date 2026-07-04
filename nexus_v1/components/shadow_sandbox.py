@@ -239,35 +239,28 @@ class ShadowSandbox:
             )
             self.bundles[bid] = SynapticBundle(cfg, srcs, tgts)
 
-        # Col → Mot (each col axis → assigned motor)
-        mot_assignment = {}
-        for axis in axes:
-            if "yaw" in axis or "oto_x" in axis:
-                mot_key = "x"
-            elif "pitch" in axis or "oto_y" in axis:
-                mot_key = "y"
-            elif "roll" in axis or "oto_z" in axis:
-                mot_key = "z"
-            elif "therm" in axis:
-                # Thermal column → all 3 motors equally (no spatial bias)
-                mot_key = "x"  # primary, cross-axis handles the rest
-            else:
-                mot_key = "z"
-            mot_assignment[axis] = mot_key
-
+        # Col → Mot: all-to-all (HC-011 fix)
+        # FIX(HC-011): replaced if/elif axis→motor string matching with full
+        # all-to-all connectivity at low initial weight, letting STDP+Xin
+        # competition determine which col→mot couplings strengthen.
+        # BIO: spinal motor pools receive convergent input from many sensory
+        # axes; specificity emerges from Hebbian competition, not wiring rules.
+        # REF: Grillner 2006 — spinal CPG connectivity from STDP.
+        # 7 axes × 3 motors = 21 bundles; initial_weight=0.001 (dormant)
         for axis in axes:
             src = [self.neurons[f"s_col_{axis}"]]
-            tgt = [self.neurons[f"s_mot_{mot_assignment[axis]}"]]
-            bid = f"s_col_to_mot_{axis}"
-            cfg = BundleConfig(
-                bundle_id=bid,
-                initial_weight=0.05,
-                stdp_lr=0.01,
-                remodel_cost_kappa=0.001,
-                synapse_gain=10.0,
-                bundle_role="shadow",  # C-001.3: shadow layer col→mot
-            )
-            self.bundles[bid] = SynapticBundle(cfg, src, tgt)
+            for mot_key in ["x", "y", "z"]:
+                bid = f"s_col_to_mot_{axis}_to_{mot_key}"
+                cfg = BundleConfig(
+                    bundle_id=bid,
+                    initial_weight=0.001,
+                    stdp_lr=0.01,
+                    remodel_cost_kappa=0.001,
+                    synapse_gain=10.0,
+                    bundle_role="shadow",
+                )
+                tgt = [self.neurons[f"s_mot_{mot_key}"]]
+                self.bundles[bid] = SynapticBundle(cfg, src, tgt)
 
         # Cross-axis col↔col (C(n,2) dormant bundles, §1.2)
         # With 7 axes: C(7,2)=21 (was 15 for vestibular-only)

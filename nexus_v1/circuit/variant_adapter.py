@@ -52,7 +52,6 @@ from ..components.vital_oscillator import VitalOscillator
 from ..components.cpg_neuron import CPGNeuron
 from ..components.circulation_proportion import CirculationProportionCircuit
 from ..components.spinal_reflex import SpinalReflexArc
-from ..components.agc import AutomaticGainControl
 from ..components.langevin_noise import LangevinNoise
 from .bundle import SynapticBundle, BundleConfig
 from .circulation import CirculationMeter
@@ -453,12 +452,18 @@ class VariantCircuit(HebbianCircuit):
         # EMERGE: Withdrawal direction is L2-fixed. Cortical override is future L1.
         self.spinal_reflex = SpinalReflexArc()
 
-        # ── Phase 4: Automatic Gain Control (AGC) ──
-        # RC leaky integrator driven by physiological deficit (energy + DA).
-        # τ ≈ 40k steps — slow enough to avoid interference with Phase 2/3.
-        # Output scales hunger reflex drive and Col→Motor bundle currents.
-        # BIO: HPA axis cortisol → locomotor drive (Sapolsky 1992).
-        self.agc = AutomaticGainControl()
+        # HC-010 REMOVED: AutomaticGainControl deleted.
+        # AGC was overriding STDP dynamics with homeostatic gain scaling.
+        # Energy-dependent amplitude is now handled exclusively by VitalOscillator
+        # (fill_fraction → amplitude_scale, death switch at fill < 0.05).
+        # Stub retained for backward compatibility with experiment scripts.
+        from types import SimpleNamespace
+        self.agc = SimpleNamespace(
+            gain=1.0,
+            s_drive=0.0,
+            config=SimpleNamespace(tau_agc=0.0, g_max=1.0),
+            summary=lambda: {"gain": 1.0, "s_drive": 0.0},
+        )
 
         # ── V8: LangevinNoise (Ornstein-Uhlenbeck thermal noise) ──
         # Provides physical thermal fluctuations to vestibular afferent path.
@@ -1249,9 +1254,6 @@ class VariantCircuit(HebbianCircuit):
         # BIO: LC-NE increases variance, not mean (Sara 2009, NRN 10:211-223).
         _eta_mean = sum(eta) / len(eta)
         eta = [x - _eta_mean for x in eta]
-        # Patch A: AGC modulates exploration amplitude (LC-NE analogue)
-        # AGC.gain ∈ [1.0, 5.0]; previous step's gain used (agc.step() at L836).
-        eta = [e * self.agc.gain for e in eta]
         # Patch A: RMS clamp — motor saturation protection
         # At starvation: σ_eff ≈ 0.42; peak may exceed 1.0 → Motor runaway.
         eta = [max(-1.0, min(1.0, e)) for e in eta]
@@ -1488,13 +1490,6 @@ class VariantCircuit(HebbianCircuit):
         ms.energy_absorbed = energy_absorbed
         ms.fill_fraction = self.energy_store.fill_fraction
 
-        # ── Phase 4: AGC update ──
-        # Drive signal computed from energy deficit + DA deficit.
-        # Slow RC integrator (τ=40k) produces gain multiplier.
-        # Applied to: (1) hunger reflex, (2) Col→Motor bundle propagation.
-        self.agc.step(self.energy_store.fill_fraction,
-                      self.dopamine.concentration, dt)
-        ms.agc_gain = self.agc.gain
         ms.yolk_level = self.yolk_sac.level
         ms.yolk_depleted = self.yolk_sac.is_depleted
         ms.efference_supp_ratio = self._efference_supp_ratio
@@ -2452,8 +2447,7 @@ class VariantCircuit(HebbianCircuit):
             "noether": self._noether_probe.summary(),
             # Energy ledger: global thermodynamic accounting
             "energy_ledger": self._energy_ledger.summary(),
-            # Phase 4: AGC state
-            "agc": self.agc.summary(),
+            # HC-010: AGC removed (energy amplitude handled by VitalOscillator)
         }
 
     # ── Phase 6: Structural event hooks → RecursionTracker ────
