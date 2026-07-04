@@ -232,6 +232,59 @@ class VariantCircuit(HebbianCircuit):
         )
         self._col_axes_order = axes  # fixed order for indexing
 
+        # ── B1b: Renshaw interneurons (HC-023 replacement) ──
+        # BIO: Renshaw cells are spinal inhibitory interneurons activated by
+        #      motor axon collaterals; they recurrently inhibit the same and
+        #      adjacent motor neuron pools (Eccles et al. 1961, J Physiol).
+        # Q1 BIO: α-motor neuron collateral → Renshaw cell → motor pool
+        #         inhibition (Eccles 1961, J Physiol 155:586–606).
+        # Q2 Structure: motor_{x,y,z} (0x03) → [frozen, gain=1.0, w=0.3]
+        #              → renshaw_{x,y,z} (0x01)
+        #              → [frozen, gain=-0.5, w=0.3]
+        #              → motor_{others} (0x03)
+        # Q3 Params: excit gain=1.0 (collateral strength = soma strength),
+        #            inhib gain=-0.5 (Renshaw inhibition ~50% of excit, Dale 2003),
+        #            w=0.3 (matches relay lateral inh pattern in P0-B).
+        _motor_key_order = ['move_x', 'move_y', 'move_z']
+        self.renshaw_neurons = {}
+        for axis in _motor_key_order:
+            suffix = axis.split('_')[1]  # x, y, z
+            self.renshaw_neurons[axis] = Neuron(NeuronConfig(
+                neuron_id=f'renshaw_{suffix}',
+                capacitance=1.0,
+                r_leak=5.0,
+                region=0x01,
+                spiking=False,
+            ))
+        # Excitatory bundles: motor → renshaw (1:1, one per axis)
+        self.bundles_renshaw_excit = []
+        for mkey in _motor_key_order:
+            self.bundles_renshaw_excit.append(SynapticBundle(
+                config=BundleConfig(
+                    bundle_id=f'motor_{mkey.split("_")[1]}_to_renshaw',
+                    learning_rule='frozen',
+                    initial_weight=0.3,
+                    synapse_gain=1.0,
+                ),
+                sources=[self.motor_neurons[mkey]],
+                targets=[self.renshaw_neurons[mkey]],
+            ))
+        # Inhibitory bundles: renshaw → other two motors (1:2, one per axis)
+        self.bundles_renshaw_inhib = []
+        for i, mkey in enumerate(_motor_key_order):
+            other_motors = [self.motor_neurons[k]
+                            for k in _motor_key_order if k != mkey]
+            self.bundles_renshaw_inhib.append(SynapticBundle(
+                config=BundleConfig(
+                    bundle_id=f'renshaw_{mkey.split("_")[1]}_inhib',
+                    learning_rule='frozen',
+                    initial_weight=0.3,
+                    synapse_gain=-0.5,
+                ),
+                sources=[self.renshaw_neurons[mkey]],
+                targets=other_motors,
+            ))
+
         # ── Variant: LiquidMetalRouter on Enc→Col connections ──
         # BIO: structural plasticity (Holtmaat 2009)
         # Start connected; correlation drives pruning/strengthening
@@ -333,6 +386,38 @@ class VariantCircuit(HebbianCircuit):
         # Breaks cold-start deadlock by providing basal motor drive.
         # BIO: sinoatrial node → hemodynamic pulsation → postural sway.
         self.vital_oscillator = VitalOscillator()
+
+        # ── B1a: CPC deviation transducer → VitalOscillator amplitude mod ──
+        # BIO: LH arousal → PPTg/LDT → locomotor CPG amplitude scaling (Saper 2002).
+        # Q1 BIO: LH → PPTg arousal projection (Saper 2002, Nat Rev Neurosci 3:833-843).
+        # Q2 Structure: cpc_dev_neuron (hypo, 0x04) → bundle → vital_amp_neuron (brainstem, 0x02).
+        # Q3 cpc_dev_neuron: C=1.0, R=3.0 → τ=3s (tonic LH signal, slow arousal);
+        #    vital_amp_neuron: C=1.0, R=5.0 → τ=5s (brainstem integration);
+        #    gain=0.3, w=0.5 (200k baseline: deviation≈0.05–0.2 → mod≈0.01–0.03).
+        self.cpc_dev_neuron = Neuron(NeuronConfig(
+            neuron_id='cpc_deviation',
+            capacitance=1.0,
+            r_leak=3.0,
+            region=0x04,
+            spiking=False,
+        ))
+        self.vital_amp_neuron = Neuron(NeuronConfig(
+            neuron_id='vital_amp',
+            capacitance=1.0,
+            r_leak=5.0,
+            region=0x02,
+            spiking=False,
+        ))
+        self.bundle_cpc_to_vital = SynapticBundle(
+            config=BundleConfig(
+                bundle_id='cpc_to_vital',
+                learning_rule='frozen',
+                initial_weight=0.5,
+                synapse_gain=0.3,
+            ),
+            sources=[self.cpc_dev_neuron],
+            targets=[self.vital_amp_neuron],
+        )
 
         # ── L2:SELECTION: Spinal Reflex Arc (nociceptive withdrawal) ──
         # BIO: Aδ-fiber → spinal interneuron → α-motor neuron (Sherrington 1906).
@@ -767,15 +852,9 @@ class VariantCircuit(HebbianCircuit):
             sum(axis_individual['z']),
         ]
 
-        # C2 fix: Cross-axis motor inhibition (push-pull)
-        # Inject inhibitory current into motor neurons based on
-        # other axes' activation. Strongest axis suppresses weakest.
-        motor_inhib = self.motor_lateral_inhibition.compute_inhibition(axis_acts)
-        motor_keys = ['move_x', 'move_y', 'move_z']
-        for idx, mkey in enumerate(motor_keys):
-            if motor_inhib[idx] < 0:
-                mot = self.motor_neurons[mkey]
-                mot._membrane.inject(motor_inhib[idx], dt)
+        # B1b: Cross-axis motor lateral inhibition is now handled by Renshaw
+        # interneurons in _propagate_bundles() (after Col→Motor propagation).
+        # See bundles_renshaw_excit / bundles_renshaw_inhib.
 
         # ── Extract MotionState from previous step's processing ──
         # This is the OUTPUT of the motion state discrimination structure.
@@ -1118,24 +1197,8 @@ class VariantCircuit(HebbianCircuit):
         if repair_cost > 0:
             self.energy_store.withdraw(repair_cost)
 
-        # ── Vital Oscillator: heartbeat → Motor membrane injection ──
-        # Three detuned VdP oscillators draw energy from store and inject
-        # sub-threshold current into Motor X/Y/Z membranes. This is the
-        # physical origin of basal motility (postural sway).
-        # Signal chain: EnergyStore → VitalOscillator → Motor.inject()
-        vital_outputs = self.vital_oscillator.step(self.energy_store, dt)
-
-        # Apply Feedback A: damage suppresses vital oscillation
-        vital_outputs = [v * vital_damage_factor for v in vital_outputs]
-
-        _VITAL_MOTOR_MAP = ['move_x', 'move_y', 'move_z']
-        for i, mkey in enumerate(_VITAL_MOTOR_MAP):
-            if mkey in self.motor_neurons:
-                self.motor_neurons[mkey]._membrane.inject(
-                    vital_outputs[i], dt)
-        # Record in MotionState
-        ms.vital_pulse = list(vital_outputs)
-        ms.vital_amplitude = sum(abs(v) for v in vital_outputs)
+        # Vital oscillator is called after CPC deviation is computed (B1a).
+        # See "B1a: CPC deviation → VitalOscillator" block below (~line 1247).
 
         # ── Feedback Loop C: Spinal nociceptive withdrawal reflex ──
         # L2:SELECTION — Hardwired directional withdrawal from noxious stimuli.
@@ -1244,22 +1307,34 @@ class VariantCircuit(HebbianCircuit):
         DA_INJECT_SCALE = 0.1
         # HC-017 fix: RPE/hunger drive accumulated into da_input_currents (after bundles).
 
-        # ── C.04: Deviation → Motor direct activation ──
-        # Spinal-level reflex: bypasses slow DA modulation.
-        # BIO: hypothalamic thermoregulatory drive → locomotor CPG
-        # (Satinoff 1978: thermoregulatory behavior = motor output).
-        # Phase 1 calibration (EXP-012): 0.05 produced 0.0000045V/step
-        # ("whispering in a hurricane"). 1.0 → 0.09V/step at deviation=0.19
-        # — sufficient to push past Motor v_peak and force spike.
-        # dt-invariant: inject(motor_drive, dt) = (deviation × GAIN) × dt / C
-        # GAIN = 1/dt → net dV/step = deviation/C regardless of dt.
-        # Calibrated at dt=0.001 (Phase 5). At dt=1.0 (regression) GAIN→1.0 ← same as before.
-        DEVIATION_MOTOR_GAIN = 1.0 / max(dt, 1e-9)
-        deviation = circ['deviation']
-        if deviation > 0.1:  # threshold: only significant deviation
-            motor_drive = (deviation - 0.1) * DEVIATION_MOTOR_GAIN
-            for key, mot in self.motor_neurons.items():
-                mot._membrane.inject(motor_drive, dt)
+        # ── B1a: CPC deviation → VitalOscillator amplitude modulation ──
+        # BIO: lateral hypothalamus (LH) → PPTg/LDT arousal projection
+        #      modulates locomotor stride amplitude (Saper 2002).
+        # Q1 BIO: LH lesion → akinesia; LH activation → locomotion (Saper 2002).
+        # Q2 Structure: cpc_dev_neuron (0x04) → [frozen bundle, gain=0.3, w=0.5]
+        #               → vital_amp_neuron (0x02) → VitalOscillator.deviation_mod
+        # Q3 Params: gain=0.3 (attenuates raw deviation [0,1] → mod [0,0.3]);
+        #            w=0.5 initial (calibration: 200k baseline shows deviation≈0.05–0.2)
+        self.cpc_dev_neuron.step(circ['deviation'], dt)
+        _cpc_cur = self.bundle_cpc_to_vital.propagate()
+        self.bundle_cpc_to_vital.apply_to_targets(_cpc_cur, dt)
+
+        # ── Vital Oscillator: heartbeat → Motor membrane injection ──
+        # Three detuned VdP oscillators draw energy from store and inject
+        # sub-threshold current into Motor X/Y/Z membranes.
+        # Signal chain: EnergyStore + deviation_mod → VitalOscillator → Motor.inject()
+        vital_outputs = self.vital_oscillator.step(
+            self.energy_store, dt,
+            deviation_mod=self.vital_amp_neuron.activation)
+        # Apply Feedback A: damage suppresses vital oscillation
+        vital_outputs = [v * vital_damage_factor for v in vital_outputs]
+        _VITAL_MOTOR_MAP = ['move_x', 'move_y', 'move_z']
+        for i, mkey in enumerate(_VITAL_MOTOR_MAP):
+            if mkey in self.motor_neurons:
+                self.motor_neurons[mkey]._membrane.inject(vital_outputs[i], dt)
+        # Record in MotionState
+        ms.vital_pulse = list(vital_outputs)
+        ms.vital_amplitude = sum(abs(v) for v in vital_outputs)
 
         # ── 1. Advance oscillators ──
         osc_modulations = {}
@@ -1870,6 +1945,18 @@ class VariantCircuit(HebbianCircuit):
             currents = bundle.propagate()
             if da_gain != 1.0:
                 currents = [c * da_gain for c in currents]
+            bundle.apply_to_targets(currents, dt)
+
+        # B1b: Renshaw recurrent lateral inhibition (after Col→Motor)
+        # BIO: α-motor collateral → Renshaw cell → motor pool inhibition
+        # (Eccles et al. 1961). Prevents co-contraction of antagonist pools.
+        # Excit: motor → renshaw (reads motor activation from Col→Motor step above)
+        for bundle in self.bundles_renshaw_excit:
+            currents = bundle.propagate()
+            bundle.apply_to_targets(currents, dt)
+        # Inhib: renshaw → other motors (reads renshaw activation just set)
+        for bundle in self.bundles_renshaw_inhib:
+            currents = bundle.propagate()
             bundle.apply_to_targets(currents, dt)
 
         # 接口一：Motor 传出副本（efference copy）→ hypothalamus_effort
@@ -2723,6 +2810,11 @@ class VariantCircuit(HebbianCircuit):
         # 接口一：Motor efference copy → hypothalamus_effort
         if self.hypothalamus_effort is not None:
             neurons.append(self.hypothalamus_effort)
+        # B1a: CPC deviation transducer + vital amplitude integrator
+        neurons.append(self.cpc_dev_neuron)
+        neurons.append(self.vital_amp_neuron)
+        # B1b: Renshaw interneurons (spinal lateral inhibition)
+        neurons.extend(self.renshaw_neurons.values())
         return neurons
 
     def get_all_bundles(self):
@@ -2772,6 +2864,11 @@ class VariantCircuit(HebbianCircuit):
         # 接口一：Motor efference copy Bundle
         if self.bundle_motor_to_effort is not None:
             bundles.append(self.bundle_motor_to_effort)
+        # B1a: CPC deviation → VitalOscillator amplitude modulation
+        bundles.append(self.bundle_cpc_to_vital)
+        # B1b: Renshaw lateral inhibition bundles
+        bundles.extend(self.bundles_renshaw_excit)
+        bundles.extend(self.bundles_renshaw_inhib)
         return bundles
 
     @property

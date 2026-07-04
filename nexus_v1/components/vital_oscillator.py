@@ -143,15 +143,19 @@ class VitalOscillator:
         # Step counter
         self._step_count: int = 0
 
-    def step(self, energy_store: 'EnergyStore', dt: float = 0.001) -> List[float]:
+    def step(self, energy_store: 'EnergyStore', dt: float = 0.001,
+             deviation_mod: float = 0.0) -> List[float]:
         """Advance oscillator by one time step.
 
-        Amplitude is modulated by energy_store.fill_fraction.
-        Energy is withdrawn from the store proportional to output magnitude.
+        Amplitude is modulated by energy_store.fill_fraction and
+        optionally by a CPC deviation signal (B1a: LH arousal pathway).
 
         Args:
             energy_store: the organism's energy reservoir
             dt: time step (seconds)
+            deviation_mod: fractional amplitude modifier from CPC deviation
+                           neuron. 0.0 = no change; +1.0 = double amplitude.
+                           Clamped to [0, 3×] to prevent runaway.
 
         Returns:
             List of [x, y, z] drive signals for Motor injection
@@ -177,6 +181,8 @@ class VitalOscillator:
                 0.3 - self.config.death_threshold)
 
         effective_amplitude = self.config.amplitude * amplitude_scale
+        # BIO: LH → PPTg/LDT arousal drive modulates locomotor amplitude (Saper 2002)
+        effective_amplitude *= max(0.0, min(3.0, 1.0 + deviation_mod))
 
         # ── Advance three VdP oscillators (independent, uncoupled) ──
         raw_outputs = []
