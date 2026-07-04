@@ -345,6 +345,33 @@ class VariantCircuit(HebbianCircuit):
         # ── Variant: Shadow Sandbox (read-only dual metric) ──
         self.shadow_sandbox = ShadowSandbox()
 
+        # ── C1: Shadow ν → DA gate (NuThresholdNeuron) ──
+        # BIO: Prediction residual ν (free energy change rate) gates VTA DA burst.
+        # Q1 BIO: basal ganglia prediction error → VTA DA burst (Schultz 1997;
+        #         Friston et al. 2012 "predictive coding and free energy").
+        # Q2 Structure: shadow._nu [transducer] → shadow_nu_neuron (0x05)
+        #              → [frozen, gain=1.0, w=0.3] → da_neurons (0x03)
+        # Q3 NU_SCALE = 1/176 (calibrated: ν_90th = 176.2, 20k-step stat, 2026-07-04).
+        #    shadow_nu_neuron: C=0.1 (fast τ=100 steps), R=1.0;
+        #    MOSFET v_threshold=0.9 → fires at ν > 0.9×176 = 158 (≈88th percentile).
+        #    w=0.3, gain=1.0 → I_DA = activation × 0.3 per DA neuron.
+        # NOTE: ν is the shadow layer's macroscopic free-energy rate; NuThresholdNeuron
+        #       is a boundary transducer (analogous to ThermalInputNeuron). The conversion
+        #       from ν (abstract) to neural current at this boundary IS the transduction.
+        #       Physical limitation noted: ν is a lagged aggregate; true phasic DA should
+        #       eventually track local Xin collapses. Preserved as a refinement interface.
+        self._NU_SCALE = 1.0 / 176.0  # BIO-CAL-2026-07-04: ν_90th = 176.2 (20k baseline)
+        self.shadow_nu_neuron = Neuron(NeuronConfig(
+            neuron_id='shadow_nu',
+            capacitance=0.1,
+            r_leak=1.0,
+            region=0x05,
+            spiking=False,
+            channels=[ChannelConfig(name='nu_thresh', v_threshold=0.9, gm=1.0)],
+        ))
+        # Bundle created after DA neurons are instantiated (see _init_da_neurons call below)
+        self.bundle_shadow_nu_to_da = None  # placeholder; initialized after DA neurons
+
         # ── Variant: 3D World + Body + Thermal + Muscle ──
         # Heat source at [70,50,50], body starts at [50,50,50]
         self.world = World()
@@ -1630,6 +1657,14 @@ class VariantCircuit(HebbianCircuit):
                 if j < len(_hd_cur) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += _hd_cur[j]
 
+        # ── C1: shadow_nu → DA (prediction-error phasic gate) ──
+        # bundle_shadow_nu_to_da created lazily (after DA circuit init).
+        if self.bundle_shadow_nu_to_da is not None:
+            _nu_cur = self.bundle_shadow_nu_to_da.propagate()
+            for j, tgt in enumerate(self.bundle_shadow_nu_to_da.targets):
+                if j < len(_nu_cur) and tgt.id in da_input_currents:
+                    da_input_currents[tgt.id] += _nu_cur[j]
+
         # HC-017 fix: RPE DA drive via normal step() pathway (not _membrane.inject).
         # BIO: VTA RPE → DA burst (Schultz 1997).
         # REF: Schultz 1997 J Neurophysiol 77:1060.
@@ -1771,6 +1806,11 @@ class VariantCircuit(HebbianCircuit):
         # At 10-step interval, only ~15k steps needed.
         if self._maturation_tick % 10 == 0:
             self.shadow_sandbox.observe(self, self._maturation_tick)
+
+        # ── C1: ShadowNuNeuron step (boundary transducer: ν → neural) ──
+        # BIO: basal ganglia prediction error → VTA DA burst (Friston 2012).
+        # _nu only updates every 10 steps; step every step to maintain τ dynamics.
+        self.shadow_nu_neuron.step(self.shadow_sandbox._nu * self._NU_SCALE, dt)
 
         # ── Phase Z: Entropy ledger post-step (slow-scale only) ──
         self._ledger_post_step(self._maturation_tick, dt)
@@ -2521,6 +2561,21 @@ class VariantCircuit(HebbianCircuit):
             )
             self.bundles_relay_to_yaw.append(SynapticBundle(_cfg_ltd, [_src_ltd], [_tgt_ltd]))
 
+        # ── C1: shadow_nu_neuron → DA (free energy gate, frozen) ──
+        # shadow_nu_neuron is already created in __init__; create the bundle here
+        # because we need da_list (not available at __init__ time in current lazy pattern).
+        cfg_nu = BundleConfig(
+            bundle_id='shadow_nu_to_da',
+            learning_rule='frozen',
+            initial_weight=0.3,
+            weight_max=0.3,
+            synapse_gain=1.0,
+            bundle_role='feedforward',
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_shadow_nu_to_da = SynapticBundle(
+            cfg_nu, [self.shadow_nu_neuron], da_list)
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -2532,6 +2587,7 @@ class VariantCircuit(HebbianCircuit):
             f"+relay_to_da({len(self.bundles_relay_to_da)})+cpg_to_da({len(self.bundles_cpg_to_da)})"
             f"+relay_lateral_inh({len(self.bundles_relay_lateral_inh)})"
             f"+relay_to_yaw({len(self.bundles_relay_to_yaw)})"
+            f"+shadow_nu_to_da(1)"
         )
 
     # ── P2-HC007: relay→enc STDP initialization ──────────────────
@@ -2815,6 +2871,8 @@ class VariantCircuit(HebbianCircuit):
         neurons.append(self.vital_amp_neuron)
         # B1b: Renshaw interneurons (spinal lateral inhibition)
         neurons.extend(self.renshaw_neurons.values())
+        # C1: shadow ν → DA boundary transducer
+        neurons.append(self.shadow_nu_neuron)
         return neurons
 
     def get_all_bundles(self):
@@ -2869,6 +2927,9 @@ class VariantCircuit(HebbianCircuit):
         # B1b: Renshaw lateral inhibition bundles
         bundles.extend(self.bundles_renshaw_excit)
         bundles.extend(self.bundles_renshaw_inhib)
+        # C1: shadow ν → DA gate (lazy: only after _init_da_circuit)
+        if self.bundle_shadow_nu_to_da is not None:
+            bundles.append(self.bundle_shadow_nu_to_da)
         return bundles
 
     @property
