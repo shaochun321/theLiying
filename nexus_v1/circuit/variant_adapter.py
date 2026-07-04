@@ -785,6 +785,35 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_yaw', 0.002, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
 
+        # D2: Phasic relay → lateral motor STDP arc (spinal_turn_toward → motor_turn)
+        # Q1. BIO: Spinal α-motor neuron arc. SA2 phasic thermal → spinal interneuron
+        #     → lateral motor neuron (move_y = body-frame lateral).
+        #     REF: Carew 2000 Behavioral Neurobiology §12; Sherrington 1910 J Physiol 40:28.
+        #     BIO: therm_left→move_y already in DC path (tonic); D2 adds PHASIC (dT/dt) version.
+        # Q2. spinal_ccw → motor_neurons['move_y'] (STDP, sg=+1.0): left thermal dT/dt → move left
+        #     spinal_cw  → motor_neurons['move_y'] (STDP, sg=−1.0): right thermal dT/dt → reduce leftward
+        #     (push-pull: mirrors DC therm_left→move_y / therm_right→move_y pattern)
+        # Q3. initial_weight=0.1, w_max=0.3, stdp_lr=0.005 (Bi&Poo 1998 — same as D1 phasic→spinal).
+        #     Multi-step: D2 apply_to_targets steps motor_y a 2nd/3rd time per step. At dt=0.001,
+        #     cumulative error < 0.1% (same as Renshaw recurrent inhibition, line 2070 comment).
+        _motor_y = self.motor_neurons.get('move_y')
+        self.bundle_d2_spinal_ccw_to_motor = (
+            SynapticBundle(BundleConfig(
+                bundle_id='d2_spinal_ccw_to_motor_y',
+                learning_rule='stdp', initial_weight=0.1, weight_max=0.3, stdp_lr=0.005,
+                synapse_gain=1.0, bundle_role='feedforward', remodel_cost_kappa=0.0,
+                use_eligibility_trace=True),
+                [self.spinal_ccw], [_motor_y])
+            if _motor_y else None)
+        self.bundle_d2_spinal_cw_to_motor = (
+            SynapticBundle(BundleConfig(
+                bundle_id='d2_spinal_cw_to_motor_y',
+                learning_rule='stdp', initial_weight=0.1, weight_max=0.3, stdp_lr=0.005,
+                synapse_gain=-1.0, bundle_role='feedforward', remodel_cost_kappa=0.0,
+                use_eligibility_trace=True),
+                [self.spinal_cw], [_motor_y])
+            if _motor_y else None)
+
         # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
         # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
         #     → 脊髓腹角运动神经元抑制，body 正面接近热源时自动减速防止冲过。
@@ -2102,6 +2131,13 @@ class VariantCircuit(HebbianCircuit):
             currents = bundle.propagate()
             bundle.apply_to_targets(currents, dt)
 
+        # D2: phasic relay → lateral motor forward pass (spinal_turn_toward → motor_y)
+        # After Renshaw (motor_y already stepped); 2nd/3rd step error < 0.1% at dt=0.001.
+        for _bd2 in [self.bundle_d2_spinal_ccw_to_motor, self.bundle_d2_spinal_cw_to_motor]:
+            if _bd2 is not None:
+                _cur2 = _bd2.propagate()
+                _bd2.apply_to_targets(_cur2, dt)
+
         # 接口一：Motor 传出副本（efference copy）→ hypothalamus_effort
         # 在 Col→Motor 传播后执行（Motor 神经元已被 step，activation 已更新）
         if getattr(self, 'bundle_motor_to_effort', None) is not None:
@@ -2251,6 +2287,13 @@ class VariantCircuit(HebbianCircuit):
             _bd1.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
                        fill_fraction=fill, da_concentration=da_conc)
             _bd1.compute_xin(dt)
+
+        # D2: spinal→motor_y STDP (DA-gated, col→motor gate; lateral locomotion learning)
+        for _bd2 in [self.bundle_d2_spinal_ccw_to_motor, self.bundle_d2_spinal_cw_to_motor]:
+            if _bd2 is not None:
+                _bd2.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                           fill_fraction=fill, da_concentration=da_conc)
+                _bd2.compute_xin(dt)
 
     def get_variant_state(self) -> dict:
         """Get variant component states for monitoring."""
@@ -2979,6 +3022,10 @@ class VariantCircuit(HebbianCircuit):
                         self.bundle_d1_phasic_left_to_spinal_ccw,
                         self.bundle_d1_phasic_right_to_spinal_cw,
                         self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw])
+        # D2: spinal → motor_y STDP bundles (lateral locomotion arc)
+        for _b in [self.bundle_d2_spinal_ccw_to_motor, self.bundle_d2_spinal_cw_to_motor]:
+            if _b is not None:
+                bundles.append(_b)
         return bundles
 
     @property
