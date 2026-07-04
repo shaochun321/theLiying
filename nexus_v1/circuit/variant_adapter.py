@@ -856,6 +856,63 @@ class VariantCircuit(HebbianCircuit):
         self._R_FEED: float = 5.0
         self._v_feed: float = 0.0   # current V_feed voltage (exposed for monitoring)
 
+        # ── Satiety Circuit: Intake + FillRate + Dwell → SatietyNeuron ──────────
+        # Q1 BIO: IntakeSensor = intestinal CCK/GLP-1 neurons (vagal afferent, nutrient absorption rate).
+        #         FillRateSensor = hepatic portal glucose sensing (vagal afferent, fill rate detection).
+        #         DwellSensor = hippocampal time cells (dwell duration integration, place-time coding).
+        #         SatietyNeuron = ARC POMC + NTS secondary satiety integration.
+        # REF: Berthoud 2008 Physiol Behav 94:681; Schmitt 2005 Cell Metab 1:63;
+        #      MacDonald 2011 Science 333:595; Cowley 2001 Nature 411:480.
+        # Q2: intake_sensor ← _v_feed (transducer boundary, HC-009 style, stepped before super().step())
+        #     fill_rate_sensor ← max(0, _rpe_da) (transducer boundary, stepped before super().step())
+        #     dwell_sensor: bc_current=0.02 ticking clock; reset when phasic fires via bundle
+        #     satiety: KCL (intake + fillrate + dwell − hunger), τ=50k steps, stepped in _propagate_bundles
+        #     satiety → vital_amp_neuron [sg=-1.0, w=0.5] → VitalOscillator (inhibit locomotion)
+        #     satiety → DA neurons [lazy: bundle_satiety_to_da created in _init_da_circuit]
+        # Q3: DwellSensor bc=0.02, C=1.0, R=50.0 → V_ss=bc×R=1.0V, τ=RC=50k steps, t_thresh=τ×ln(2)≈35k.
+        #     sg_phasic_dwell=-200: phasic_act≈0.001 → I_reset=0.2 >> bc=0.02 (10× safety margin).
+        #     SatietyNeuron C=50.0, R=1.0 → τ=50k steps (matches biological satiety timescale ~30-60s).
+        # NOTE: All 4 neurons EXCLUDED from get_all_neurons() (same principle as D1 arc neurons —
+        #       passive transducers, non-energy-limited; exclusion avoids diluting energy_per_neuron).
+        #       All bundles INCLUDED in get_all_bundles() for Noether/Xin tracking.
+        #       bundle_satiety_to_da is lazy-initialized in _init_da_circuit (da_neurons not ready yet).
+        self.intake_sensor_neuron = Neuron(NeuronConfig(
+            neuron_id='intake_sensor', capacitance=1.0, r_leak=1.0, region=0x04,
+            spiking=False))
+        self.fill_rate_sensor_neuron = Neuron(NeuronConfig(
+            neuron_id='fill_rate_sensor', capacitance=5.0, r_leak=1.0, region=0x04,
+            spiking=False))
+        self.dwell_sensor_neuron = Neuron(NeuronConfig(
+            neuron_id='dwell_sensor', capacitance=1.0, r_leak=50.0, region=0x01,
+            spiking=False, use_bias_current=True, bc_current=0.02))
+        self.satiety_neuron = Neuron(NeuronConfig(
+            neuron_id='satiety', capacitance=50.0, r_leak=1.0, region=0x04,
+            spiking=False))
+
+        def _sat_bun(bid, sg, w, srcs, tgts):
+            return SynapticBundle(BundleConfig(
+                bundle_id=bid, learning_rule='frozen', initial_weight=w,
+                synapse_gain=sg, bundle_role='feedforward', remodel_cost_kappa=0.0),
+                srcs, tgts)
+
+        self.bundle_intake_to_satiety   = _sat_bun('intake_to_satiety',   1.0,  1.0,
+                                                    [self.intake_sensor_neuron],    [self.satiety_neuron])
+        self.bundle_fillrate_to_satiety = _sat_bun('fillrate_to_satiety',  1.0,  0.5,
+                                                    [self.fill_rate_sensor_neuron], [self.satiety_neuron])
+        self.bundle_dwell_to_satiety    = _sat_bun('dwell_to_satiety',     1.0,  0.3,
+                                                    [self.dwell_sensor_neuron],     [self.satiety_neuron])
+        self.bundle_hunger_to_satiety   = _sat_bun('hunger_to_satiety',   -1.0,  0.5,
+                                                    [self.hypothalamus_hunger],     [self.satiety_neuron])
+        # phasic → dwell reset: sg=-200 ensures even weak phasic (act≈0.001) → I_reset=0.2 >> bc=0.02
+        self.bundle_phasic_to_dwell     = _sat_bun('phasic_to_dwell',   -200.0,  1.0,
+                                                    [self.phasic_left, self.phasic_right],
+                                                    [self.dwell_sensor_neuron])
+        # satiety → vital_amp_neuron (inhibit locomotion when full); KCL-summed with CPC signal
+        self.bundle_satiety_to_vital    = _sat_bun('satiety_to_vital',    -1.0,  0.5,
+                                                    [self.satiety_neuron],          [self.vital_amp_neuron])
+        # satiety → DA: lazy (da_neurons created in _init_da_circuit, not available at __init__ time)
+        self.bundle_satiety_to_da: SynapticBundle | None = None
+
         # ── Region assignment: tag all neurons with brain region codes ──
         # Must be called AFTER all _init_* methods complete (neurons fully created).
         self._assign_regions()
@@ -878,10 +935,14 @@ class VariantCircuit(HebbianCircuit):
         _HYPOTHALAMUS_IDS = {
             'energy_sensor_0', 'energy_sensor_1', 'energy_sensor_2',
             'average_energy', 'hypothalamus_hunger', 'hypothalamus_effort',
+            # Satiety circuit (region 0x04): registered here even though currently
+            # excluded from get_all_neurons() — ensures correct tagging if census changes.
+            'intake_sensor', 'fill_rate_sensor', 'satiety',
         }
 
         # 0x01 SPINAL: brake/Renshaw interneurons (Phase B will add more)
-        _SPINAL_IDS = {'spinal_renshaw_interneuron', 'motor_brake_interneuron'}
+        _SPINAL_IDS = {'spinal_renshaw_interneuron', 'motor_brake_interneuron',
+                       'dwell_sensor'}  # satiety dwell timer (region 0x01)
 
         for n in self.get_all_neurons():
             nid = n.id
@@ -1389,6 +1450,8 @@ class VariantCircuit(HebbianCircuit):
         self._feed_rate_cap.inject(_I_feed, dt)
         self._feed_rate_cap.leak(self._R_FEED, dt)
         self._v_feed = self._feed_rate_cap.voltage
+        # Satiety transducer 1: intake rate → IntakeSensorNeuron (HC-009 boundary)
+        self.intake_sensor_neuron.step(self._v_feed, dt)
 
         # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
         # BIO: dorsal horn spatial comparison across dermatomes.
@@ -1429,6 +1492,8 @@ class VariantCircuit(HebbianCircuit):
         # BIO: VTA burst on unexpected reward, silent on steady state.
         # REF: Schultz et al. 1997, Science 275:1593-1599.
         _rpe_da = self.da_gate.step(self.energy_store.fill_fraction, dt)
+        # Satiety transducer 2: fill rate → FillRateSensorNeuron (positive RPE only)
+        self.fill_rate_sensor_neuron.step(max(0.0, _rpe_da), dt)
         # HC-017删除: _hunger_da = max(0, 1.0*(0.5-fill_fraction)) [原L1094]
         # 饥饿 DA 已由接口二物理路径取代（ARC K_ATP → LH → hunger → DA Bundle）
         # BIO: Spanswick 1997 / Wise 2004；路径见 _init_energy_sensing()。
@@ -1451,8 +1516,11 @@ class VariantCircuit(HebbianCircuit):
         # Q3 Params: gain=0.3 (attenuates raw deviation [0,1] → mod [0,0.3]);
         #            w=0.5 initial (calibration: 200k baseline shows deviation≈0.05–0.2)
         self.cpc_dev_neuron.step(circ['deviation'], dt)
+        # KCL: CPC deviation + satiety inhibition → vital_amp_neuron (single step, avoid double-integrate)
         _cpc_cur = self.bundle_cpc_to_vital.propagate()
-        self.bundle_cpc_to_vital.apply_to_targets(_cpc_cur, dt)
+        _sat_v_cur = self.bundle_satiety_to_vital.propagate()
+        _vital_I = (_cpc_cur[0] if _cpc_cur else 0.0) + (_sat_v_cur[0] if _sat_v_cur else 0.0)
+        self.vital_amp_neuron.step(_vital_I, dt)
 
         # ── Vital Oscillator: heartbeat → Motor membrane injection ──
         # Three detuned VdP oscillators draw energy from store and inject
@@ -1772,6 +1840,14 @@ class VariantCircuit(HebbianCircuit):
             for j, tgt in enumerate(self.bundle_shadow_nu_to_da.targets):
                 if j < len(_nu_cur) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += _nu_cur[j]
+
+        # ── Satiety → DA: inhibit STDP learning window when full ──
+        # BIO: ARC POMC → VTA inhibitory projection (Berthoud 2008 Physiol Behav 94:681).
+        if self.bundle_satiety_to_da is not None:
+            _sat_da_cur = self.bundle_satiety_to_da.propagate()
+            for j, tgt in enumerate(self.bundle_satiety_to_da.targets):
+                if j < len(_sat_da_cur) and tgt.id in da_input_currents:
+                    da_input_currents[tgt.id] += _sat_da_cur[j]
 
         # HC-017 fix: RPE DA drive via normal step() pathway (not _membrane.inject).
         # BIO: VTA RPE → DA burst (Schultz 1997).
@@ -2114,6 +2190,21 @@ class VariantCircuit(HebbianCircuit):
             if da_gain != 1.0:
                 currents = [c * da_gain for c in currents]
             bundle.apply_to_targets(currents, dt)
+
+        # ── Satiety circuit propagation ─────────────────────────────────────────
+        # phasic → dwell: apply_to_targets calls dwell_sensor_neuron.step() every tick,
+        # ensuring bc_current integrates at all times (even when phasic=0 → current=0).
+        _pd_cur = self.bundle_phasic_to_dwell.propagate()
+        self.bundle_phasic_to_dwell.apply_to_targets(_pd_cur, dt)
+        # KCL: accumulate all satiety inputs, then step satiety_neuron once.
+        # Must be in same batch to avoid half-explicit Euler error (KCL constraint).
+        _I_sat = 0.0
+        for _b in (self.bundle_intake_to_satiety, self.bundle_fillrate_to_satiety,
+                   self.bundle_dwell_to_satiety, self.bundle_hunger_to_satiety):
+            _cur = _b.propagate()
+            if _cur:
+                _I_sat += _cur[0]   # each bundle has single target (satiety_neuron)
+        self.satiety_neuron.step(_I_sat, dt)
 
     # ── Ledger: Pre-step / Post-step ──────────────────────────────
 
@@ -2614,6 +2705,21 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_shadow_nu_to_da = SynapticBundle(
             cfg_nu, [self.shadow_nu_neuron], da_list)
 
+        # ── Satiety → DA (inhibit STDP learning window when full) ──
+        # BIO: ARC POMC neurons project inhibitory axons to VTA (Berthoud 2008 Physiol Behav 94:681).
+        # sg=-1.0, w=0.3: at satiety_act=0.5 → I_inhib=0.15; DA resting I ≈ 0.1 (bc only),
+        # so full satiety can suppress DA to ~35% of baseline (locomotion suppression without silence).
+        cfg_satiety_da = BundleConfig(
+            bundle_id='satiety_to_da',
+            learning_rule='frozen',
+            initial_weight=0.3,
+            synapse_gain=-1.0,
+            bundle_role='feedforward',
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_satiety_to_da = SynapticBundle(
+            cfg_satiety_da, [self.satiety_neuron], da_list)
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -2915,6 +3021,9 @@ class VariantCircuit(HebbianCircuit):
         # col→motor STDP selectivity (T4.1 regression). D1 neurons are passive
         # (non-spiking, non-energy-limited) so vascular exclusion is safe.
         # D1 bundles ARE in get_all_bundles() for Noether/Xin bookkeeping.
+        # Satiety circuit neurons (intake_sensor, fill_rate_sensor, dwell_sensor, satiety_neuron)
+        # also excluded — metabolically passive transducers; same rationale as D1.
+        # Satiety bundles ARE in get_all_bundles() for Noether/Xin tracking.
         return neurons
 
     def get_all_bundles(self):
@@ -2979,6 +3088,13 @@ class VariantCircuit(HebbianCircuit):
                         self.bundle_d1_phasic_left_to_spinal_ccw,
                         self.bundle_d1_phasic_right_to_spinal_cw,
                         self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw])
+        # Satiety circuit bundles (all included for Noether/Xin tracking)
+        for _b in (self.bundle_intake_to_satiety, self.bundle_fillrate_to_satiety,
+                   self.bundle_dwell_to_satiety, self.bundle_hunger_to_satiety,
+                   self.bundle_phasic_to_dwell, self.bundle_satiety_to_vital):
+            bundles.append(_b)
+        if self.bundle_satiety_to_da is not None:
+            bundles.append(self.bundle_satiety_to_da)
         return bundles
 
     @property
