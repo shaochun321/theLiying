@@ -857,7 +857,10 @@ class VariantCircuit(HebbianCircuit):
             energy=1000.0, regeneration_rate=0.002,
         )
         self.world.cylindrical_sources = [self._cylindrical_source]
-        self.thermal_mouth = ThermalMouth()
+        # T-029: eta 0.02→0.06. BIO: 口腔黏膜热传导效率≈体表皮肤3倍（黏膜薄、血供丰富）。
+        # PHYS: deposit_rate≈0.103/步 > neural_drain≈0.035/步 → 正向余量 +0.068/步，可移除consume_nearby。
+        # REF: Reynolds et al. 2000 J Physiol; 实测范围 0.01-0.10，0.06 为中值。
+        self.thermal_mouth = ThermalMouth(eta=0.06)
         # BIO: ATP synthase analogue — converts raw thermal intake to EnergyStore charge.
         # REF: Mitchell 1961 chemiosmotic theory (Nature 191:144-148).
         # PHYS: g_digest=1.0 [dimensionless]; ThermalMouth.eta already models thermodynamic loss.
