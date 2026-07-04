@@ -929,6 +929,15 @@ class VariantCircuit(HebbianCircuit):
         # satiety → DA: lazy (da_neurons created in _init_da_circuit, not available at __init__ time)
         self.bundle_satiety_to_da: SynapticBundle | None = None
 
+        # ── DwellSensor Schmitt trigger state ─────────────────────────────────
+        # BIO: hippocampal place cell timer — only resets on confirmed locomotion
+        #      (not thermal noise). Schmitt hysteresis prevents rapid on/off chatter.
+        # SEMI: equivalent to MOSFET shunt gated by phasic EMA; smooth g_dis avoids
+        #       current spikes into the large satiety capacitor (C=50, τ=50k).
+        self._phasic_ema_dwell: float = 0.0   # EMA of positive-clamped phasic signal
+        self._dwell_is_discharging: bool = False  # Schmitt latch state
+        self._dwell_g_dis: float = 0.001      # current smoothed discharge conductance
+
         # ── Region assignment: tag all neurons with brain region codes ──
         # Must be called AFTER all _init_* methods complete (neurons fully created).
         self._assign_regions()
@@ -2203,20 +2212,43 @@ class VariantCircuit(HebbianCircuit):
             bundle.apply_to_targets(currents, dt)
 
         # ── Satiety circuit propagation ─────────────────────────────────────────
-        # phasic → dwell: dead-zone threshold filters thermal noise from true locomotion.
-        # Calibrated from 10k test: thermal-equilibration phasic ≈ 3e-5 (noise floor),
-        # locomotion phasic ≈ 0.01-0.1 (100-3000× larger). Threshold = 1e-3 separates them.
-        # BIO: hippocampal time cells reset only when locomotion speed exceeds noise floor.
-        _PHASIC_RESET_THRESHOLD = 1e-3
-        _phasic_total = self.phasic_left.activation + self.phasic_right.activation
-        if _phasic_total >= _PHASIC_RESET_THRESHOLD:
-            _pd_cur = self.bundle_phasic_to_dwell.propagate()
-        else:
-            _pd_cur = [0.0]  # thermal noise: no discharge, bc_current charges freely
-        self.bundle_phasic_to_dwell.apply_to_targets(_pd_cur, dt)
-        # Voltage floor: phasic reset is a TIMER RESET (to 0), not hyperpolarization.
-        # Prevents extreme negative voltage requiring 70k+ steps to recover after locomotion.
-        # BIO: timer resets to zero when leaving place field, not to "negative time".
+        # DwellSensor Schmitt trigger: phasic EMA + dual-threshold hysteresis + smooth g_dis.
+        # Replaces simple dead-zone threshold (>= 1e-3) with:
+        #   1. Positive-clamp phasic (negative = moving away from heat → no reset)
+        #   2. EMA smoothing (tau=10 steps) prevents single-step noise spikes from triggering
+        #   3. Schmitt hysteresis (on=0.01, off=0.005) prevents rapid on/off chatter
+        #   4. 1st-order g_dis smoothing (tau=5 steps) avoids current spikes into C=50 satiety cap
+        # BIO: hippocampal time cells reset only on confirmed locomotion; TRPV1 phasic
+        #      distinguishes thermal front (positive) from cool-return (negative).
+        # SEMI: equivalent to phasic-EMA-gated MOSFET shunt across DwellSensor capacitor.
+        _DWELL_ON_THRESH  = 0.01    # Schmitt upper: phasic EMA ≥ this → start discharge
+        _DWELL_OFF_THRESH = 0.005   # Schmitt lower: phasic EMA < this → stop discharge
+        _DWELL_TAU_EMA    = 10.0    # phasic EMA window (steps)
+        _DWELL_TAU_G      = 5.0     # conductance smooth tau (supplement §3.1: prevents spikes)
+        _DWELL_G_HIGH     = 1.0     # discharge conductance (fast drain: τ_eff ≈ C/G ≈ 1 step)
+        _DWELL_G_LOW      = 0.001   # standby conductance (negligible drain)
+
+        _phasic_pos = max(0.0, self.phasic_left.activation + self.phasic_right.activation)
+        _alpha_ema  = min(1.0, dt / _DWELL_TAU_EMA)
+        self._phasic_ema_dwell = (self._phasic_ema_dwell * (1.0 - _alpha_ema)
+                                  + _phasic_pos * _alpha_ema)
+        # Schmitt latch transitions
+        if not self._dwell_is_discharging and self._phasic_ema_dwell >= _DWELL_ON_THRESH:
+            self._dwell_is_discharging = True
+        elif self._dwell_is_discharging and self._phasic_ema_dwell < _DWELL_OFF_THRESH:
+            self._dwell_is_discharging = False
+        # Smooth conductance (1st-order low-pass)
+        _target_g = _DWELL_G_HIGH if self._dwell_is_discharging else _DWELL_G_LOW
+        self._dwell_g_dis += (_target_g - self._dwell_g_dis) * (dt / _DWELL_TAU_G)
+        # Apply discharge drain (MOSFET shunt analogue)
+        _V_dwell = self.dwell_sensor_neuron._membrane.voltage
+        if _V_dwell > 0.0:
+            self.dwell_sensor_neuron._membrane.charge -= self._dwell_g_dis * _V_dwell * dt
+        # bundle_phasic_to_dwell: structurally retained for census/audit; propagation
+        # superseded by Schmitt conductance drain above. Apply with zero current to
+        # satisfy Noether KCL accounting without injecting double discharge.
+        self.bundle_phasic_to_dwell.apply_to_targets([0.0], dt)
+        # Voltage floor: timer reset to 0, not hyperpolarization.
         if self.dwell_sensor_neuron._membrane.voltage < 0.0:
             self.dwell_sensor_neuron._membrane.charge = 0.0
         # KCL: accumulate all satiety inputs, then step satiety_neuron once.
