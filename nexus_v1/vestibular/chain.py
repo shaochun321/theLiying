@@ -33,6 +33,7 @@ Each axis has its own parallel chain of Neurons.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -116,6 +117,25 @@ def _met_config(axis: str) -> NeuronConfig:
 
 
 
+# ─────────────────────────────────────────────────────────────────────
+# N-HC Phase B differentiation parameters
+# REF: Goldberg 2000 Annu Rev Physiol 62:121-155; Eatock & Songer 2011
+# τ = C × R_leak; R_leak=5.0 fixed; C × factor gives frequency separation.
+# HC_0 (Type I-like): fast τ, high-gain — encodes phasic/high-freq stimuli.
+# HC_1 (mixed):       τ×2,  normal gain — mid-range encoding.
+# HC_2 (Type II-like): τ×4, low-gain — encodes slow/tonic stimuli, saturation-resistant.
+# ─────────────────────────────────────────────────────────────────────
+_HC_CAP_FACTORS: tuple = (1.0, 2.0, 4.0)   # capacitance multiplier per HC index
+
+# MET→HC synapse_gain per HC index (KCL T-024 audit correction, baseline=5.0)
+# HC_0/1: 5.0 (baseline); HC_2: 4.0 (−20%, saturation-resistant)
+_HC_MET_GAINS: tuple = (5.0, 5.0, 4.0)
+
+# HC→Aff synapse_gain = 20.0 / N_hair_cells (KCL current conservation)
+# Original single-HC synapse_gain=20.0; N=3 → 20.0/3 ≈ 6.67 each
+_HC_AFF_GAIN_TOTAL: float = 20.0
+
+
 def _haircell_config(axis: str) -> NeuronConfig:
     """TYPE:BIO — Layer 2: Hair cell — multi-channel HH equivalent.
 
@@ -183,6 +203,27 @@ def _haircell_config(axis: str) -> NeuronConfig:
         vr_base_rate=0.001,
         vr_activity_coeff=0.3,
         vr_max_rate=3.0,
+    )
+
+
+def _haircell_config_n(axis: str, hc_idx: int) -> NeuronConfig:
+    """TYPE:BIO — Differentiated HC config for N-HC Phase B expansion.
+
+    HC_0 is identical to the single-HC baseline (backward compatible).
+    HC_1/2 share the same channels + Ca²⁺ subsystem but have larger capacitance
+    for τ differentiation — implementing Type I / Type II parallel frequency encoding.
+
+    BIO: Type I HCs (small C, fast τ) → high-freq phasic; Type II (large C, slow τ) → DC tonic.
+    REF: Goldberg 2000 Annu Rev Physiol 62:121-155; Eatock & Songer 2011.
+    """
+    base = _haircell_config(axis)
+    if hc_idx == 0:
+        return base  # HC_0: identical to original (preserves Ca²⁺ calibration)
+    c_factor = _HC_CAP_FACTORS[min(hc_idx, len(_HC_CAP_FACTORS) - 1)]
+    return dataclasses.replace(
+        base,
+        neuron_id=f"hc_{axis}_{hc_idx}",
+        capacitance=base.capacitance * c_factor,
     )
 
 
@@ -261,84 +302,115 @@ def _afferent_irregular_config(axis: str) -> NeuronConfig:
 class VestibularChain:
     """TYPE:BIO — 5-layer vestibular transduction chain, built from MetaNeurons.
 
-    Architecture per axis:
+    Architecture per axis (N=1):
         mechanical_input → [MET] → [HairCell] → release → [Afferent_reg]
                                                        → [Afferent_irr]
 
-    MET → HairCell via bundle (STDP-capable)
-    HairCell.release_rate → Afferent via bundle (STDP-capable)
+    Architecture per axis (N=3, Phase B):
+        mechanical_input → [MET] ─┬→ [HC_0 fast τ, STDP] ─┐
+                                  ├→ [HC_1 mid  τ, frozen]─┼→ KCL add → [Aff_reg]
+                                  └→ [HC_2 slow τ, frozen]─┘          → [Aff_irr]
+
+    MET → HairCell via bundle (HC_0 STDP; HC_1/2 frozen)
+    HairCell.release_rate → Afferent via bundle (frozen, KCL scaled)
 
     Two afferents per axis: regular (DC/gravity) + irregular (AC/motion)
-    Total neurons: 6 axes × 4 neurons = 24
-    Total bundles: 6 axes × 2 bundles = 12
+    N=1: 6 axes × 4 neurons = 24 neurons, 12 bundles
+    N=3: 6 axes × (1 MET + 3 HC + 2 Aff) = 36 neurons, 36 bundles
     """
 
-    def __init__(self, axes: List[str] | None = None):
+    def __init__(self, axes: List[str] | None = None, n_hair_cells: int = 1):
         if axes is None:
             axes = ALL_AXES
         self.axes = axes
+        self.n_hair_cells = n_hair_cells
 
         # Create neurons per axis
         self.met_neurons: Dict[str, Neuron] = {}
-        self.haircell_neurons: Dict[str, Neuron] = {}
         self.afferent_regular: Dict[str, Neuron] = {}
         self.afferent_irregular: Dict[str, Neuron] = {}
 
-        # Bundles
+        # HC_0 (primary, backward-compatible access)
+        self.haircell_neurons: Dict[str, Neuron] = {}
         self.bundles_met_to_hc: Dict[str, SynapticBundle] = {}
         self.bundles_hc_to_aff: Dict[str, SynapticBundle] = {}
 
+        # Full lists for N≥1 (includes HC_0 as index 0)
+        self.haircell_neurons_all: Dict[str, List[Neuron]] = {}
+        self.bundles_met_to_hc_all: Dict[str, List[SynapticBundle]] = {}
+        self.bundles_hc_to_aff_all: Dict[str, List[SynapticBundle]] = {}
+
+        # KCL: total HC→Aff gain is fixed; each HC contributes 1/N share
+        hc_aff_gain = round(_HC_AFF_GAIN_TOTAL / n_hair_cells, 4)
+
         for axis in axes:
-            # Create neurons
             met = Neuron(_met_config(axis))
-            hc = Neuron(_haircell_config(axis))
             aff_r = Neuron(_afferent_regular_config(axis))
             aff_i = Neuron(_afferent_irregular_config(axis))
 
             self.met_neurons[axis] = met
-            self.haircell_neurons[axis] = hc
             self.afferent_regular[axis] = aff_r
             self.afferent_irregular[axis] = aff_i
 
+            hc_list: List[Neuron] = []
+            met_hc_list: List[SynapticBundle] = []
+            hc_aff_list: List[SynapticBundle] = []
 
-            # Bundle: MET → HairCell
-            b_met_hc = SynapticBundle(
-                config=BundleConfig(
-                    bundle_id=f"met_to_hc_{axis}",
-                    learning_rule="stdp",
-                    initial_weight=0.5,    # moderate (standard chemical synapse)
-                    stdp_lr=0.005,
-                    # Gain: HC needs to reach Ca threshold (0.308) from rest (0.115)
-                    # ΔV = 0.193 in ~200 steps, C=1.0
-                    # I_needed = 0.193 / (0.002 * 200) = 0.48
-                    # I_without = act(1.0) × G(1.0) = 1.0 → gain = 0.48/1.0 ≈ 1
-                    # But MET activation rises slowly, so need more gain
-                    synapse_gain=5.0,
-                ),
-                sources=[met],
-                targets=[hc],
-            )
-            self.bundles_met_to_hc[axis] = b_met_hc
+            for hc_idx in range(n_hair_cells):
+                hc = Neuron(_haircell_config_n(axis, hc_idx))
+                hc_list.append(hc)
 
-            # Bundle: HairCell → Afferents (regular + irregular)
-            b_hc_aff = SynapticBundle(
-                config=BundleConfig(
-                    bundle_id=f"hc_to_aff_{axis}",
-                    learning_rule="frozen",  # ribbon synapse: no STDP
-                    # REF: Bao et al. 2003 — ribbon synapse = structurally stable
-                    initial_weight=0.8,    # BIO: ribbon synapse (calibrated)
-                    weight_max=0.95,       # cap prevents over-drive
-                    # Gain derivation (after Ca fix):
-                    # release_ss ≈ 0.4, G(w=0.8) = 0.48
-                    # Target 50 Hz: ISI=20, ΔV=0.153, C=0.5
-                    # I_needed = 0.153 × 0.5 / (20 × 0.001) = 3.83
-                    # gain = 3.83 / (0.4 × 0.48) = 19.9 → 20
-                    synapse_gain=20.0,
-                ),
-                sources=[hc],
-                targets=[aff_r, aff_i],
-            )
-            self.bundles_hc_to_aff[axis] = b_hc_aff
+                # Bundle: MET → HairCell_i
+                # HC_0: STDP (preserves original learning dynamics)
+                # HC_1/2: frozen (fixed frequency-domain filters)
+                met_gain = _HC_MET_GAINS[min(hc_idx, len(_HC_MET_GAINS) - 1)]
+                b_id = (f"met_to_hc_{axis}" if n_hair_cells == 1
+                        else f"met_to_hc_{axis}_{hc_idx}")
+                b_met_hc = SynapticBundle(
+                    config=BundleConfig(
+                        bundle_id=b_id,
+                        learning_rule="stdp" if hc_idx == 0 else "frozen",
+                        initial_weight=0.5,
+                        stdp_lr=0.005,
+                        # HC_0/1: gain=5.0 (baseline); HC_2: 4.0 (saturation-resistant)
+                        # BIO: Type II HCs have lower gain per Goldberg 2000
+                        # T-024 audit: corrected from plan baseline 1.0 → actual 5.0
+                        synapse_gain=met_gain,
+                    ),
+                    sources=[met],
+                    targets=[hc],
+                )
+                met_hc_list.append(b_met_hc)
+
+                # Bundle: HairCell_i → Afferents (KCL scaled)
+                # Each HC contributes 1/N of the total Aff drive.
+                # KCL: N × (20.0/N) = 20.0, preserving original Aff current level.
+                # T-024 audit: corrected from plan 1.0/3=0.33 → actual 20.0/3=6.67
+                # REF: Bao et al. 2003 — ribbon synapse = structurally stable
+                b_aff_id = (f"hc_to_aff_{axis}" if n_hair_cells == 1
+                            else f"hc_to_aff_{axis}_{hc_idx}")
+                b_hc_aff = SynapticBundle(
+                    config=BundleConfig(
+                        bundle_id=b_aff_id,
+                        learning_rule="frozen",
+                        initial_weight=0.8,
+                        weight_max=0.95,
+                        synapse_gain=hc_aff_gain,
+                    ),
+                    sources=[hc],
+                    targets=[aff_r, aff_i],
+                )
+                hc_aff_list.append(b_hc_aff)
+
+            # Backward-compatible single references (HC_0)
+            self.haircell_neurons[axis] = hc_list[0]
+            self.bundles_met_to_hc[axis] = met_hc_list[0]
+            self.bundles_hc_to_aff[axis] = hc_aff_list[0]
+
+            # Full N-HC lists
+            self.haircell_neurons_all[axis] = hc_list
+            self.bundles_met_to_hc_all[axis] = met_hc_list
+            self.bundles_hc_to_aff_all[axis] = hc_aff_list
 
     def step(self, mechanical_inputs: Dict[str, float], dt: float = 1.0):
         """Process one time step.
@@ -349,6 +421,7 @@ class VestibularChain:
                 Values: local strain / radial velocity (float)
             dt: time step
         """
+        import math as _math
         for axis in self.axes:
             deflection = mechanical_inputs.get(axis, 0.0)
 
@@ -356,40 +429,49 @@ class VestibularChain:
             met = self.met_neurons[axis]
             met.step(deflection, dt)
 
-            # Layer 2: HairCell (receives MET output via bundle)
-            currents = self.bundles_met_to_hc[axis].propagate()
-            hc = self.haircell_neurons[axis]
-            _pt_before = hc.pre_trace  # save before step() overwrites with MOSFET trace
-            if currents:
-                hc.step(currents[0], dt)
-            else:
-                hc.step(0.0, dt)
-
-            # Layer 3: Release is computed inside HairCell (Ca²⁺ subsystem)
-            # hc.release_rate is the output of the Ca²⁺ gate
-
-            # Layer 4: Afferents (receive release_rate via bundle)
-            # HC-008 fix: single update — Ca²⁺ release_rate is the STDP pre-signal
-            # BIO: CaV1.3 Ca²⁺ drives vesicle exocytosis at IHC ribbon synapse
-            # REF: Fuchs 2005 J Physiology 567(1):13-19; Nouvian et al. 2006 Nat Neurosci
-            hc.activation = hc.release_rate  # bridge: Ca²⁺ output → bundle propagation
-            import math as _math
-            _decay = _math.exp(-dt / max(hc.config.trace_tau_pre * 0.001, 0.001))
-            hc.pre_trace = min(_pt_before * _decay + abs(hc.release_rate), 10.0)
-            aff_currents = self.bundles_hc_to_aff[axis].propagate()
+            # Layer 2–3: All HCs receive MET output through their individual bundles.
+            # Each HC has its own RC time constant (τ = C × R_leak) for frequency separation.
             aff_r = self.afferent_regular[axis]
             aff_i = self.afferent_irregular[axis]
-            if len(aff_currents) >= 2:
-                aff_r.step(aff_currents[0], dt)
-                aff_i.step(aff_currents[1], dt)
-            elif len(aff_currents) == 1:
-                aff_r.step(aff_currents[0], dt)
-                aff_i.step(aff_currents[0], dt)
+            total_aff_r = 0.0
+            total_aff_i = 0.0
 
-        # Learning
+            hc_list = self.haircell_neurons_all[axis]
+            met_hc_list = self.bundles_met_to_hc_all[axis]
+            hc_aff_list = self.bundles_hc_to_aff_all[axis]
+
+            for hc, b_met_hc, b_hc_aff in zip(hc_list, met_hc_list, hc_aff_list):
+                currents = b_met_hc.propagate()
+                _pt_before = hc.pre_trace
+                hc.step(currents[0] if currents else 0.0, dt)
+
+                # Layer 3: Ca²⁺ release bridge (same for all HCs)
+                # HC-008 fix: Ca²⁺ release_rate → bundle propagation signal
+                # BIO: CaV1.3 Ca²⁺ drives vesicle exocytosis at IHC ribbon synapse
+                # REF: Fuchs 2005 J Physiology 567(1):13-19; Nouvian et al. 2006
+                hc.activation = hc.release_rate
+                _decay = _math.exp(-dt / max(hc.config.trace_tau_pre * 0.001, 0.001))
+                hc.pre_trace = min(_pt_before * _decay + abs(hc.release_rate), 10.0)
+
+                # Layer 4: Accumulate Aff currents from all N HCs (KCL addition)
+                aff_currents = b_hc_aff.propagate()
+                if len(aff_currents) >= 2:
+                    total_aff_r += aff_currents[0]
+                    total_aff_i += aff_currents[1]
+                elif len(aff_currents) == 1:
+                    total_aff_r += aff_currents[0]
+                    total_aff_i += aff_currents[0]
+
+            # Step Afferents once with the summed KCL current
+            aff_r.step(total_aff_r, dt)
+            aff_i.step(total_aff_i, dt)
+
+        # Learning (all bundles across all HCs)
         for axis in self.axes:
-            self.bundles_met_to_hc[axis].learn(dt)
-            self.bundles_hc_to_aff[axis].learn(dt)
+            for b in self.bundles_met_to_hc_all[axis]:
+                b.learn(dt)
+            for b in self.bundles_hc_to_aff_all[axis]:
+                b.learn(dt)
 
     def get_output(self) -> Dict[str, Dict[str, float]]:
         """Get per-axis output from afferent neurons.
@@ -398,22 +480,25 @@ class VestibularChain:
             "rate_regular": firing rate of regular afferent,
             "rate_irregular": firing rate of irregular afferent,
             "regularity": ISI regularity of regular afferent,
-            "release_rate": Ca²⁺ release rate from hair cell,
+            "release_rate": Ca²⁺ release rate from HC_0 (primary hair cell),
+            "hc_voltages": list of membrane voltages for all N HCs,
         }
         """
         output = {}
         for axis in self.axes:
             aff_r = self.afferent_regular[axis]
             aff_i = self.afferent_irregular[axis]
-            hc = self.haircell_neurons[axis]
+            hc0 = self.haircell_neurons[axis]  # HC_0 (primary)
 
             output[axis] = {
                 "rate_regular": aff_r.firing_rate(),
                 "rate_irregular": aff_i.firing_rate(),
                 "regularity": aff_r.regularity(),
-                "release_rate": hc.release_rate,
+                "release_rate": hc0.release_rate,
                 "met_activation": self.met_neurons[axis].activation,
-                "hc_voltage": hc._membrane.voltage,
+                "hc_voltage": hc0._membrane.voltage,
+                "hc_voltages": [hc._membrane.voltage
+                                for hc in self.haircell_neurons_all[axis]],
             }
         return output
 
@@ -421,20 +506,18 @@ class VestibularChain:
         """Get all neurons in the chain (for circuit integration)."""
         neurons = []
         for axis in self.axes:
-            neurons.extend([
-                self.met_neurons[axis],
-                self.haircell_neurons[axis],
-                self.afferent_regular[axis],
-                self.afferent_irregular[axis],
-            ])
+            neurons.append(self.met_neurons[axis])
+            neurons.extend(self.haircell_neurons_all[axis])   # all N HCs
+            neurons.append(self.afferent_regular[axis])
+            neurons.append(self.afferent_irregular[axis])
         return neurons
 
     def get_all_bundles(self) -> List[SynapticBundle]:
         """Get all bundles (for circuit integration)."""
         bundles = []
         for axis in self.axes:
-            bundles.append(self.bundles_met_to_hc[axis])
-            bundles.append(self.bundles_hc_to_aff[axis])
+            bundles.extend(self.bundles_met_to_hc_all[axis])  # all N MET→HC
+            bundles.extend(self.bundles_hc_to_aff_all[axis])  # all N HC→Aff
         return bundles
 
     def summary(self) -> dict:
