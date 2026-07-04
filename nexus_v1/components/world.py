@@ -22,6 +22,19 @@ import random
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
+# ── Physical scale constants (T-023: scale generalization prep) ──
+# BIO: small thermophilic invertebrate, body ~1cm radius (like C. elegans at 1mm scale).
+# REF: Devor 1987 J Neurosci 7:2195 — receptive field geometry in peripheral nervous system.
+# 1 sim_unit = BODY_SCALE_M meters.
+# Derived: effective radius r_body = (3V/4π)^(1/3) = (3×9/(4π))^(1/3) ≈ 1.31 sim_units
+#          r_physical ≈ 1.31 × 0.01 m ≈ 1.3 cm → consistent with small marine invertebrate.
+BODY_SCALE_M: float = 0.01        # meters per sim_unit
+
+# BIO: skin thermal zone (epidermis + superficial dermis) where TRPV1/TRPA1 sit.
+# REF: Elwassif 2006 J Biomech — thermal diffusivity α≈0.14mm²/s in soft tissue;
+#      1mm penetration depth → τ = d²/(2α) ≈ 3.6s → depth 2mm gives τ ≈ 7s ≈ 5s calibrated.
+SKIN_DEPTH_M: float = 0.002       # meters (2 mm skin depth)
+
 
 @dataclass
 class HeatSource:
@@ -129,6 +142,37 @@ class SkinPatch:
     # BIO: 43°C in real units; normalized to 3.0 in our thermal range.
     # Damage accumulates only when skin temperature exceeds this.
     damage_heal_rate: float = 0.1     # slow self-repair rate
+
+    # ── Patch geometry (T-023: scale generalization prep) ──
+    # Read-only; not stored, always derived. No dynamic effect.
+    # n_patches: 12 (3 rings × 4 directions).
+    # Body surface area = 4π × r_body², where r_body = effective_radius × BODY_SCALE_M.
+    # Patch area = body_surface_area / n_patches (equal-area assumption).
+    # BIO: each patch covers one dermatome receptive field unit.
+    N_PATCHES: int = 12              # expected total patches
+
+    @property
+    def area_m2(self) -> float:
+        """Patch surface area in m².
+
+        Derived from body total volume (V=9 sim_units³) and equal-area partition.
+        BIO: each SkinPatch covers 1/N_PATCHES of the body surface — one dermatome.
+        REF: Devor 1987 J Neurosci 7:2195 — receptive field areas in skin afferents.
+        """
+        # Body effective radius from default total_volume=9 sim_units³
+        r_body_sim = (3.0 * 9.0 / (4.0 * math.pi)) ** (1.0 / 3.0)  # ≈ 1.31 sim_units
+        r_body_m = r_body_sim * BODY_SCALE_M
+        total_surface_m2 = 4.0 * math.pi * r_body_m ** 2
+        return total_surface_m2 / self.N_PATCHES
+
+    @property
+    def volume_m3(self) -> float:
+        """Patch skin volume in m³ (area × SKIN_DEPTH_M).
+
+        BIO: thermal mass of the superficial skin layer (epidermis + dermis).
+        REF: Elwassif 2006 J Biomech — skin depth 2mm for thermal computations.
+        """
+        return self.area_m2 * SKIN_DEPTH_M
 
     def world_position(self, body: 'Body') -> List[float]:
         """Patch world position via explicit yaw rotation around z-axis.
@@ -281,6 +325,25 @@ class Body:
         V = (4/3)πr³ → r = (3V/4π)^(1/3)
         """
         return (3.0 * self.total_volume / (4.0 * math.pi)) ** (1.0 / 3.0)
+
+    @property
+    def effective_radius_m(self) -> float:
+        """Body effective radius in meters (T-023: scale generalization prep).
+
+        BIO: used by vestibular Phase B (N=1→3) to calibrate canal/otolith geometry
+        relative to body size. Also base for SkinPatch.area_m2 computation.
+        """
+        return self.effective_radius * BODY_SCALE_M
+
+    @property
+    def surface_area_m2(self) -> float:
+        """Total body surface area in m² (sphere model).
+
+        Used by vestibular/canal geometry calibration (T-024: vestibular Phase B).
+        BIO: surface/volume ratio determines thermal buffering capacity.
+        REF: Elwassif 2006 J Biomech — surface area used for thermal boundary conditions.
+        """
+        return 4.0 * math.pi * self.effective_radius_m ** 2
 
     def sample_skin(self, world: 'World', dt: float = 1.0) -> dict:
         """Step thermal dynamics and sample all skin patches.
