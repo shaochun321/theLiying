@@ -1466,7 +1466,7 @@ class VariantCircuit(HebbianCircuit):
         # Transducer bypass: set activation directly from physical signal (like ThermalInputNeuron).
         # MOSFET quadratic squashing (vm-0.3)² reduces activation 57× vs linear passthrough.
         # BIO: CCK/GLP-1 release neurons fire proportionally to nutrient flux, not thresholded.
-        self.intake_sensor_neuron.activation = max(0.0, self._v_feed)
+        self.intake_sensor_neuron.activation = max(0.0, min(1.0, self._v_feed))
 
         # T-022 清洁化：feed channel 暂禁用（0.0），待 DigestiveInterface → CPC 量纲校准后接入。
         # 原 max(thermo)-min(thermo) 无上界（STDP 下可增长到 5+），破坏 rho_homeo。
