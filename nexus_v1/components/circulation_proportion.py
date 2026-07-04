@@ -115,9 +115,12 @@ class CirculationProportionCircuit:
         """Integrate amplitude signals and compute structural outputs.
 
         Args:
-            thermal_stability: 1/(1+|thermal_err|×10). High = stable.
-            body_speed: actual body speed. High = moving.
-            feed_alignment: max(0, dot(heat_dir, vel_dir)) × thermal_err.
+            thermal_stability: 1 - relay_avg (from somatosensory relay neurons).
+                High = thermally comfortable (quiet relays). Low = stressed (active relays).
+                BIO: preoptic area codes thermal comfort; high relay input suppresses homeo channel.
+                REF: Nakamura & Morrison 2008, Nat Neurosci.
+            body_speed: actual body speed in m/s. High = moving.
+            feed_alignment: feeding drive signal (currently 0.0; pending DigestiveInterface calibration).
             dt: time step.
 
         Returns:

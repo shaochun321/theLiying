@@ -1457,8 +1457,6 @@ class VariantCircuit(HebbianCircuit):
         # FeedRateCapacitor: DigestiveInterface deposit_rate → V_feed [diagnostic]
         # 脆弱点3基础设施：保存 deposit_rate → FeedRateCapacitor 积分，供将来 ν-DA 集成。
         # V_ss ≈ 1.0V（进食时），τ ≈ 5000步。
-        # NOTE: _v_feed 量级(~1V) >> circulation_proportion 期望的 feed_alignment(~0.02)，
-        # 故暂不接入 CPC；仍用 patch温差(max-min) 传入 CPC，待量纲校准后再切换。
         _I_feed = _deposit_rate / max(dt, 1e-12)
         self._feed_rate_cap.inject(_I_feed, dt)
         self._feed_rate_cap.leak(self._R_FEED, dt)
@@ -1470,10 +1468,10 @@ class VariantCircuit(HebbianCircuit):
         # BIO: CCK/GLP-1 release neurons fire proportionally to nutrient flux, not thresholded.
         self.intake_sensor_neuron.activation = max(0.0, self._v_feed)
 
-        # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
-        # BIO: dorsal horn spatial comparison across dermatomes.
-        thermo_vals = [soma_output[pid]["thermo_activation"] for pid in soma_output]
-        feed_alignment = (max(thermo_vals) - min(thermo_vals) if thermo_vals else 0.0)
+        # T-022 清洁化：feed channel 暂禁用（0.0），待 DigestiveInterface → CPC 量纲校准后接入。
+        # 原 max(thermo)-min(thermo) 无上界（STDP 下可增长到 5+），破坏 rho_homeo。
+        # 正确路径：_v_feed (饱腹感 Capacitor) → 归一化 → CPC feed，与接口三对齐。
+        feed_alignment = 0.0
 
         # ── Structural circuit: Capacitor integration + MOSFET deviation ──
         # All ratios emerge from component voltages, not software division.
