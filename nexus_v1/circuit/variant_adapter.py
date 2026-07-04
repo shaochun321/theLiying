@@ -793,6 +793,17 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_yaw', 0.002, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
 
+        # Step 6: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
+        # BIO: spinal Ia inhibitory interneurons — monosynaptic mutual inhibition between
+        #      antagonist motor columns. Ensures CCW/CW WTA selection without mathematical logic.
+        #      REF: Eccles, Eccles & Lundberg 1960 J Physiol 154:89; Jankowska 1992 TINS 15:333.
+        # SEMI: sg=-1.0 inhibitory synapse; w=0.1 conservative (can raise to 0.3 post-validation).
+        #       frozen=True: structural weight fixed; inhibition magnitude set by w × spinal.activation.
+        self.bundle_spinal_ccw_to_cw = SynapticBundle(
+            _frozen_cfg('spinal_ccw_to_cw', 0.1, -1.0), [self.spinal_ccw], [self.spinal_cw])
+        self.bundle_spinal_cw_to_ccw = SynapticBundle(
+            _frozen_cfg('spinal_cw_to_ccw', 0.1, -1.0), [self.spinal_cw], [self.spinal_ccw])
+
         # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
         # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
         #     → 脊髓腹角运动神经元抑制，body 正面接近热源时自动减速防止冲过。
@@ -1217,11 +1228,15 @@ class VariantCircuit(HebbianCircuit):
         _i_pr += _spr[0] if _spr else 0.0
         self.phasic_right.step(_i_pr, dt)
 
-        # Spinal turn interneurons: D1 STDP forward pass (pre_trace already updated above)
+        # Spinal turn interneurons: collect all inputs symmetrically before stepping.
+        # Push-pull: pre-compute mutual inhibition from t-1 activations → both neurons see
+        # same-timestep inhibitory contribution, avoiding asymmetric update order bias.
         _d1_ccw = self.bundle_d1_phasic_left_to_spinal_ccw.propagate()
-        self.spinal_ccw.step(_d1_ccw[0] if _d1_ccw else 0.0, dt)
         _d1_cw = self.bundle_d1_phasic_right_to_spinal_cw.propagate()
-        self.spinal_cw.step(_d1_cw[0] if _d1_cw else 0.0, dt)
+        _inh_to_ccw = self.bundle_spinal_cw_to_ccw.propagate()   # Ia inhibition: CW→CCW
+        _inh_to_cw  = self.bundle_spinal_ccw_to_cw.propagate()   # Ia inhibition: CCW→CW
+        self.spinal_ccw.step((_d1_ccw[0] if _d1_ccw else 0.0) + (_inh_to_ccw[0] if _inh_to_ccw else 0.0), dt)
+        self.spinal_cw.step((_d1_cw[0] if _d1_cw else 0.0) + (_inh_to_cw[0] if _inh_to_cw else 0.0), dt)
 
         # ── P2-HC007: relay→enc STDP bundle propagation ──
         # Replaces: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt) (direct injection)
@@ -3156,7 +3171,8 @@ class VariantCircuit(HebbianCircuit):
         bundles.extend([self.bundle_slow_to_phasic_left, self.bundle_slow_to_phasic_right,
                         self.bundle_d1_phasic_left_to_spinal_ccw,
                         self.bundle_d1_phasic_right_to_spinal_cw,
-                        self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw])
+                        self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw,
+                        self.bundle_spinal_ccw_to_cw, self.bundle_spinal_cw_to_ccw])  # Step 6: Ia push-pull
         # Satiety circuit bundles (all included for Noether/Xin tracking)
         for _b in (self.bundle_intake_to_satiety, self.bundle_fillrate_to_satiety,
                    self.bundle_dwell_to_satiety, self.bundle_hunger_to_satiety,
