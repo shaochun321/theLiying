@@ -821,6 +821,11 @@ class HebbianCircuit:
                 for src in bundle.sources:
                     src.energy = max(0.0, src.energy - 5e-5)
 
+            # Frozen bundles (hard-wired connections) are not subject to
+            # metabolic weight decay — their conductance is fixed by structure.
+            if bundle.config.learning_rule == "frozen":
+                continue
+
             # Energy-starved decay: Memristor conductance drops
             # when source neurons can't maintain the synapse
             avg_src_energy = sum(
