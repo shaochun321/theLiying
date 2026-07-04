@@ -9,9 +9,7 @@
 
 | ID | 任务描述 | 开始日期 | 备注 |
 |:---|:---|:---|:---|
-| T-010 | HC-008 ReleaseNeuron（Ca²⁺→IHC重构） | 2026-07-04 | chain.py 接入 CalciumChannel+CalciumDynamics |
-| T-011 | Ca²⁺ Phase B（CalciumChannel 接入 HairCell） | 2026-07-04 | 含于 T-010，pre_trace 修正 |
-| T-012 | DelayedBundle 前庭接入（Aα/C纤维延迟） | 2026-07-04 | hc_to_aff 改 DelayedBundle |
+| — | 无 | — | — |
 
 ---
 
@@ -36,6 +34,9 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| T-012 | DelayedBundle 前庭接入（Aα/C纤维延迟） | 2026-07-05 | 38eec5c |
+| T-011 | Ca²⁺ Phase B（CalciumChannel 接入 HairCell） | 2026-07-05 | 38eec5c |
+| T-010 | HC-008 ReleaseNeuron（Ca²⁺→IHC重构） | 2026-07-05 | 38eec5c |
 | T-024 | 前庭 Phase B（N=1→3 扩展）| 2026-07-04 | ec582fd |
 | T-023 | 规模泛化 Prep（SkinPatch/Body 物理几何属性） | 2026-07-04 | 507921f |
 | T-022 | 体感 Phase 3：环流耦合清洁化 | 2026-07-04 | 1121a72 |
