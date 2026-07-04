@@ -2404,6 +2404,36 @@ class VariantCircuit(HebbianCircuit):
             )
             self.bundles_relay_to_yaw.append(SynapticBundle(_cfg_yaw, [_src_yaw], [_tgt_yaw]))
 
+        # P3-B: relay → motor_yaw LTD cross-cables (push-pull braking, frozen)
+        # Q1. BIO: Sherrington 1910 reciprocal inhibition — when agonist contracts,
+        #     antagonist is simultaneously inhibited. Yaw push-pull: right-hot → CW
+        #     drive + hard-wired CCW brake → prevents overshoot past optimal heading.
+        #     REF: Sherrington 1910 J Physiol 40:28.
+        # Q2. relay_right → [frozen, gain=-1.0] → yaw_ccw_neuron
+        #     relay_left  → [frozen, gain=-1.0] → yaw_cw_neuron
+        # Q3. initial_weight=0.2: G(0.2)≈0.11; relay.act≈1.3 (WTA winner):
+        #     I_brake = 1.3 × 0.11 × (-1.0) ≈ -0.14 A
+        #     I_drive (LTP w=0.1) = 1.3 × 0.09 × (+1.0) ≈ +0.12 A
+        #     brake/drive ratio ≈ 1.2×: net stop signal; reversal still possible.
+        _yaw_ltd_pairs = [
+            ('relay_right_to_yaw_ccw_ltd', 'right', self.yaw_ccw_neuron),
+            ('relay_left_to_yaw_cw_ltd',   'left',  self.yaw_cw_neuron),
+        ]
+        for _bid_ltd, _pid_ltd, _tgt_ltd in _yaw_ltd_pairs:
+            _src_ltd = _relays_p1.get(_pid_ltd)
+            if _src_ltd is None or _tgt_ltd is None:
+                continue
+            _cfg_ltd = BundleConfig(
+                bundle_id=_bid_ltd,
+                learning_rule="frozen",
+                initial_weight=0.2,
+                weight_max=0.2,
+                synapse_gain=-1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            self.bundles_relay_to_yaw.append(SynapticBundle(_cfg_ltd, [_src_ltd], [_tgt_ltd]))
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
