@@ -1452,6 +1452,10 @@ class VariantCircuit(HebbianCircuit):
         self._v_feed = self._feed_rate_cap.voltage
         # Satiety transducer 1: intake rate → IntakeSensorNeuron (HC-009 boundary)
         self.intake_sensor_neuron.step(self._v_feed, dt)
+        # Transducer bypass: set activation directly from physical signal (like ThermalInputNeuron).
+        # MOSFET quadratic squashing (vm-0.3)² reduces activation 57× vs linear passthrough.
+        # BIO: CCK/GLP-1 release neurons fire proportionally to nutrient flux, not thresholded.
+        self.intake_sensor_neuron.activation = max(0.0, self._v_feed)
 
         # Feed alignment: thermoreceptor spatial contrast (physical, not god-view)
         # BIO: dorsal horn spatial comparison across dermatomes.
@@ -1494,6 +1498,9 @@ class VariantCircuit(HebbianCircuit):
         _rpe_da = self.da_gate.step(self.energy_store.fill_fraction, dt)
         # Satiety transducer 2: fill rate → FillRateSensorNeuron (positive RPE only)
         self.fill_rate_sensor_neuron.step(max(0.0, _rpe_da), dt)
+        # Transducer bypass: linear RPE passthrough (same HC-009 pattern as intake_sensor).
+        # BIO: hepatoportal glucose sensors signal proportionally to glucose flux rate.
+        self.fill_rate_sensor_neuron.activation = max(0.0, min(1.0, _rpe_da))
         # HC-017删除: _hunger_da = max(0, 1.0*(0.5-fill_fraction)) [原L1094]
         # 饥饿 DA 已由接口二物理路径取代（ARC K_ATP → LH → hunger → DA Bundle）
         # BIO: Spanswick 1997 / Wise 2004；路径见 _init_energy_sensing()。
