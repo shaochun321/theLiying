@@ -702,6 +702,89 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_right_to_yaw: SynapticBundle | None = None
         self._init_yaw_bundles()
 
+        # D1: Phasic relay → spinal_turn_toward STDP arc (thermal direction learning)
+        # Q1. BIO: SA2 slow-adapting input subtraction → dorsal-horn WDR phasic output.
+        #     slow_relay tracks DC baseline; phasic = relay − slow = rate-of-change.
+        #     spinal_turn_toward: spinal interneuron that learns to gate yaw drive when
+        #     phasic signal (approach) coincides with DA reward.
+        #     REF: Collins et al. 1997 J Neurophysiol 78:88 (phasic/tonic WDR dissociation)
+        #     REF: Sherrington 1910 J Physiol 40:28 (spinal reflex interneuron arc)
+        # Q2. relay_left → slow_relay_left (frozen, g=1.0, w=1/R_slow)
+        #     relay_left → phasic_left (frozen, g=+1.0, w=W_P) [excit]
+        #     slow_relay_left → phasic_left (frozen, g=−1.0, w=W_P) [inhib → KCL subtraction]
+        #     phasic_left → spinal_ccw (STDP, DA-gated, eligibility trace)
+        #     spinal_ccw → yaw_ccw_neuron (frozen, w=0.5)
+        #     (mirror structure for right/cw side)
+        # Q3. slow_relay: R=5000 → τ=5000 steps≈5s. SA2 τ∈[2,10]s (Johansson 2004).
+        #     W_RELAY_TO_SLOW=1/R_slow=0.0002: V_ss_slow=relay.act×W×R_slow=relay.act ✓
+        #     W_PHASIC=0.02: at Δ=0.05 → I_net=0.001 → V_phasic=0.1 → act=10×0.1=1.0 ✓
+        #     D1 STDP: init_w=0.1, w_max=0.3, stdp_lr=0.005 (Bi & Poo 1998 Neuron).
+        #     spinal_out: w=0.5 (conservative; D1 grows from 0.1 to 0.3 over 200k).
+        _W_RS = 1.0 / 5000.0   # relay→slow weight: V_ss_slow ≈ relay.act
+        _W_P  = 0.02            # relay→phasic weight; at Δ=0.05 → phasic.act≈1.0
+
+        self.slow_relay_left = Neuron(NeuronConfig(
+            neuron_id='slow_relay_left', capacitance=1.0, r_leak=5000.0, region=0x03,
+            spiking=False, channels=[ChannelConfig(name='slow_l', v_threshold=0.0001, gm=1.0)]))
+        self.slow_relay_right = Neuron(NeuronConfig(
+            neuron_id='slow_relay_right', capacitance=1.0, r_leak=5000.0, region=0x03,
+            spiking=False, channels=[ChannelConfig(name='slow_r', v_threshold=0.0001, gm=1.0)]))
+        self.phasic_left = Neuron(NeuronConfig(
+            neuron_id='phasic_left', capacitance=0.5, r_leak=100.0, region=0x03,
+            spiking=False, channels=[ChannelConfig(name='phasic_l', v_threshold=0.0001, gm=10.0)]))
+        self.phasic_right = Neuron(NeuronConfig(
+            neuron_id='phasic_right', capacitance=0.5, r_leak=100.0, region=0x03,
+            spiking=False, channels=[ChannelConfig(name='phasic_r', v_threshold=0.0001, gm=10.0)]))
+        self.spinal_ccw = Neuron(NeuronConfig(
+            neuron_id='spinal_ccw', capacitance=1.0, r_leak=5.0, region=0x01,
+            spiking=False, channels=[ChannelConfig(name='spinal_ccw', v_threshold=0.01, gm=1.0)]))
+        self.spinal_cw = Neuron(NeuronConfig(
+            neuron_id='spinal_cw', capacitance=1.0, r_leak=5.0, region=0x01,
+            spiking=False, channels=[ChannelConfig(name='spinal_cw', v_threshold=0.01, gm=1.0)]))
+
+        _rl = self.somatosensory.relays.get('left')
+        _rr = self.somatosensory.relays.get('right')
+        _frozen_cfg = lambda bid, w, sg: BundleConfig(
+            bundle_id=bid, learning_rule='frozen',
+            initial_weight=w, weight_max=w, synapse_gain=sg,
+            bundle_role='feedforward', remodel_cost_kappa=0.0)
+
+        self.bundle_relay_to_slow_left = (
+            SynapticBundle(_frozen_cfg('relay_left_to_slow', _W_RS, 1.0), [_rl], [self.slow_relay_left])
+            if _rl else None)
+        self.bundle_relay_to_slow_right = (
+            SynapticBundle(_frozen_cfg('relay_right_to_slow', _W_RS, 1.0), [_rr], [self.slow_relay_right])
+            if _rr else None)
+        self.bundle_relay_to_phasic_left = (
+            SynapticBundle(_frozen_cfg('relay_left_to_phasic', _W_P, 1.0), [_rl], [self.phasic_left])
+            if _rl else None)
+        self.bundle_slow_to_phasic_left = SynapticBundle(
+            _frozen_cfg('slow_left_to_phasic', _W_P, -1.0), [self.slow_relay_left], [self.phasic_left])
+        self.bundle_relay_to_phasic_right = (
+            SynapticBundle(_frozen_cfg('relay_right_to_phasic', _W_P, 1.0), [_rr], [self.phasic_right])
+            if _rr else None)
+        self.bundle_slow_to_phasic_right = SynapticBundle(
+            _frozen_cfg('slow_right_to_phasic', _W_P, -1.0), [self.slow_relay_right], [self.phasic_right])
+
+        _stdp_d1_cfg = lambda bid, src, tgt: SynapticBundle(BundleConfig(
+            bundle_id=bid, learning_rule='stdp',
+            initial_weight=0.1, weight_max=0.3, stdp_lr=0.005,
+            synapse_gain=1.0, bundle_role='feedforward', remodel_cost_kappa=0.0,
+            use_eligibility_trace=True), [src], [tgt])
+        self.bundle_d1_phasic_left_to_spinal_ccw = _stdp_d1_cfg(
+            'd1_phasic_left_to_spinal_ccw', self.phasic_left, self.spinal_ccw)
+        self.bundle_d1_phasic_right_to_spinal_cw = _stdp_d1_cfg(
+            'd1_phasic_right_to_spinal_cw', self.phasic_right, self.spinal_cw)
+
+        # w=0.002: slow_relay warmup (τ=5000 steps) creates spurious phasic activation
+        # 6× HC-016 torque at w=0.5, disrupting col→motor STDP. Directional learning
+        # lives in phasic→spinal STDP; output relay weight set small until STDP matures.
+        # EXP: T4.1 regression analysis 2026-07-04; tune upward after 200k D1 validation.
+        self.bundle_spinal_ccw_to_yaw = SynapticBundle(
+            _frozen_cfg('spinal_ccw_to_yaw', 0.002, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
+        self.bundle_spinal_cw_to_yaw = SynapticBundle(
+            _frozen_cfg('spinal_cw_to_yaw', 0.002, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
+
         # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
         # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
         #     → 脊髓腹角运动神经元抑制，body 正面接近热源时自动减速防止冲过。
@@ -1020,6 +1103,39 @@ class VariantCircuit(HebbianCircuit):
                 dT_raw = patch_temps.get(pid, (0.0, 0.0, 0.0))[1]
                 dn.step(dT_raw, dt)
 
+        # ── D1: Phasic relay computation ──
+        # slow_relay tracks DC relay with τ≈5000 (SA2 adaptation baseline).
+        # phasic = relay − slow_relay = rate-of-change (fires only when temp increasing).
+        # TIMING: after somatosensory.step() (relay states current); before HC-016 A yaw.
+        if self.bundle_relay_to_slow_left is not None:
+            _sl = self.bundle_relay_to_slow_left.propagate()
+            self.slow_relay_left.step(_sl[0] if _sl else 0.0, dt)
+        if self.bundle_relay_to_slow_right is not None:
+            _sr = self.bundle_relay_to_slow_right.propagate()
+            self.slow_relay_right.step(_sr[0] if _sr else 0.0, dt)
+
+        _i_pl = 0.0
+        if self.bundle_relay_to_phasic_left is not None:
+            _rpl = self.bundle_relay_to_phasic_left.propagate()
+            _i_pl += _rpl[0] if _rpl else 0.0
+        _spl = self.bundle_slow_to_phasic_left.propagate()
+        _i_pl += _spl[0] if _spl else 0.0
+        self.phasic_left.step(_i_pl, dt)
+
+        _i_pr = 0.0
+        if self.bundle_relay_to_phasic_right is not None:
+            _rpr = self.bundle_relay_to_phasic_right.propagate()
+            _i_pr += _rpr[0] if _rpr else 0.0
+        _spr = self.bundle_slow_to_phasic_right.propagate()
+        _i_pr += _spr[0] if _spr else 0.0
+        self.phasic_right.step(_i_pr, dt)
+
+        # Spinal turn interneurons: D1 STDP forward pass (pre_trace already updated above)
+        _d1_ccw = self.bundle_d1_phasic_left_to_spinal_ccw.propagate()
+        self.spinal_ccw.step(_d1_ccw[0] if _d1_ccw else 0.0, dt)
+        _d1_cw = self.bundle_d1_phasic_right_to_spinal_cw.propagate()
+        self.spinal_cw.step(_d1_cw[0] if _d1_cw else 0.0, dt)
+
         # ── P2-HC007: relay→enc STDP bundle propagation ──
         # Replaces: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt) (direct injection)
         # With: bundle current fed through mechanical_inputs → HebbianCircuit injects it.
@@ -1090,10 +1206,15 @@ class VariantCircuit(HebbianCircuit):
         _i_cw = 0.0
         if self.bundle_left_to_yaw is not None:
             _cur = self.bundle_left_to_yaw.propagate()
-            _i_ccw = _cur[0] if _cur else 0.0
+            _i_ccw += _cur[0] if _cur else 0.0
         if self.bundle_right_to_yaw is not None:
             _cur = self.bundle_right_to_yaw.propagate()
-            _i_cw = _cur[0] if _cur else 0.0
+            _i_cw += _cur[0] if _cur else 0.0
+        # D1: add spinal_turn_toward → yaw contribution (KCL, stepped once)
+        _sc = self.bundle_spinal_ccw_to_yaw.propagate()
+        _i_ccw += _sc[0] if _sc else 0.0
+        _sw = self.bundle_spinal_cw_to_yaw.propagate()
+        _i_cw += _sw[0] if _sw else 0.0
         self.yaw_ccw_neuron.step(_i_ccw, dt=dt)
         self.yaw_cw_neuron.step(_i_cw, dt=dt)
         _yaw_torque = (self.yaw_ccw_neuron.activation - self.yaw_cw_neuron.activation) * YAW_GAIN
@@ -2124,6 +2245,13 @@ class VariantCircuit(HebbianCircuit):
             b.learn(dt, plasticity_gate=gate, fill_fraction=fill,
                     da_concentration=da_conc)
 
+        # D1: phasic→spinal STDP (DA-gated, col→motor gate; directional thermal learning)
+        for _bd1 in [self.bundle_d1_phasic_left_to_spinal_ccw,
+                     self.bundle_d1_phasic_right_to_spinal_cw]:
+            _bd1.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                       fill_fraction=fill, da_concentration=da_conc)
+            _bd1.compute_xin(dt)
+
     def get_variant_state(self) -> dict:
         """Get variant component states for monitoring."""
         return {
@@ -2782,6 +2910,11 @@ class VariantCircuit(HebbianCircuit):
         neurons.extend(self.renshaw_neurons.values())
         # C1: shadow ν → DA boundary transducer
         neurons.append(self.shadow_nu_neuron)
+        # D1: phasic relay arc neurons NOT included in vascular census.
+        # Adding them dilutes energy_per_neuron → changes ECM gate_col → breaks
+        # col→motor STDP selectivity (T4.1 regression). D1 neurons are passive
+        # (non-spiking, non-energy-limited) so vascular exclusion is safe.
+        # D1 bundles ARE in get_all_bundles() for Noether/Xin bookkeeping.
         return neurons
 
     def get_all_bundles(self):
@@ -2837,6 +2970,15 @@ class VariantCircuit(HebbianCircuit):
         # C1: shadow ν → DA gate (lazy: only after _init_da_circuit)
         if self.bundle_shadow_nu_to_da is not None:
             bundles.append(self.bundle_shadow_nu_to_da)
+        # D1: phasic relay arc bundles
+        for _b in [self.bundle_relay_to_slow_left, self.bundle_relay_to_slow_right,
+                   self.bundle_relay_to_phasic_left, self.bundle_relay_to_phasic_right]:
+            if _b is not None:
+                bundles.append(_b)
+        bundles.extend([self.bundle_slow_to_phasic_left, self.bundle_slow_to_phasic_right,
+                        self.bundle_d1_phasic_left_to_spinal_ccw,
+                        self.bundle_d1_phasic_right_to_spinal_cw,
+                        self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw])
         return bundles
 
     @property
