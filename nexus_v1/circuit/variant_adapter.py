@@ -890,12 +890,18 @@ class VariantCircuit(HebbianCircuit):
             spiking=False))
 
         def _sat_bun(bid, sg, w, srcs, tgts):
+            # weight_min=weight_max=w pins initial weight regardless of PYTHONHASHSEED variation.
+            # BIO: frozen (innate) metabolic circuits have fixed conductances, not plastic.
             return SynapticBundle(BundleConfig(
                 bundle_id=bid, learning_rule='frozen', initial_weight=w,
+                weight_min=w, weight_max=w,
                 synapse_gain=sg, bundle_role='feedforward', remodel_cost_kappa=0.0),
                 srcs, tgts)
 
-        self.bundle_intake_to_satiety   = _sat_bun('intake_to_satiety',   1.0,  1.0,
+        # intake→satiety: w=0.975 → G=2.88; derived: V(30k)≈0.52V > 0.5 target
+        # at V_feed_ss≈0.4V: current=1.15A, V_ss=1.15V, τ=50k steps → V(30k)=0.52V.
+        # REF: 推导见工作报告 口器消化系统分析报告 §4 (2026-07-05).
+        self.bundle_intake_to_satiety   = _sat_bun('intake_to_satiety',   1.0,  0.975,
                                                     [self.intake_sensor_neuron],    [self.satiety_neuron])
         self.bundle_fillrate_to_satiety = _sat_bun('fillrate_to_satiety',  1.0,  0.5,
                                                     [self.fill_rate_sensor_neuron], [self.satiety_neuron])
@@ -903,7 +909,10 @@ class VariantCircuit(HebbianCircuit):
                                                     [self.dwell_sensor_neuron],     [self.satiety_neuron])
         self.bundle_hunger_to_satiety   = _sat_bun('hunger_to_satiety',   -1.0,  0.5,
                                                     [self.hypothalamus_hunger],     [self.satiety_neuron])
-        # phasic → dwell reset: sg=-200 ensures even weak phasic (act≈0.001) → I_reset=0.2 >> bc=0.02
+        # phasic → dwell reset: sg=-200 for sharp reset during locomotion.
+        # Dead-zone threshold (PHASIC_RESET_THRESHOLD=1e-3) in _propagate_bundles() prevents
+        # thermal noise (phasic≈3e-5) from triggering reset. Voltage floor (V<0 → clamp to 0)
+        # prevents extreme hyperpolarization after locomotion bouts.
         self.bundle_phasic_to_dwell     = _sat_bun('phasic_to_dwell',   -200.0,  1.0,
                                                     [self.phasic_left, self.phasic_right],
                                                     [self.dwell_sensor_neuron])
@@ -2199,10 +2208,22 @@ class VariantCircuit(HebbianCircuit):
             bundle.apply_to_targets(currents, dt)
 
         # ── Satiety circuit propagation ─────────────────────────────────────────
-        # phasic → dwell: apply_to_targets calls dwell_sensor_neuron.step() every tick,
-        # ensuring bc_current integrates at all times (even when phasic=0 → current=0).
-        _pd_cur = self.bundle_phasic_to_dwell.propagate()
+        # phasic → dwell: dead-zone threshold filters thermal noise from true locomotion.
+        # Calibrated from 10k test: thermal-equilibration phasic ≈ 3e-5 (noise floor),
+        # locomotion phasic ≈ 0.01-0.1 (100-3000× larger). Threshold = 1e-3 separates them.
+        # BIO: hippocampal time cells reset only when locomotion speed exceeds noise floor.
+        _PHASIC_RESET_THRESHOLD = 1e-3
+        _phasic_total = self.phasic_left.activation + self.phasic_right.activation
+        if _phasic_total >= _PHASIC_RESET_THRESHOLD:
+            _pd_cur = self.bundle_phasic_to_dwell.propagate()
+        else:
+            _pd_cur = [0.0]  # thermal noise: no discharge, bc_current charges freely
         self.bundle_phasic_to_dwell.apply_to_targets(_pd_cur, dt)
+        # Voltage floor: phasic reset is a TIMER RESET (to 0), not hyperpolarization.
+        # Prevents extreme negative voltage requiring 70k+ steps to recover after locomotion.
+        # BIO: timer resets to zero when leaving place field, not to "negative time".
+        if self.dwell_sensor_neuron._membrane.voltage < 0.0:
+            self.dwell_sensor_neuron._membrane.charge = 0.0
         # KCL: accumulate all satiety inputs, then step satiety_neuron once.
         # Must be in same batch to avoid half-explicit Euler error (KCL constraint).
         _I_sat = 0.0
@@ -2212,6 +2233,12 @@ class VariantCircuit(HebbianCircuit):
             if _cur:
                 _I_sat += _cur[0]   # each bundle has single target (satiety_neuron)
         self.satiety_neuron.step(_I_sat, dt)
+        # Satiety transducer bypass: activation = vm directly (linear, no MOSFET threshold barrier).
+        # V_ss = I_total × r_leak = 0.28V < MOSFET threshold 0.3V → without bypass, satiety
+        # never activates. POMC neurons are tonic integrators with graded (not threshold-gated)
+        # output proportional to energy state.
+        # BIO: Cowley et al. 2001 — arcuate POMC neurons have tonic, graded firing rate.
+        self.satiety_neuron.activation = max(0.0, self.satiety_neuron._membrane.voltage)
 
     # ── Ledger: Pre-step / Post-step ──────────────────────────────
 
