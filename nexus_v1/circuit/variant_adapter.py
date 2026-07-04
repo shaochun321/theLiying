@@ -722,19 +722,20 @@ class VariantCircuit(HebbianCircuit):
         #     phasic_left → spinal_ccw (STDP, DA-gated, eligibility trace)
         #     spinal_ccw → yaw_ccw_neuron (frozen, w=0.5)
         #     (mirror structure for right/cw side)
-        # Q3. slow_relay: R=5000 → τ=5000 steps≈5s. SA2 τ∈[2,10]s (Johansson 2004).
-        #     W_RELAY_TO_SLOW=1/R_slow=0.0002: V_ss_slow=relay.act×W×R_slow=relay.act ✓
+        # Q3. slow_relay: R=15000 → τ=15000 steps≈15s. SA2 τ∈[2,10]s (Johansson 2004), mid-range.
+        #     W_RELAY_TO_SLOW=1/R_slow≈6.67e-5: V_ss_slow=relay.act×W×R_slow=relay.act ✓
         #     W_PHASIC=0.02: at Δ=0.05 → I_net=0.001 → V_phasic=0.1 → act=10×0.1=1.0 ✓
         #     D1 STDP: init_w=0.1, w_max=0.3, stdp_lr=0.005 (Bi & Poo 1998 Neuron).
         #     spinal_out: w=0.5 (conservative; D1 grows from 0.1 to 0.3 over 200k).
-        _W_RS = 1.0 / 5000.0   # relay→slow weight: V_ss_slow ≈ relay.act
+        _R_SLOW = 15000.0
+        _W_RS = 1.0 / _R_SLOW  # relay→slow weight: V_ss_slow = relay.act × W × R = relay.act ✓
         _W_P  = 0.02            # relay→phasic weight; at Δ=0.05 → phasic.act≈1.0
 
         self.slow_relay_left = Neuron(NeuronConfig(
-            neuron_id='slow_relay_left', capacitance=1.0, r_leak=5000.0, region=0x03,
+            neuron_id='slow_relay_left', capacitance=1.0, r_leak=_R_SLOW, region=0x03,
             spiking=False, channels=[ChannelConfig(name='slow_l', v_threshold=0.0001, gm=1.0)]))
         self.slow_relay_right = Neuron(NeuronConfig(
-            neuron_id='slow_relay_right', capacitance=1.0, r_leak=5000.0, region=0x03,
+            neuron_id='slow_relay_right', capacitance=1.0, r_leak=_R_SLOW, region=0x03,
             spiking=False, channels=[ChannelConfig(name='slow_r', v_threshold=0.0001, gm=1.0)]))
         self.phasic_left = Neuron(NeuronConfig(
             neuron_id='phasic_left', capacitance=0.5, r_leak=100.0, region=0x03,
