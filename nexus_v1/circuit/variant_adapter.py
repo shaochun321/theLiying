@@ -802,14 +802,15 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_d1_phasic_right_to_spinal_cw = _stdp_d1_cfg(
             'd1_phasic_right_to_spinal_cw', self.phasic_right, self.spinal_cw)
 
-        # w=0.002: slow_relay warmup (τ=5000 steps) creates spurious phasic activation
-        # 6× HC-016 torque at w=0.5, disrupting col→motor STDP. Directional learning
-        # lives in phasic→spinal STDP; output relay weight set small until STDP matures.
-        # EXP: T4.1 regression analysis 2026-07-04; tune upward after 200k D1 validation.
+        # w=0.020: tuned up 10× after T-036 200k D1 validation (2026-07-05).
+        # BIO: spinal interneuron → VMN synaptic conductance (Eccles 1960 J Physiol 154:89).
+        # w=0.002 was conservative to prevent T4.1 regression during early learning;
+        # T-036 confirmed |Δw|=0.2991 is stable → relay weight promoted to 0.020.
+        # EXP: T4.1 regression analysis 2026-07-04; tune upward after 200k D1 validation. ✓
         self.bundle_spinal_ccw_to_yaw = SynapticBundle(
-            _frozen_cfg('spinal_ccw_to_yaw', 0.002, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
+            _frozen_cfg('spinal_ccw_to_yaw', 0.020, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
-            _frozen_cfg('spinal_cw_to_yaw', 0.002, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
+            _frozen_cfg('spinal_cw_to_yaw', 0.020, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
 
         # Step 6: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
         # BIO: spinal Ia inhibitory interneurons — monosynaptic mutual inhibition between
@@ -2431,9 +2432,14 @@ class VariantCircuit(HebbianCircuit):
         body_lr = self.world.body.mass_inertia_factor()
 
         # Column → Motor: PNN × DA × sync × body_inertia
+        # VOR axis bundles (yaw/pitch/roll → move_x/y/z) are anatomically hardwired.
+        # BIO: Jones 1991 Rev Neurol 147:569 — VOR brainstem arc has fixed topographic gain;
+        #      STDP disabled here to prevent equilibrium-driven weight collapse (T4.1 fix).
+        #      Only cross-axis and thermal differential bundles retain Hebbian plasticity.
         for b in self.bundles_col_to_motor:
-            b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
-                    fill_fraction=fill, da_concentration=da_conc)
+            if 'cross' in b.id or 'therm' in b.id:
+                b.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                        fill_fraction=fill, da_concentration=da_conc)
 
         # Sprouted bundles: use target layer's gate
         for b in self._sprouted_bundles:
