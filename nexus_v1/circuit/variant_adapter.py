@@ -774,6 +774,24 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_slow_to_phasic_right = SynapticBundle(
             _frozen_cfg('slow_right_to_phasic', _W_P, -1.0), [self.slow_relay_right], [self.phasic_right])
 
+        # Step 7: relay 自适应增益 — phasic → relay inhibitory feedback (gate control AGC)
+        # BIO: dorsal horn inhibitory interneurons reduce relay gain when phasic signal is active,
+        #      preventing relay saturation at heat-source edges ("edge blindness" / 边缘失明).
+        # Q1. REF: Melzack & Wall 1965 Science 150:971 — gate control theory; Aδ/C-fiber
+        #          modulation of WDR relay neurons in spinal dorsal horn.
+        # Q2. phasic_left → relay_left (frozen, sg=-0.3, w=0.2); phasic_right → relay_right.
+        # Q3. sg=-0.3: mild inhibition (prevents saturation without silencing).
+        #     w=0.2: conservative start; from 最终物理审计版, 主层(0x03) 表格.
+        #     Effect: V_inh = phasic.activation × 0.2 × (-0.3) ≈ -0.06 × act (partial suppression).
+        self.bundle_phasic_left_to_relay_left: SynapticBundle | None = (
+            SynapticBundle(_frozen_cfg('phasic_left_to_relay_left', 0.2, -0.3),
+                           [self.phasic_left], [_rl])
+            if _rl else None)
+        self.bundle_phasic_right_to_relay_right: SynapticBundle | None = (
+            SynapticBundle(_frozen_cfg('phasic_right_to_relay_right', 0.2, -0.3),
+                           [self.phasic_right], [_rr])
+            if _rr else None)
+
         _stdp_d1_cfg = lambda bid, src, tgt: SynapticBundle(BundleConfig(
             bundle_id=bid, learning_rule='stdp',
             initial_weight=0.1, weight_max=0.3, stdp_lr=0.005,
@@ -1193,6 +1211,18 @@ class VariantCircuit(HebbianCircuit):
                 if _relay is not None and abs(_I) > 1e-12:
                     _relay._membrane.inject(_I, dt)
 
+        # ── Relay adaptive gain pre-inject (Step 7: phasic→relay inhibitory feedback) ──
+        # BIO: gate control interneurons reduce relay gain when phasic dT/dt signal is active.
+        # Uses phasic.activation from t-1 (1-step delay, same pattern as relay WTA above).
+        # REF: Melzack & Wall 1965 — gate control; 最终物理审计版 主层(0x03) 表格.
+        for _agc_b in [self.bundle_phasic_left_to_relay_left,
+                       self.bundle_phasic_right_to_relay_right]:
+            if _agc_b is not None:
+                _agc_I = _agc_b.propagate()
+                for _j, _agc_tgt in enumerate(_agc_b.targets):
+                    if _j < len(_agc_I) and abs(_agc_I[_j]) > 1e-12:
+                        _agc_tgt._membrane.inject(_agc_I[_j], dt)
+
         # 2. Step the somatosensory chain (Thermo + Noci + Relay)
         self.somatosensory.step(patch_temps, dt)
 
@@ -1478,10 +1508,11 @@ class VariantCircuit(HebbianCircuit):
         # BIO: CCK/GLP-1 release neurons fire proportionally to nutrient flux, not thresholded.
         self.intake_sensor_neuron.activation = max(0.0, min(1.0, self._v_feed))
 
-        # T-022 清洁化：feed channel 暂禁用（0.0），待 DigestiveInterface → CPC 量纲校准后接入。
-        # 原 max(thermo)-min(thermo) 无上界（STDP 下可增长到 5+），破坏 rho_homeo。
-        # 正确路径：_v_feed (饱腹感 Capacitor) → 归一化 → CPC feed，与接口三对齐。
-        feed_alignment = 0.0
+        # 脆弱点3修正（Step 7 CPC接入）：_v_feed → CPC feed channel。
+        # 旧 max(thermo)-min(thermo) 无上界破坏 rho_homeo；新 FeedRateCapacitor V_ss=1.0V 有界。
+        # Q3: V_ss=deposit_rate/dt × R_FEED = 0.2A × 5Ω = 1.0V（进食时），τ=5000步。
+        # REF: 三核心脆弱点修正方案 脆弱点3，2026-07-04。
+        feed_alignment = self._v_feed
 
         # ── Structural circuit: Capacitor integration + MOSFET deviation ──
         # All ratios emerge from component voltages, not software division.
@@ -3158,6 +3189,11 @@ class VariantCircuit(HebbianCircuit):
                         self.bundle_d1_phasic_right_to_spinal_cw,
                         self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw,
                         self.bundle_spinal_ccw_to_cw, self.bundle_spinal_cw_to_ccw])  # Step 6: Ia push-pull
+        # Step 7: relay adaptive gain (phasic→relay inhibition)
+        for _b in [self.bundle_phasic_left_to_relay_left,
+                   self.bundle_phasic_right_to_relay_right]:
+            if _b is not None:
+                bundles.append(_b)
         # Satiety circuit bundles (all included for Noether/Xin tracking)
         for _b in (self.bundle_intake_to_satiety, self.bundle_fillrate_to_satiety,
                    self.bundle_dwell_to_satiety, self.bundle_hunger_to_satiety,
