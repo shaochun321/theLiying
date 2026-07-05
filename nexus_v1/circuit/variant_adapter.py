@@ -961,6 +961,8 @@ class VariantCircuit(HebbianCircuit):
                                                     [self.satiety_neuron],          [self.vital_amp_neuron])
         # satiety → DA: lazy (da_neurons created in _init_da_circuit, not available at __init__ time)
         self.bundle_satiety_to_da: SynapticBundle | None = None
+        # P0-2: intake_sensor → DA: consummatory reward pulse (lazy, like satiety_to_da)
+        self.bundle_intake_to_da_reward: SynapticBundle | None = None
 
         # ── DwellSensor Schmitt trigger state ─────────────────────────────────
         # BIO: hippocampal place cell timer — only resets on confirmed locomotion
@@ -1252,6 +1254,12 @@ class VariantCircuit(HebbianCircuit):
         _spl = self.bundle_slow_to_phasic_left.propagate()
         _i_pl += _spl[0] if _spl else 0.0
         self.phasic_left.step(_i_pl, dt)
+        # P0-1: K+ reversal potential floor — prevents unbounded hyperpolarization ("anodal block").
+        # BIO: E_K ≈ -90mV normalized; τ=15000 (TRPV1) unchanged — physical fact, not a tune.
+        # REF: 最终架构裁决 P0-1, 2026-07-05
+        if self.phasic_left._membrane.voltage < -0.1:
+            self.phasic_left._membrane.discharge_to(-0.1)
+            self.phasic_left.activation = max(-10.0, -0.1)
 
         _i_pr = 0.0
         if self.bundle_relay_to_phasic_right is not None:
@@ -1260,6 +1268,9 @@ class VariantCircuit(HebbianCircuit):
         _spr = self.bundle_slow_to_phasic_right.propagate()
         _i_pr += _spr[0] if _spr else 0.0
         self.phasic_right.step(_i_pr, dt)
+        if self.phasic_right._membrane.voltage < -0.1:
+            self.phasic_right._membrane.discharge_to(-0.1)
+            self.phasic_right.activation = max(-10.0, -0.1)
 
         # Spinal turn interneurons: collect all inputs symmetrically before stepping.
         # Push-pull: pre-compute mutual inhibition from t-1 activations → both neurons see
@@ -1900,6 +1911,13 @@ class VariantCircuit(HebbianCircuit):
             for j, tgt in enumerate(self.bundle_satiety_to_da.targets):
                 if j < len(_sat_da_cur) and tgt.id in da_input_currents:
                     da_input_currents[tgt.id] += _sat_da_cur[j]
+
+        # ── P0-2: IntakeSensor → DA: consummatory reward pulse ──
+        if self.bundle_intake_to_da_reward is not None:
+            _idr_cur = self.bundle_intake_to_da_reward.propagate()
+            for j, tgt in enumerate(self.bundle_intake_to_da_reward.targets):
+                if j < len(_idr_cur) and tgt.id in da_input_currents:
+                    da_input_currents[tgt.id] += _idr_cur[j]
 
         # HC-017 fix: RPE DA drive via normal step() pathway (not _membrane.inject).
         # BIO: VTA RPE → DA burst (Schultz 1997).
@@ -2820,6 +2838,24 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_satiety_to_da = SynapticBundle(
             cfg_satiety_da, [self.satiety_neuron], da_list)
 
+        # ── P0-2: IntakeSensor → DA: consummatory reward pulse ──
+        # Q1. BIO: VTA DA neurons fire phasically during food intake (Schultz 1997 Science 275:1593).
+        # Q2. intake_sensor_neuron → [frozen, sg=+1.0, w=1.0] → all da_neurons.
+        # Q3. w=1.0: D2R autoreceptor (d2_ec50=0.3, d2_conductance=0.5) provides upper limit.
+        #     V_ss_max = 1.0 × r_leak=1.0 = 1.0V; D2R GIRK kicks in at [DA]>0.3 → self-limiting.
+        #     Peak phasic burst ≈ 1s (τ_D2=1000steps) then D2R damps to steady state.
+        # REF: 最终架构裁决 P0-2, 2026-07-05
+        cfg_intake_da = BundleConfig(
+            bundle_id='intake_to_da_reward',
+            learning_rule='frozen',
+            initial_weight=1.0,
+            synapse_gain=1.0,
+            bundle_role='feedforward',
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_intake_to_da_reward = SynapticBundle(
+            cfg_intake_da, [self.intake_sensor_neuron], da_list)
+
         self._da_circuit_initialized = True
 
         # Log to growth log (same as sprout events)
@@ -3201,6 +3237,9 @@ class VariantCircuit(HebbianCircuit):
             bundles.append(_b)
         if self.bundle_satiety_to_da is not None:
             bundles.append(self.bundle_satiety_to_da)
+        # P0-2: IntakeSensor → DA consummatory reward pulse
+        if self.bundle_intake_to_da_reward is not None:
+            bundles.append(self.bundle_intake_to_da_reward)
         return bundles
 
     @property
