@@ -44,6 +44,7 @@ from ..components.thermal_mouth import ThermalMouth
 from ..components.digestive_interface import DigestiveInterface
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
+from ..vestibular.chain import VestibularChain
 from ..somatosensory.chain import SomatosensoryChain
 from ..somatosensory.transducer_neurons import (
     ThermalDeltaNeuron, make_thermo_delta_to_da_bundle)
@@ -136,7 +137,11 @@ class VariantCircuit(HebbianCircuit):
         # BIO: spatial temperature field encoded in 12 receptive fields.
         from ..somatosensory.chain import PATCH_IDS as _SOMAT_PATCH_IDS
         _patch_axes = [f"therm_{pid}" for pid in _SOMAT_PATCH_IDS]
-        super().__init__(extra_axes=_patch_axes)
+        # BIO: vestibular inner ear has 15-25 hair cells per crista (Goldberg 1991).
+        # N=3 models fast/mid/slow temporal filtering (HC_0 STDP, HC_1/2 frozen).
+        # synapse_gain auto-scales to preserve KCL total HC→Aff current.
+        super().__init__(vestibular=VestibularChain(n_hair_cells=3),
+                         extra_axes=_patch_axes)
 
         # ── Variant: Oscillators for afferent ISI synchronization ──
         # REF: Vestibular nucleus tonic oscillation
@@ -823,6 +828,25 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_spinal_cw_to_ccw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_ccw', 0.1, -1.0), [self.spinal_cw], [self.spinal_ccw])
 
+        # T-043: yaw-level cross-inhibition (Fully Differential push-pull at motor output)
+        # BIO: Ia inhibitory interneuron → antagonist motor neuron pool (Eccles 1960 J Physiol 154:89).
+        #      spinal_ccw firing → suppresses yaw_cw; spinal_cw firing → suppresses yaw_ccw.
+        #      Creates CMRR: bilateral background (spinal≈-0.030) cancels; phasic burst → 2× differential.
+        # PHYS: Fully Differential Amplifier analogy — common-mode rejection at background,
+        #       differential gain 2× during phasic burst peaks (sp_peak≈0.138, w=0.1).
+        # EXP: T-042 sp_peak=0.138 at w=0.1 (with Ia); W_CROSS=0.020 = bundle_spinal_to_yaw weight
+        #      → 1:1 differential: spinal_ccw → +yaw_ccw (existing) AND −yaw_cw (new cross).
+        #      Background: spinal≈-0.030 → cross injects +0.00060 into opposite yaw (<0.1% of 0.65 baseline).
+        #      Three-document consensus (doc98/99/100): W_CROSS=0.020, SG_CROSS=-1.0. Fallback: 0.015.
+        _W_CROSS  = 0.020
+        _SG_CROSS = -1.0
+        self.bundle_spinal_ccw_to_yaw_cw = SynapticBundle(
+            _frozen_cfg('spinal_ccw_to_yaw_cw', _W_CROSS, _SG_CROSS),
+            [self.spinal_ccw], [self.yaw_cw_neuron])
+        self.bundle_spinal_cw_to_yaw_ccw = SynapticBundle(
+            _frozen_cfg('spinal_cw_to_yaw_ccw', _W_CROSS, _SG_CROSS),
+            [self.spinal_cw], [self.yaw_ccw_neuron])
+
         # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
         # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
         #     → 脊髓腹角运动神经元抑制，body 正面接近热源时自动减速防止冲过。
@@ -1359,6 +1383,11 @@ class VariantCircuit(HebbianCircuit):
         _i_ccw += _sc[0] if _sc else 0.0
         _sw = self.bundle_spinal_cw_to_yaw.propagate()
         _i_cw += _sw[0] if _sw else 0.0
+        # T-043: cross-inhibition (push-pull differential amplifier at yaw output)
+        _cross_cw  = self.bundle_spinal_ccw_to_yaw_cw.propagate()   # spinal_ccw suppresses yaw_cw
+        _cross_ccw = self.bundle_spinal_cw_to_yaw_ccw.propagate()   # spinal_cw suppresses yaw_ccw
+        _i_cw   += _cross_cw[0]  if _cross_cw  else 0.0
+        _i_ccw  += _cross_ccw[0] if _cross_ccw else 0.0
         self.yaw_ccw_neuron.step(_i_ccw, dt=dt)
         self.yaw_cw_neuron.step(_i_cw, dt=dt)
         _yaw_torque = (self.yaw_ccw_neuron.activation - self.yaw_cw_neuron.activation) * YAW_GAIN
@@ -3230,7 +3259,8 @@ class VariantCircuit(HebbianCircuit):
                         self.bundle_d1_phasic_left_to_spinal_ccw,
                         self.bundle_d1_phasic_right_to_spinal_cw,
                         self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw,
-                        self.bundle_spinal_ccw_to_cw, self.bundle_spinal_cw_to_ccw])  # Step 6: Ia push-pull
+                        self.bundle_spinal_ccw_to_cw, self.bundle_spinal_cw_to_ccw,  # Step 6: Ia push-pull
+                        self.bundle_spinal_ccw_to_yaw_cw, self.bundle_spinal_cw_to_yaw_ccw])  # T-043: cross-inhibition
         # Step 7: relay adaptive gain (phasic→relay inhibition)
         for _b in [self.bundle_phasic_left_to_relay_left,
                    self.bundle_phasic_right_to_relay_right]:
