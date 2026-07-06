@@ -1003,9 +1003,10 @@ class VariantCircuit(HebbianCircuit):
         #      energy is low, increasing leak conductance and lowering excitability threshold.
         #      REF: Burdakov 2005 Neuron 46:533; Bhaskara 2011 J Physiol 589:3763.
         # PHYS: r_leak ∝ 1/g_leak; modulating r_leak changes τ and threshold, not injected current.
-        #       EMA τ=1000 steps smooths BMR noise; gain cap ≤1.5× prevents runaway sensitization.
+        #       EMA τ=1000 steps smooths BMR noise; gain cap ≤1.15× matches Orexin physiology.
         # EXP: fill_fraction=1.0 (satiated) → gain=1.0 (no change);
-        #      fill_fraction=0.0 (starving)  → gain=1.5 (50% increase, i.e. r_leak×1.5).
+        #      fill_fraction=0.0 (starving)  → gain=1.15 (15% increase, i.e. r_leak×1.15).
+        #      Reduced from 1.5× (T-057 FAIL: fill saturated at step 50k, STDP locked).
         self._hunger_ema: float = 0.0
         self._relay_base_r_leak: dict = {
             pid: neuron.config.r_leak
@@ -1332,7 +1333,7 @@ class VariantCircuit(HebbianCircuit):
         # τ=1000 EMA → ~1000-step lag; prevents rapid oscillation from BMR noise.
         _hunger_raw = max(0.0, 1.0 - self.energy_store.fill_fraction)
         self._hunger_ema += (_hunger_raw - self._hunger_ema) / 1000.0
-        _gain = min(1.5, 1.0 + 0.5 * self._hunger_ema)
+        _gain = min(1.15, 1.0 + 0.15 * self._hunger_ema)  # BIO: Burdakov 2005 Orexin ~15% max
         for _pid, _base_rl in self._relay_base_r_leak.items():
             _relay_n = self.somatosensory.relays.get(_pid)
             if _relay_n is not None:
