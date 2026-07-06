@@ -1016,6 +1016,99 @@ class VariantCircuit(HebbianCircuit):
         # Must be called AFTER all _init_* methods complete (neurons fully created).
         self._assign_regions()
 
+        # T-047: P0-B shadow layer input enhancement
+        # Force shadow_sandbox.initialize() so neurons exist before we wire bundles.
+        # observe() checks _initialized and skips redundant re-initialization.
+        self.shadow_sandbox.initialize(self)
+        self._init_shadow_input_bundles()
+
+    def _init_shadow_input_bundles(self):
+        """Wire Motor / relay / energy → shadow layer (frozen, low-gain, observer-only).
+
+        TYPE:INFRA
+        BIO: efference copy (motor corollary discharge) → cerebellar-like shadow layer.
+             REF: Wolpert & Kawato 1998 Trends Cogn Sci 2:338 (forward model receives
+             motor commands + sensory context to predict outcome).
+        PHYS: Frozen SynapticBundle (frozen=True, no STDP); gain 0.1–0.2 prevents
+              shadow-layer saturation. Bundles registered in shadow_sandbox.bundles so
+              observe() propagates them automatically each SHADOW_K step.
+        EXP: goal = shadow._nu > 0.01 (T-050 criterion); prior ν≈0 because shadow had
+             no motor or sensory input (only Xin-tension from main bundles).
+        """
+        self._shadow_input_bundles: list = []
+        sb = self.shadow_sandbox
+        sn = sb.neurons
+
+        def _sh_frozen(bid, w, sg):
+            return BundleConfig(
+                bundle_id=bid,
+                learning_rule="frozen",
+                initial_weight=w,
+                weight_max=w,
+                synapse_gain=sg,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+
+        # ── Motor efference copy → shadow motor neurons ──
+        # BIO: spinal ventral-horn axon collaterals → cerebellum efference copy
+        #      (Sherrington 1910; Ito 1984 The Cerebellum and Neural Control).
+        # Q2: motor_neurons['move_x/y/z'] → s_mot_x/y/z (1:1, sg=1.0, w=0.1)
+        # Q3: w=0.1: motor.act≈0.4 at cruise → s_mot input≈0.04 (below saturation C=1)
+        _motor_map = [('move_x', 'x'), ('move_y', 'y'), ('move_z', 'z')]
+        for mk, sv in _motor_map:
+            src_n = self.motor_neurons.get(mk)
+            tgt_n = sn.get(f's_mot_{sv}')
+            if src_n is None or tgt_n is None:
+                continue
+            bid = f'shadow_motor_{sv}'
+            b = SynapticBundle(_sh_frozen(bid, 0.1, 1.0), [src_n], [tgt_n])
+            self._shadow_input_bundles.append(b)
+            sb.bundles[bid] = b
+
+        # ── Somatosensory relay → shadow encoding neurons ──
+        # BIO: spinothalamic tract → predictive cortical layer (Clark et al. 2013).
+        # Q2: relay['front/back/left/right/top_front/...'] → s_enc_reg_therm_{patch}
+        # Q3: w=0.1: relay.act≈1.3 (hot) → input≈0.13 to shadow enc (v_th=0.3, subthreshold)
+        _relay_patch_map = [
+            ('front',     'therm_front'),
+            ('back',      'therm_back'),
+            ('left',      'therm_left'),
+            ('right',     'therm_right'),
+            ('top_front', 'therm_top_front'),
+            ('top_back',  'therm_top_back'),
+            ('top_left',  'therm_top_left'),
+            ('top_right', 'therm_top_right'),
+            ('bot_front', 'therm_bot_front'),
+            ('bot_back',  'therm_bot_back'),
+            ('bot_left',  'therm_bot_left'),
+            ('bot_right', 'therm_bot_right'),
+        ]
+        for relay_pid, shadow_axis in _relay_patch_map:
+            src_n = self.somatosensory.relays.get(relay_pid)
+            tgt_n = sn.get(f's_enc_reg_{shadow_axis}')
+            if src_n is None or tgt_n is None:
+                continue
+            bid = f'shadow_relay_{relay_pid}'
+            b = SynapticBundle(_sh_frozen(bid, 0.1, 1.0), [src_n], [tgt_n])
+            self._shadow_input_bundles.append(b)
+            sb.bundles[bid] = b
+
+        # ── Energy state → shadow column (metabolic context) ──
+        # BIO: hypothalamic energy-sensing → predictive processing context
+        #      (Lieder & Griffiths 2017 Behav Brain Sci — metabolic resource-rational PP).
+        # Q2: average_energy_neuron → s_col_therm_front (thermal column as proxy)
+        # Q3: w=0.2: avg_energy.act≈0.5 → input≈0.1 to shadow col
+        if self.average_energy_neuron is not None:
+            tgt_n = sn.get('s_col_therm_front')
+            if tgt_n is not None:
+                bid = 'shadow_energy_col'
+                b = SynapticBundle(
+                    _sh_frozen(bid, 0.2, 1.0),
+                    [self.average_energy_neuron], [tgt_n])
+                self._shadow_input_bundles.append(b)
+                sb.bundles[bid] = b
+
     def _assign_regions(self):
         """Assign brain region codes to all neurons based on functional identity.
 
@@ -3275,6 +3368,9 @@ class VariantCircuit(HebbianCircuit):
         # C1: shadow ν → DA gate (lazy: only after _init_da_circuit)
         if self.bundle_shadow_nu_to_da is not None:
             bundles.append(self.bundle_shadow_nu_to_da)
+        # T-047: shadow layer input bundles (Motor/relay/energy → shadow neurons)
+        if hasattr(self, '_shadow_input_bundles'):
+            bundles.extend(self._shadow_input_bundles)
         # D1: phasic relay arc bundles
         for _b in [self.bundle_relay_to_slow_left, self.bundle_relay_to_slow_right,
                    self.bundle_relay_to_phasic_left, self.bundle_relay_to_phasic_right]:
