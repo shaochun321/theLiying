@@ -17,11 +17,7 @@
 
 | ID | 任务描述 | 优先级 | 依赖 | 来源文档 |
 |:---|:---|:---|:---|:---|
-| ~~T-045~~ | ~~Step D：T-042确认spinal未饱和（全负值），此任务取消~~ | ~~P2~~ | ~~取消~~ | — |
-| T-047 | P0-B：影子层输入增强（Motor/体感/EnergyStore→shadow neurons，frozen束，gain=0.1~0.2，加入get_all_bundles） | P2 | T-043 ✅ | 未完成任务并行方案评判_2026-07-06 |
-| T-052 | P0-C S2 spinal门槛调整：需重新推导参数（V_th=1.5在initial_weight=0.1时致命，sp_peak=0.138<<1.5会永久沉默spinal）| P3 | 独立 | v5.0文档分歧 |
-| T-049 | P1-D Step1：feed_alignment物理重建（relay_front→cpc frozen bundle，替代HC-006删除留下的零值） | P3 | T-047 ✅ | 未完成任务并行方案评判_2026-07-06 |
-| T-050 | P2-H验证：P0-B完成后验证shadow_nu激活（ν>0.01），无需新代码 | P3 | T-047 ✅ | 未完成任务并行方案评判_2026-07-06 |
+| T-053 | nu_neuron 校准修复：_NU_SCALE=1/176 vs 当前xin_max≈8470（差4个量级），τ=0.1/dt=1.0导致exp(-10)衰减，nu_neuron.activation≈0，shadow→DA通路实质失效；需方案更新 ⏸ | P3 | T-047 ✅ | T-050诊断发现 |
 
 ---
 
@@ -37,7 +33,9 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
-| T-048 | P1-G 饥饿r_leak调制（EMA τ=1000，_hunger_ema，gain≤1.5×），21/21 PASS，T4.1=4.04x | 2026-07-06 | — |
+| T-050 | P2-H shadow_nu验证：ν实测值在百万级（>0.01 ✅），shadow输入激活s_enc_therm_front=1.23；nu_neuron.activation=0（_NU_SCALE校准问题，登记T-053）| 2026-07-06 | — |
+| T-047 | P0-B：shadow层输入增强（16条frozen束：3 Motor+12 relay+1 energy），H_struct 7.03→7.14，21/21 PASS | 2026-07-06 | 85274e9 |
+| T-048 | P1-G 饥饿r_leak调制（EMA τ=1000，_hunger_ema，gain≤1.5×），21/21 PASS，T4.1=4.04x | 2026-07-06 | bafeae4 |
 | T-051 | P0-A relay侧向抑制：已存在（bundles_relay_lateral_inh 4条，sg=-1.0/w=0.3，已注册 get_all_bundles）| 2026-07-06 | — |
 | T-044 | 50k 验证：4/4 PASS（DR5%=76.5%/|Δw|=0.110/无死锁2.2%/T4.1=3.30x）| 2026-07-06 | — |
 | T-043 | yaw层交叉抑制束实装（spinal_ccw→yaw_cw + spinal_cw→yaw_ccw，W=0.020/sg=-1.0，frozen，get_all_bundles注册），21/21 PASS | 2026-07-06 | 4ac8d98 |
@@ -87,7 +85,8 @@
 
 | ID | 任务描述 | 取消原因 |
 |:---|:---|:---|
-| — | — | — |
+| T-052 | P0-C S2 spinal门槛调整 | S2参数从未被写入代码，当前 v_threshold=0.01 正常工作，v5.0文档分歧已消除 |
+| T-049 | P1-D feed_alignment物理重建 | HC-006零值问题已由 T-031（Step7 _v_feed→CPC）解决，不需要再加relay_front路径 |
 
 ---
 
