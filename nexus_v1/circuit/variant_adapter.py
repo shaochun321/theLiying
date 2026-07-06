@@ -998,6 +998,20 @@ class VariantCircuit(HebbianCircuit):
         self._dwell_is_discharging: bool = False  # Schmitt latch state
         self._dwell_g_dis: float = 0.001      # current smoothed discharge conductance
 
+        # T-048: P1-G hunger-sensitization — r_leak modulation via EMA
+        # BIO: hypothalamic orexin neurons open K2P channels on relay (WDR) neurons when
+        #      energy is low, increasing leak conductance and lowering excitability threshold.
+        #      REF: Burdakov 2005 Neuron 46:533; Bhaskara 2011 J Physiol 589:3763.
+        # PHYS: r_leak ∝ 1/g_leak; modulating r_leak changes τ and threshold, not injected current.
+        #       EMA τ=1000 steps smooths BMR noise; gain cap ≤1.5× prevents runaway sensitization.
+        # EXP: fill_fraction=1.0 (satiated) → gain=1.0 (no change);
+        #      fill_fraction=0.0 (starving)  → gain=1.5 (50% increase, i.e. r_leak×1.5).
+        self._hunger_ema: float = 0.0
+        self._relay_base_r_leak: dict = {
+            pid: neuron.config.r_leak
+            for pid, neuron in self.somatosensory.relays.items()
+        }
+
         # ── Region assignment: tag all neurons with brain region codes ──
         # Must be called AFTER all _init_* methods complete (neurons fully created).
         self._assign_regions()
@@ -1219,6 +1233,17 @@ class VariantCircuit(HebbianCircuit):
         # 1. Sample skin patches at body surface positions
         patch_temps = self.world.body.sample_skin(self.world, dt)
         self._patch_temps = patch_temps  # exposed for DR5 metric in experiment scripts
+
+        # ── T-048: P1-G hunger-sensitization r_leak modulation ──
+        # Update relay r_leak each step based on smoothed hunger signal.
+        # τ=1000 EMA → ~1000-step lag; prevents rapid oscillation from BMR noise.
+        _hunger_raw = max(0.0, 1.0 - self.energy_store.fill_fraction)
+        self._hunger_ema += (_hunger_raw - self._hunger_ema) / 1000.0
+        _gain = min(1.5, 1.0 + 0.5 * self._hunger_ema)
+        for _pid, _base_rl in self._relay_base_r_leak.items():
+            _relay_n = self.somatosensory.relays.get(_pid)
+            if _relay_n is not None:
+                _relay_n.config.r_leak = _base_rl * _gain
 
         # ── Relay lateral inhibition pre-inject (P0-B: Winner-Take-All) ──
         # Inject inhibitory currents from previous step into competing relay membranes

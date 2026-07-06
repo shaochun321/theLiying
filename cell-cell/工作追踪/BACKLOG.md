@@ -17,11 +17,8 @@
 
 | ID | 任务描述 | 优先级 | 依赖 | 来源文档 |
 |:---|:---|:---|:---|:---|
-| T-044 | 50k快速验证（回归+无创检验，确认T-043新束不破坏能量链）| P1 | T-043 ✅ | 架构审计方案评判与执行计划_2026-07-06 |
 | ~~T-045~~ | ~~Step D：T-042确认spinal未饱和（全负值），此任务取消~~ | ~~P2~~ | ~~取消~~ | — |
 | T-047 | P0-B：影子层输入增强（Motor/体感/EnergyStore→shadow neurons，frozen束，gain=0.1~0.2，加入get_all_bundles） | P2 | T-043 ✅ | 未完成任务并行方案评判_2026-07-06 |
-| T-048 | P1-G：饥饿敏化r_leak调制（EMA τ=1000，有效增益≤1.5×，hunger=1-fill_fraction） | P2 | T-043 ✅ | 未完成任务并行方案评判_2026-07-06 |
-| T-051 | P0-A：relay侧向抑制（relay_front↔back, relay_left↔right，各2束双向=4束，sg=-0.3，w=0.2） | P2 | T-044 ✅ | 未完成任务并行方案评判v2_2026-07-06 |
 | T-052 | P0-C S2 spinal门槛调整：需重新推导参数（V_th=1.5在initial_weight=0.1时致命，sp_peak=0.138<<1.5会永久沉默spinal）| P3 | 独立 | v5.0文档分歧 |
 | T-049 | P1-D Step1：feed_alignment物理重建（relay_front→cpc frozen bundle，替代HC-006删除留下的零值） | P3 | T-047 ✅ | 未完成任务并行方案评判_2026-07-06 |
 | T-050 | P2-H验证：P0-B完成后验证shadow_nu激活（ν>0.01），无需新代码 | P3 | T-047 ✅ | 未完成任务并行方案评判_2026-07-06 |
@@ -40,7 +37,10 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
-| T-043 | yaw层交叉抑制束实装（spinal_ccw→yaw_cw + spinal_cw→yaw_ccw，W=0.020/sg=-1.0，frozen，get_all_bundles注册），21/21 PASS | 2026-07-06 | — |
+| T-048 | P1-G 饥饿r_leak调制（EMA τ=1000，_hunger_ema，gain≤1.5×），21/21 PASS，T4.1=4.04x | 2026-07-06 | — |
+| T-051 | P0-A relay侧向抑制：已存在（bundles_relay_lateral_inh 4条，sg=-1.0/w=0.3，已注册 get_all_bundles）| 2026-07-06 | — |
+| T-044 | 50k 验证：4/4 PASS（DR5%=76.5%/|Δw|=0.110/无死锁2.2%/T4.1=3.30x）| 2026-07-06 | — |
+| T-043 | yaw层交叉抑制束实装（spinal_ccw→yaw_cw + spinal_cw→yaw_ccw，W=0.020/sg=-1.0，frozen，get_all_bundles注册），21/21 PASS | 2026-07-06 | 4ac8d98 |
 | T-042 | F-I曲线诊断：phasic钳位(-0.1V)是根本原因，Ia压制比1.09×（峰值），T-045取消，T-043参数W=0.020/sg=-1.0 | 2026-07-06 | — |
 | T-046 | P1-F：前庭N=3激活（VestibularChain(n_hair_cells=3)，21/21 PASS，variant_adapter.py+1行import） | 2026-07-06 | — |
 | T-041 | 200k步长程复测：T4.1全程3.65x→5.56x（PASS），P8-3/P8-4 FAIL（时间点问题）| 2026-07-05-06 | 08e4c76 |
