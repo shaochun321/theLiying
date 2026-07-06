@@ -211,6 +211,28 @@
 | HC-058 | LOW | UNGROUNDED_PARAM | compensation.py:180 | tau_agc=0.1（自注释 UNGROUNDED，时间压缩 10^6×）|
 | HC-059 | LOW | SUSPICIOUS | compensation.py:279+ | CRI 硬重置（vs RC drain）；BiasCS 绕过 Bundle 注入 |
 | HC-060 | LOW | LOGIC_REPLACES_CIRCUIT | somatosensory/chain.py:19+ | 侧抑制邻接图硬编码 front↔back 不相邻（无 BIO: 说明）|
+| HC-061 | MED | MISSING_PHYSICAL_MODEL | variant_adapter.py:1125 | 前庭半规管（yaw/pitch/roll）用零占位符代替，无真实角速度反馈物理化 |
+
+---
+
+### HC-061: 前庭半规管（canal）功能缺失（2026-07-06 登记）
+
+- **位置**：`nexus_v1/circuit/variant_adapter.py` 第1125行；`mechanical_inputs` 字典
+- **问题**：`_VESTIBULAR_AXES = {'yaw', 'pitch', 'roll', 'oto_x', 'oto_y', 'oto_z'}` 中，`yaw/pitch/roll` 三个半规管轴在整个仿真过程中均为零值占位符——在 `variant_adapter.step()` 中从未向 `mechanical_inputs['yaw/pitch/roll']` 写入体角速度，因此前庭半规管（semicircular canal）功能物理上不存在。
+- **当前状态**：仅耳石器官（otolith）功能物理化：`oto_x/y/z = body.acceleration × OTOLITH_GAIN`（第1475-1477行）。
+- **影响**：
+  - T-061 前庭消融实验中，消融操作只能作用于耳石信号（oto），无法完整消融角速度感知路径。
+  - 前庭链路（MET→HC→Aff→Enc）的 yaw canal 层实际上一直处于零输入状态，相当于半规管盲区。
+  - Col_yaw → Motor_move_x 的 VOR 路径（bundles_col_to_motor 中 yaw 轴）无法形成真实反射弧。
+- **补全方案（远期）**：
+  1. 在 `body.step()` 或 `variant_adapter.step()` 中，将 `body.angular_velocity` 映射到 `mechanical_inputs['yaw']`（BIO：半规管感知头部角速度，不是角位移）
+  2. 增益推导：人类 canal 增益约 2 rad/s 对应 1 单位神经激活（Goldberg & Fernandez 1971）
+  3. 引入 CANAL_GAIN 常数（类比现有 OTOLITH_GAIN=500），从生物文献推导数值
+  4. 无需新神经元，直接接入现有 MET→HC 输入路径
+- **当前不阻塞**：核心热趋性验证（T-060 to T-065）均不依赖 yaw canal 功能；体方向控制由 relay→yaw_neuron→apply_yaw_torque 路径完成（已物理化）。
+- **优先级**：MEDIUM（不阻塞近期实验，但影响前庭系统长期完整性）
+- **DEG 关联**：无（新登记）
+- **登记时间**：2026-07-06，T-061 实现分析中发现
 
 ---
 
