@@ -1425,6 +1425,10 @@ class VariantCircuit(HebbianCircuit):
         if self.phasic_left._membrane.voltage < -0.1:
             self.phasic_left._membrane.discharge_to(-0.1)
             self.phasic_left.activation = max(-10.0, -0.1)
+            # T-078 fix-A: phasic near heat source is metabolically active (TRPV1 active);
+            # clamp voltage floor must not drain energy → maintain above ENERGY_FLOOR (0.3).
+            # BIO: WDR phasic neurons receiving thermal drive maintain ATP via oxidative phosphorylation.
+            self.phasic_left.energy = max(self.phasic_left.energy, 0.5)
 
         _i_pr = 0.0
         if self.bundle_relay_to_phasic_right is not None:
@@ -1436,6 +1440,7 @@ class VariantCircuit(HebbianCircuit):
         if self.phasic_right._membrane.voltage < -0.1:
             self.phasic_right._membrane.discharge_to(-0.1)
             self.phasic_right.activation = max(-10.0, -0.1)
+            self.phasic_right.energy = max(self.phasic_right.energy, 0.5)  # T-078 fix-A (same)
 
         # Spinal turn interneurons: collect all inputs symmetrically before stepping.
         # Push-pull: pre-compute mutual inhibition from t-1 activations → both neurons see
