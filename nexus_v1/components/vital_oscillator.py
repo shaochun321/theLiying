@@ -79,7 +79,7 @@ class VitalOscillatorConfig:
     # Base amplitude scaling (output = VdP_x × amplitude)
     # Must be small enough to be sub-dominant to vestibular drive (~0.01)
     # but large enough to occasionally push Motor past spike threshold.
-    amplitude: float = 0.003
+    amplitude: float = 0.005
 
     # Energy cost coefficient: ΔE_withdraw = cost × Σ|output_i| × dt
     # ~0.0002/step at full amplitude ≈ basal_drain level
