@@ -767,6 +767,14 @@ class VariantCircuit(HebbianCircuit):
         self.spinal_cw = Neuron(NeuronConfig(
             neuron_id='spinal_cw', capacitance=1.0, r_leak=5.0, region=0x01,
             spiking=False, channels=[ChannelConfig(name='spinal_cw', v_threshold=0.01, gm=1.0)]))
+        # T-085: spinal_fwd — bilateral convergence FORWARD nucleus
+        # BIO: Grillner 1996 EIN (excitatory interneurons) — bilateral bilateral summation
+        #      drives locomotion forward when heat is directly ahead (left+right co-fire).
+        # Q2: phasic_left + phasic_right → spinal_fwd → move_x (frozen w=0.200)
+        # Q3: same config as spinal_ccw/cw (passive Capacitor integrator, no spiking)
+        self.spinal_fwd = Neuron(NeuronConfig(
+            neuron_id='spinal_fwd', capacitance=1.0, r_leak=5.0, region=0x01,
+            spiking=False, channels=[ChannelConfig(name='spinal_fwd', v_threshold=0.01, gm=1.0)]))
 
         _rl = self.somatosensory.relays.get('left')
         _rr = self.somatosensory.relays.get('right')
@@ -827,6 +835,14 @@ class VariantCircuit(HebbianCircuit):
             'd1_phasic_left_to_spinal_ccw', self.phasic_left, self.spinal_ccw)
         self.bundle_d1_phasic_right_to_spinal_cw = _stdp_d1_cfg(
             'd1_phasic_right_to_spinal_cw', self.phasic_right, self.spinal_cw)
+        # T-085: bilateral convergence → spinal_fwd (same D1 arc config)
+        # BIO: bilateral EIN summation — when heat is ahead, both phasic neurons co-fire
+        #      → spinal_fwd gets double input → forward drive beats single-sided turning.
+        # Q3: w0/wmax/lr match D1 arc; bilateral addition replaces any Python condition.
+        self.bundle_d1_phasic_left_to_spinal_fwd = _stdp_d1_cfg(
+            'd1_phasic_left_to_spinal_fwd', self.phasic_left, self.spinal_fwd)
+        self.bundle_d1_phasic_right_to_spinal_fwd = _stdp_d1_cfg(
+            'd1_phasic_right_to_spinal_fwd', self.phasic_right, self.spinal_fwd)
 
         # w=0.200: T-071-fix-A Step3 (2026-07-07): 0.100→0.200 (Step2 T4.1=7.5x, no drop).
         # BIO: spinal interneuron → VMN synaptic conductance (Eccles 1960 J Physiol 154:89).
@@ -839,6 +855,12 @@ class VariantCircuit(HebbianCircuit):
             _frozen_cfg('spinal_ccw_to_yaw', 0.200, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_yaw', 0.200, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
+        # T-085: spinal_fwd → move_x (frozen, drives forward locomotion)
+        # Q3: w=0.200 matches spinal_ccw/cw → yaw (same D1 arc output calibration).
+        #     Bilateral co-fire gives 2× current to spinal_fwd vs single-side → FWD wins.
+        self.bundle_spinal_fwd_to_move_x = SynapticBundle(
+            _frozen_cfg('spinal_fwd_to_move_x', 0.200, 1.0),
+            [self.spinal_fwd], [self.motor_neurons['move_x']])
 
         # Step 6 / P1: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
         # BIO: spinal Ia inhibitory interneurons — monosynaptic mutual inhibition between
@@ -875,6 +897,39 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_spinal_cw_to_yaw_ccw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_yaw_ccw', _W_CROSS, _SG_CROSS),
             [self.spinal_cw], [self.yaw_ccw_neuron])
+
+        # T-084: Z轴热觉接线 — col_therm_top/bot_* → move_z STDP bundles (8条)
+        # Q1. BIO: 脊髓热梯度探测 → Z轴运动柱（上下热差 → 趋热垂直导航）
+        #     REF: Bhaskara 2011 WormBook §thermotaxis; Fraenkel & Gunn 1961 kinesis+taxis.
+        # Q2. column_neurons['therm_top_{dir}'] → motor_neurons['move_z'] (excit, sg=+2.5)
+        #     column_neurons['therm_bot_{dir}'] → motor_neurons['move_z'] (inhib, sg=-2.5)
+        # Q3. gain ±2.5: 4 top-patches × 2.5 = ±10 total (matches mid-ring single-axis ±10).
+        #     w0=0.1/wmax=0.5/stdp_lr=0.05 mirroring mid-ring thermotaxis pathways.
+        #     eligibility_trace: DA-gated LTP (Reynolds & Wickens 2002 same as mid-ring).
+        _THERM_Z_W0   = 0.1
+        _THERM_Z_WMAX = 0.5
+        _THERM_Z_LR   = 0.05
+        self.bundles_therm_z: List[SynapticBundle] = []
+        _move_z_n = self.motor_neurons['move_z']
+        for _pid, _sg in [
+            ('therm_top_front', +2.5), ('therm_top_back',  +2.5),
+            ('therm_top_left',  +2.5), ('therm_top_right', +2.5),
+            ('therm_bot_front', -2.5), ('therm_bot_back',  -2.5),
+            ('therm_bot_left',  -2.5), ('therm_bot_right', -2.5),
+        ]:
+            if _pid in self.column_neurons:
+                _ring = 'top' if _sg > 0 else 'bot'
+                _dir  = _pid[len(f'therm_{_ring}_'):]
+                _bid  = f'therm_z_{_ring}_{_dir}'
+                _b = SynapticBundle(BundleConfig(
+                    bundle_id=_bid, learning_rule='stdp',
+                    initial_weight=_THERM_Z_W0, weight_max=_THERM_Z_WMAX,
+                    stdp_lr=_THERM_Z_LR, synapse_gain=_sg,
+                    bundle_role='feedforward', remodel_cost_kappa=0.0,
+                    use_eligibility_trace=True, eligibility_tau=300.0,
+                    eligibility_gain=1e-5, eligibility_ltd_rate=0.01,
+                ), [self.column_neurons[_pid]], [_move_z_n])
+                self.bundles_therm_z.append(_b)
 
         # 接口三：接近→制动束（thermo_front → motor_move_x，抑制性反射弧）
         # Q1. BIO: 脊髓热防御制动反射 — TRPV1/A1 热感受器激活 → Aδ/C 热觉传入
@@ -1459,6 +1514,11 @@ class VariantCircuit(HebbianCircuit):
         _inh_to_cw  = self.bundle_spinal_ccw_to_cw.propagate()   # Ia inhibition: CCW→CW
         self.spinal_ccw.step((_d1_ccw[0] if _d1_ccw else 0.0) + (_inh_to_ccw[0] if _inh_to_ccw else 0.0), dt)
         self.spinal_cw.step((_d1_cw[0] if _d1_cw else 0.0) + (_inh_to_cw[0] if _inh_to_cw else 0.0), dt)
+        # T-085: spinal_fwd bilateral convergence (pre-computed before step, KCL symmetric)
+        _d1_fwd_l = self.bundle_d1_phasic_left_to_spinal_fwd.propagate()
+        _d1_fwd_r = self.bundle_d1_phasic_right_to_spinal_fwd.propagate()
+        _i_fwd = (_d1_fwd_l[0] if _d1_fwd_l else 0.0) + (_d1_fwd_r[0] if _d1_fwd_r else 0.0)
+        self.spinal_fwd.step(_i_fwd, dt)
 
         # ── P2-HC007: relay→enc STDP bundle propagation ──
         # Replaces: enc_reg.step(relay.activation * EXTRA_AXIS_GAIN, dt) (direct injection)
@@ -2446,6 +2506,19 @@ class VariantCircuit(HebbianCircuit):
                 currents = [c * da_gain for c in currents]
             bundle.apply_to_targets(currents, dt)
 
+        # T-084: Z-axis thermal bundles (col_therm_top/bot → move_z, DA-scaled)
+        for bundle in self.bundles_therm_z:
+            currents = bundle.propagate()
+            if da_gain != 1.0:
+                currents = [c * da_gain for c in currents]
+            bundle.apply_to_targets(currents, dt)
+
+        # T-085: spinal_fwd → move_x (forward locomotion, DA-scaled)
+        _sfwd_cur = self.bundle_spinal_fwd_to_move_x.propagate()
+        if da_gain != 1.0:
+            _sfwd_cur = [c * da_gain for c in _sfwd_cur]
+        self.bundle_spinal_fwd_to_move_x.apply_to_targets(_sfwd_cur, dt)
+
         # B1b: Renshaw recurrent lateral inhibition (after Col→Motor)
         # BIO: α-motor collateral → Renshaw cell → motor pool inhibition
         # (Eccles et al. 1961). Prevents co-contraction of antagonist pools.
@@ -2670,6 +2743,19 @@ class VariantCircuit(HebbianCircuit):
             _bd1.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
                        fill_fraction=fill, da_concentration=da_conc)
             _bd1.compute_xin(dt)
+
+        # T-085: phasic→spinal_fwd STDP (bilateral convergence, same gate as D1)
+        for _bfwd in [self.bundle_d1_phasic_left_to_spinal_fwd,
+                      self.bundle_d1_phasic_right_to_spinal_fwd]:
+            _bfwd.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                        fill_fraction=fill, da_concentration=da_conc)
+            _bfwd.compute_xin(dt)
+
+        # T-084: Z-axis thermal STDP (col_therm_top/bot → move_z, same gate as col_to_motor)
+        for _bz in self.bundles_therm_z:
+            _bz.learn(dt, plasticity_gate=gate_col * da_lr_mod * g_sync * body_lr,
+                      fill_fraction=fill, da_concentration=da_conc)
+            _bz.compute_xin(dt)
 
     def get_variant_state(self) -> dict:
         """Get variant component states for monitoring."""
@@ -3453,6 +3539,12 @@ class VariantCircuit(HebbianCircuit):
                         self.bundle_spinal_ccw_to_yaw, self.bundle_spinal_cw_to_yaw,
                         self.bundle_spinal_ccw_to_cw, self.bundle_spinal_cw_to_ccw,  # Step 6: Ia push-pull
                         self.bundle_spinal_ccw_to_yaw_cw, self.bundle_spinal_cw_to_yaw_ccw])  # T-043: cross-inhibition
+        # T-085: spinal_fwd bundles (bilateral convergence forward arc)
+        bundles.extend([self.bundle_d1_phasic_left_to_spinal_fwd,
+                        self.bundle_d1_phasic_right_to_spinal_fwd,
+                        self.bundle_spinal_fwd_to_move_x])
+        # T-084: Z-axis thermal STDP bundles (col_therm_top/bot → move_z)
+        bundles.extend(self.bundles_therm_z)
         # Step 7: relay adaptive gain (phasic→relay inhibition)
         for _b in [self.bundle_phasic_left_to_relay_left,
                    self.bundle_phasic_right_to_relay_right]:
