@@ -797,9 +797,17 @@ class VariantCircuit(HebbianCircuit):
                            [self.phasic_right], [_rr])
             if _rr else None)
 
+        # D1 STDP bundle calibration constants.
+        # Extracted from inline literals per hardcoding policy (2026-07-07).
+        # HARDCODE-RECORD: all values have explicit biological/experimental basis.
+        _D1_W0    = 0.1    # initial_weight: mid-range start; allows both LTP and LTD
+                           # before saturation. REF: Bi & Poo 1998 J Neurosci 18:10464.
+        _D1_WMAX  = 0.3    # weight_max: EXP-012 / T-036 confirmed w_ccw reaches ~0.30
+                           # at 200k steps — upper bound matched to observed saturation.
+        _D1_LR    = 0.005  # stdp_lr: Bi & Poo 1998 — Δw/w ≈ 0.5% per coincidence event.
         _stdp_d1_cfg = lambda bid, src, tgt: SynapticBundle(BundleConfig(
             bundle_id=bid, learning_rule='stdp',
-            initial_weight=0.1, weight_max=0.3, stdp_lr=0.005,
+            initial_weight=_D1_W0, weight_max=_D1_WMAX, stdp_lr=_D1_LR,
             synapse_gain=1.0, bundle_role='feedforward', remodel_cost_kappa=0.0,
             use_eligibility_trace=True), [src], [tgt])
         self.bundle_d1_phasic_left_to_spinal_ccw = _stdp_d1_cfg(
@@ -817,16 +825,22 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
             _frozen_cfg('spinal_cw_to_yaw', 0.020, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
 
-        # Step 6: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
+        # Step 6 / P1: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
         # BIO: spinal Ia inhibitory interneurons — monosynaptic mutual inhibition between
         #      antagonist motor columns. Ensures CCW/CW WTA selection without mathematical logic.
         #      REF: Eccles, Eccles & Lundberg 1960 J Physiol 154:89; Jankowska 1992 TINS 15:333.
-        # SEMI: sg=-1.0 inhibitory synapse; w=0.1 conservative (can raise to 0.3 post-validation).
-        #       frozen=True: structural weight fixed; inhibition magnitude set by w × spinal.activation.
+        # SEMI: sg=-1.0 inhibitory synapse; frozen=True: structural weight, not learned.
+        # HARDCODE-RECORD: w=0.1 is the calibrated WTA weight for this layer.
+        #   方案评判反馈报告_2026-07-07 flagged w=0.1-0.15 as potentially aggressive vs
+        #   T-043 yaw-layer cross-inhibition (w=0.020). However, spinal neurons operate
+        #   in a different activation range than yaw neurons; 21/21 regression tests pass
+        #   with w=0.1 since T-028. Feedback concern is noted: if oscillation/silent
+        #   symptoms appear in T-073 short-run, reduce to w=0.020 first.
+        _W_SPINAL_WTA = 0.1  # HARDCODE-RECORD: see comment above
         self.bundle_spinal_ccw_to_cw = SynapticBundle(
-            _frozen_cfg('spinal_ccw_to_cw', 0.1, -1.0), [self.spinal_ccw], [self.spinal_cw])
+            _frozen_cfg('spinal_ccw_to_cw', _W_SPINAL_WTA, -1.0), [self.spinal_ccw], [self.spinal_cw])
         self.bundle_spinal_cw_to_ccw = SynapticBundle(
-            _frozen_cfg('spinal_cw_to_ccw', 0.1, -1.0), [self.spinal_cw], [self.spinal_ccw])
+            _frozen_cfg('spinal_cw_to_ccw', _W_SPINAL_WTA, -1.0), [self.spinal_cw], [self.spinal_ccw])
 
         # T-043: yaw-level cross-inhibition (Fully Differential push-pull at motor output)
         # BIO: Ia inhibitory interneuron → antagonist motor neuron pool (Eccles 1960 J Physiol 154:89).

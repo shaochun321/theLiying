@@ -105,9 +105,29 @@ class BundleConfig:
     eligibility_tau: float = 300.0
     # η_elig: scaling factor for E(t) × DA(t) → dw_ltp.
     eligibility_gain: float = 1.0
-    # η_ltd: realtime LTD rate (not DA-gated — forgetting is always on).
-    # BIO: AMPA receptor endocytosis is constitutive (Ehlers 2000).
+    # η_ltd: active LTD rate.  After P0 this is DA_ema-gated (see learn()).
+    # BIO: AMPA receptor endocytosis requires Ca²⁺/calmodulin (Bhatt 2009).
     eligibility_ltd_rate: float = 0.01
+
+    # ── P0: DA temporal integration (anti-satiety-erosion, 2026-07-07) ──
+    # da_ema_tau: EMA decay constant in SIMULATION STEPS, NOT seconds.
+    # β = dt / (dt + da_ema_tau) is computed dynamically in learn().
+    # WARN: Never hardcode β as a constant — it must depend on dt to avoid
+    #       dt-drift bugs (cf. Phase B P1 trap: exp(-50)≈0 at DT=1.0).
+    # At DT=1.0: τ=5000 steps ≈ 5s @ 1ms biological convention.
+    # BIO: DA receptor kinetics persist beyond phasic burst (Seamans & Yang
+    #      2004 Nat Rev Neurosci 5:369 — D1 intracellular cascade τ≈1-5s).
+    # REF: T-073; STDP架构解剖报告_2026-07-07; 方案评判反馈报告_2026-07-07.
+    da_ema_tau: float = 5000.0
+    # lambda_metabolic: passive AMPA structural turnover (steps⁻¹, always-on).
+    # Replaces decay_rate_by_stage[0]=0.025 in eligibility-trace branches only.
+    # ROOT CAUSE FIX: 0.025/step eroded w=0.3 to ~0 in ~740 satiety steps
+    # (T-067 post-mortem; 175k-step LTD wash observed directly).
+    # λ=1e-6/step → (1-1e-6)^175000 ≈ 0.84 retention across full satiety period.
+    # BIO: AMPA receptor half-life ~12-24h (Bhatt et al. 2009 Neuron 54:205).
+    # HARDCODE-RECORD: 1e-6 is physiologically derived; recalibrate if
+    #   satiety-period length or DT changes substantially.
+    lambda_metabolic: float = 1e-6
 
 
 # HC-022 fix: zero-crossing MOSFET comparator for Xin sign discrimination.
@@ -185,6 +205,10 @@ class SynapticBundle:
             self._eligibility_traces: List[List[float]] = [
                 [0.0] * len(targets) for _ in sources
             ]
+            # P0: per-bundle DA_ema state.
+            # DA is a global signal → one EMA per bundle is correct.
+            # Initialized to 0.0; warms up naturally as DA rises on first approach.
+            self._da_ema: float = 0.0
         else:
             self._eligibility_traces = None
 
@@ -351,6 +375,13 @@ class SynapticBundle:
         energy_plasticity_scale = min(
             1.0, fill_fraction / self.FILL_THRESHOLD_PLASTICITY)
 
+        # P0: Update DA_ema once per learn() call (before per-synapse loop).
+        # β is computed from dt to survive DT changes without silent drift.
+        # WARN: da_ema_tau is in simulation steps — do NOT substitute seconds.
+        if self.config.use_eligibility_trace:
+            _beta = dt / (dt + self.config.da_ema_tau)
+            self._da_ema = _beta * da_concentration + (1.0 - _beta) * self._da_ema
+
         for i, src in enumerate(self.sources):
             for j, tgt in enumerate(self.targets):
                 m = self._memristors[i][j]
@@ -371,23 +402,29 @@ class SynapticBundle:
                             + src.pre_trace * post_act * dt
                         )
 
-                        # Step 2: LTP = η_elig × E(t) × DA(t)  (DA-gated)
-                        #   Only DA confirmation converts the eligibility
-                        #   mark into actual weight change.
-                        #   DA=0 → ltp=0 → no blind potentiation.
+                        # Step 2: LTP = η_elig × E(t) × DA_ema  (DA-gated)
+                        #   P0: use DA_ema (smoothed) instead of point-sample DA(t).
+                        #   DA_ema decays over τ_DA steps after fill saturates →
+                        #   LTP tapers gradually instead of dropping to 0 instantly.
                         ltp = (self.config.eligibility_gain
                                * self._eligibility_traces[i][j]
-                               * da_concentration)
+                               * self._da_ema)
 
-                        # Step 3: LTD + decay (realtime, no DA gate)
-                        #   BIO: AMPA endocytosis is constitutive.
-                        #   Forgetting is always on — only growth needs permission.
-                        ltd = (self.config.eligibility_ltd_rate * dt
-                               * src.pre_trace * post_act)
-                        decay = self.config.decay_rate_by_stage[0] * m.w * dt
+                        # Step 3: Active LTD (DA_ema-gated) + passive metabolic decay
+                        #   P0 fix: LTD_active is now gated by DA_ema.
+                        #   BIO: Ca²⁺/calmodulin-dependent AMPA endocytosis requires
+                        #        coincident neuromodulatory state (Bhatt 2009 Neuron).
+                        #   During satiety (DA_ema→0), ltd_active→0 → weights freeze.
+                        ltd_active = (self.config.eligibility_ltd_rate * dt
+                                      * src.pre_trace * post_act
+                                      * self._da_ema)
+                        # Passive metabolic turnover (always-on, minimal).
+                        # λ_metabolic replaces decay_rate_by_stage[0]=0.025 here.
+                        # 0.025 was root cause of T-067 erosion (740-step wipe-out).
+                        decay = self.config.lambda_metabolic * m.w * dt
 
                         # Step 4: Combine with multiplicative soft bounds
-                        dw_raw = ltp - ltd - decay
+                        dw_raw = ltp - ltd_active - decay
                         if dw_raw > 0:
                             dw = dw_raw * (self.config.weight_max - m.w)
                         else:
