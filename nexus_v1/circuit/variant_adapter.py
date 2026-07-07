@@ -326,6 +326,13 @@ class VariantCircuit(HebbianCircuit):
         self._feedback_gain = 0.05   # gentle suppression
         self._feedback_tau = 0.5     # 500ms smoothing
 
+        # ── Variant: Cupula high-pass filter state (T-076 Phase 0) ──
+        # BIO: Steinhausen (1931) torsion pendulum — Cupula deflects ∝ angular velocity,
+        #      adapts out for sustained constant rotation (τ≈4s, Fernández & Goldberg 1971).
+        # TRAP: ALPHA = dt/(dt + TAU_CUPULA) must be computed per call, NOT hardcoded 0.00025.
+        self._cupula_omega_prev: float = 0.0   # ω[t-1] for IIR high-pass filter
+        self._cupula_theta: float = 0.0         # Cupula deflection estimate θ[t]
+
         # ── Variant: Binding Layer (§5 of math spec) ──
         # Patch B: TemporalBindingLayer replaces BindingLayer.
         # STF convolution on vestibular axes (tau_w=30); thermal stays instantaneous.
@@ -1489,6 +1496,25 @@ class VariantCircuit(HebbianCircuit):
         mechanical_inputs['oto_x'] = mechanical_inputs.get('oto_x', 0.0) + (acc[0] + eta[0]) * OTOLITH_GAIN
         mechanical_inputs['oto_y'] = mechanical_inputs.get('oto_y', 0.0) + (acc[1] + eta[1]) * OTOLITH_GAIN
         mechanical_inputs['oto_z'] = mechanical_inputs.get('oto_z', 0.0) + (acc[2] + eta[2]) * OTOLITH_GAIN
+
+        # ── 0c. Cupula high-pass filter: yaw angular velocity → canal MET input ──
+        # BIO: Steinhausen (1931) overdamped torsion pendulum.  Cupula detects transient
+        #      rotation; adapts to constant angular velocity with τ=4 s (R/K ratio).
+        # TRAP: ALPHA = dt/(dt + TAU_CUPULA) — NOT hardcoded 0.00025 (breaks at other DT).
+        # REF: Fernández & Goldberg 1971 J Neurophysiol 34:661.
+        # World 2.0 Phase 1: only yaw; pitch/roll angular_velocity = 0.
+        _TAU_CUPULA = 4000.0          # steps (4 s at 1 ms/step biological convention)
+        _ALPHA_CUPULA = dt / (dt + _TAU_CUPULA)
+        _ANGULAR_GAIN = 5000.0        # Phase 0 initial; Phase 0.5 calibration will adjust
+        raw_omega_yaw = self.world.body.angular_velocity
+        self._cupula_theta = (
+            _ALPHA_CUPULA * (raw_omega_yaw - self._cupula_omega_prev)
+            + (1.0 - _ALPHA_CUPULA) * self._cupula_theta
+        )
+        self._cupula_omega_prev = raw_omega_yaw
+        mechanical_inputs['yaw'] = mechanical_inputs.get('yaw', 0.0) + self._cupula_theta * _ANGULAR_GAIN
+        # pitch / roll: planar approximation (Phase 1) — kept at zero.
+
         # ── World 2.0: Phase 1 planar approximation — lock Z axis ──
         # TEMP: remove in Phase 2 (full 3D motion). Z=25 matches cylindrical
         # source center Z, ensuring within_height check always fires.
