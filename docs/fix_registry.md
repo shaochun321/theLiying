@@ -62,3 +62,33 @@
 - **capacitance 恢复**: 300.0（已验证有效值；重新分类为"导航背景减除 τ≈5min"而非"无依据"）
 - **DEG-002**: RECLASSIFIED（真正根因是 HC-002，等待 V2.0）
 - **分析报告**: `cell-cell/工作报告/FIX004_analysis_2026-07-01.md`
+
+---
+
+### FIX-005: P0 DA_ema + lambda_metabolic 权重保留修复
+
+- **日期**: 2026-07-07
+- **关联降级**: T-067 观察（fill 饱和后 740 步权重归零）
+- **修复内容**:
+  1. `bundle.py BundleConfig` 新增 `da_ema_tau=5000.0`, `lambda_metabolic=1e-6`
+  2. `SynapticBundle.__init__`: 新增 `self._da_ema = 0.0`
+  3. `SynapticBundle.learn()`: DA_ema 替代点采样；LTP/LTD 均用 DA_ema 门控；被动衰减用 lambda_metabolic 替代 decay_rate_by_stage[0]=0.025
+- **验证**: T-073 3/3 PASS，w_ccw 保留率 99.8%（vs P0 前 ≈0%）
+- **Commit**: 4d3526a
+
+---
+
+### FIX-006: Motor 度量规范修正（DEG-006 后续）
+
+- **日期**: 2026-07-07
+- **关联降级**: DEG-006（motor_neurons dict key 与 neuron.id 不一致）
+- **规范内容**（适用于所有新实验脚本）:
+  1. **正确的 Motor axis 过滤**: 用 `'move_x' in neuron.id`（子串匹配），而非 `neuron.id == 'move_x'`
+     - 正确: `if 'move_x' in mot.id:`  
+     - 错误: `if mot.id == 'move_x':` 或 `if key == 'move_x':`
+  2. **正确的 Motor 激活度量**: 读 `neuron._activation_ema`（firing rate，variant_adapter 实际使用的值），而非 `neuron.activation`（瞬时 0/1，circuit step 结束时永远是 0）
+     - 正确: `motor_ema = mn._activation_ema`  
+     - 错误: `motor_peak = max(peak, abs(mn.activation))`
+  3. **多次步进注意**: 神经元在一个 circuit step 内可被多个 bundle 多次调用。`activation` 反映最后一次调用状态，不代表该 step 内的峰值激活。
+  4. **axis_acts 的实际驱动**: 确认 `variant_adapter.py:1210` 用 `mot._activation_ema` 计算 axis_acts，motor force = muscle.gain × axis_acts。
+- **未修改代码**（已正确）: variant_adapter 本身的 axis_acts 计算逻辑正确（已用 EMA），无需改动。只需修正外部度量脚本。

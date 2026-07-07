@@ -63,3 +63,25 @@
 - **根因**: K_ema 更新规则中缺乏上界约束
 - **状态**: OPEN
 - **修复**: 未开始
+
+---
+
+### DEG-006: motor_neurons dict key 与 neuron.id 不一致导致度量指标错误
+
+- **发现时间**: 2026-07-07（T-077 Motor 链诊断）
+- **现象**: `c.motor_neurons['move_x']` 指向的神经元实际 ID 为 `'motor_move_x'`，而非 dict key `'move_x'`。  
+  T-073 实验过滤条件 `self.id in ('move_x', 'move_y', 'move_z')` → 0 命中，被误判为"神经元未被步进"。  
+  进而写了错误的 T-077 任务和 T-073 报告 §四"Motor 链失联"结论。
+- **错误对应链**（保留以防重蹈覆辙）:
+  1. `c.motor_neurons` dict key `'move_x'` ≠ 神经元 `.id 'motor_move_x'`
+  2. 用 dict key 作 ID 过滤 → 0 命中 → 误判"未步进"
+  3. T-073 在 `c.step()` 后读 `activation` → 神经元最后一次调用 input≈0，spiked=False，act=0.0 → 永远读到 0.0
+  4. 结论："Motor_x peak=0.0000，Motor 链 broken" → **错误**
+- **真实情况**: Motor 链完全正常。每 circuit step 内 motor_move_x 被调用 6-7 次，其中 2-3 次 spiked=True。EMA=0.33-0.44，variant_adapter axis_acts 基于 EMA 正常驱动 muscle force。
+- **影响层**: 所有度量脚本 Motor 读取逻辑；T-073 报告 §四（结论已失效，以本条目为准）
+- **根因分类**:
+  - (A) dict key 是"轴别名"，`.id` 是"完整神经元名"，二者不同
+  - (B) 度量脚本应读 `_activation_ema`（firing rate），而非 `activation`（瞬时 0/1）
+  - (C) 神经元在一个 circuit step 内被多个 bundle 多次调用，最终状态非峰值
+- **状态**: DOCUMENTED（不修复电路，修复度量规范）
+- **修复**: 见 FIX-006（度量规范）；T-073 报告 §四 结论已失效（参见本条目）
