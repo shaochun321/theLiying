@@ -822,16 +822,17 @@ class VariantCircuit(HebbianCircuit):
         self.bundle_d1_phasic_right_to_spinal_cw = _stdp_d1_cfg(
             'd1_phasic_right_to_spinal_cw', self.phasic_right, self.spinal_cw)
 
-        # w=0.100: T-071-fix-A Step2 (2026-07-07): 0.050→0.100 (Step1 DR5≈56%, marginal).
+        # w=0.200: T-071-fix-A Step3 (2026-07-07): 0.100→0.200 (Step2 T4.1=7.5x, no drop).
         # BIO: spinal interneuron → VMN synaptic conductance (Eccles 1960 J Physiol 154:89).
-        # Step1 result: DR5 avg=56%, T4.1=6.6x (no regression); H-B断路 still marginal.
-        # Step2: raise to 0.100 (5x original, ~half thermo direct arc); observe T4.1 at 50k.
-        # Rollback: if T4.1 drops >20% from 6.6x (i.e. <5.3x), revert to 0.050.
+        # Step2 result (50k): body reaches dist=21 at 5k steps; fill=1.0 at 25k; T4.1 6.5→7.5x.
+        # DR5 avg=38% post-fill (satiety normal); approach-phase DR5=57% (good direction).
+        # Step3: raise to 0.200 (10x original); observe yaw oscillation pattern at 50k.
+        # Rollback: if yaw oscillation > 3x baseline or T4.1 < 5.5x, revert to 0.100.
         # EXP: T4.1 regression analysis 2026-07-04; T-071-fix-A escalation plan 2026-07-07. ✓
         self.bundle_spinal_ccw_to_yaw = SynapticBundle(
-            _frozen_cfg('spinal_ccw_to_yaw', 0.100, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
+            _frozen_cfg('spinal_ccw_to_yaw', 0.200, 1.0), [self.spinal_ccw], [self.yaw_ccw_neuron])
         self.bundle_spinal_cw_to_yaw = SynapticBundle(
-            _frozen_cfg('spinal_cw_to_yaw', 0.100, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
+            _frozen_cfg('spinal_cw_to_yaw', 0.200, 1.0), [self.spinal_cw], [self.yaw_cw_neuron])
 
         # Step 6 / P1: 脊髓推挽互抑 — Ia 抑制性中间神经元（拮抗肌互抑，Eccles 1965）
         # BIO: spinal Ia inhibitory interneurons — monosynaptic mutual inhibition between
