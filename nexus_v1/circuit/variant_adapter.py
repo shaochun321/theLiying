@@ -1505,7 +1505,12 @@ class VariantCircuit(HebbianCircuit):
         # World 2.0 Phase 1: only yaw; pitch/roll angular_velocity = 0.
         _TAU_CUPULA = 4000.0          # steps (4 s at 1 ms/step biological convention)
         _ALPHA_CUPULA = dt / (dt + _TAU_CUPULA)
-        _ANGULAR_GAIN = 5000.0        # Phase 0 initial; Phase 0.5 calibration will adjust
+        # T-076a calibration: at ANGULAR_GAIN=5000 yaw_mi_peak=4.35e-3 → MET_yaw=0.0002 (too weak).
+        # Target MET_yaw≈0.38 → need V'=0.435 → yaw_mi=0.087 → gain=5000×(0.087/4.35e-3)=100000.
+        # EXP-T076a: 2026-07-07, 5k-step spin test.
+        # T-076a: gain=100000→MET_yaw=0.035; gain=300000→MET_yaw=0.32 (in range, non-saturated).
+        # MET is quadratic: gm×(V-Vth)²; transient peak needs 3× more than linear estimate.
+        _ANGULAR_GAIN = 300000.0      # T-076a calibrated 2026-07-07; MET_yaw≈0.32 at peak spin
         raw_omega_yaw = self.world.body.angular_velocity
         self._cupula_theta = (
             _ALPHA_CUPULA * (raw_omega_yaw - self._cupula_omega_prev)
