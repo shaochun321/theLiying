@@ -26,7 +26,8 @@ SAMPLE = 5000
 def main():
     print("T-080 Phase A — 影子模式决策框架 (50k steps)")
     print(f"  {'step':>7} | {'conf_ccw':>8} | {'conf_cw':>8} | {'conf_fwd':>8} "
-          f"| {'L2L':>6} | {'L2R':>6} | {'R2L':>6} | {'R2R':>6} | {'dist':>5}")
+          f"| {'m_ccw':>6} | {'m_cw':>6} | {'m_fwd':>6} "
+          f"| {'L2L':>6} | {'L2R':>6} | {'dist':>5}")
     print("-" * 100)
 
     # 热源：左侧接近场景（应产生 CCW 分化）
@@ -61,10 +62,13 @@ def main():
 
         if step % SAMPLE == 0:
             summ = c.summary()['decision']
+            _m_ccw = c.yaw_ccw_neuron.activation
+            _m_cw  = c.yaw_cw_neuron.activation
+            _m_fwd = c.motor_neurons['move_x'].activation
             print(f"  {step:7d} | {summ['conf_ccw']:8.4f} | {summ['conf_cw']:8.4f} "
                   f"| {summ['conf_fwd']:8.4f} "
-                  f"| {summ['obs_L2L_w']:6.4f} | {summ['obs_L2R_w']:6.4f} "
-                  f"| {summ['obs_R2L_w']:6.4f} | {summ['obs_R2R_w']:6.4f} | {dist:5.0f}")
+                  f"| {_m_ccw:6.3f} | {_m_cw:6.3f} | {_m_fwd:6.3f} "
+                  f"| {summ['obs_L2L_w']:6.4f} | {summ['obs_L2R_w']:6.4f} | {dist:5.0f}")
 
     # Final report
     final = c.summary()['decision']
@@ -78,6 +82,11 @@ def main():
               f"fwd={conf_at_approach[2]:.4f}")
     print(f"Final conf:     ccw={final['conf_ccw']:.4f}  cw={final['conf_cw']:.4f}  "
           f"fwd={final['conf_fwd']:.4f}")
+    # Phase B diagnostics (if available in summary)
+    if 'dec_ccw' in final:
+        print(f"Final dec:      ccw={final['dec_ccw']:.4f}  cw={final['dec_cw']:.4f}  fwd={final['dec_fwd']:.4f}")
+        print(f"Final pred:     dT={final['pred_dT']:.5f}  domg={final['pred_domg']:.5f}")
+        print(f"Final err:      dT={final['err_dT']:.5f}   domg={final['err_domg']:.5f}")
     print()
     print("§9.3 Lateralization (want L2L/R2R > L2R/R2L):")
     print(f"  L2L (corr)={final['obs_L2L_w']:.5f}  L2R (cross)={final['obs_L2R_w']:.5f}")
@@ -94,11 +103,12 @@ def main():
 
     # Validation
     print()
-    # V1: confidence > 0.2 at approach (or at end if approached)
+    # V1: confidence > 0.2 — check conf_fwd for frontal approach scenario
     if conf_at_approach:
-        v1_conf_approach = max(conf_at_approach) > 0.2
+        v1_conf_approach = max(conf_at_approach) > 0.2  # any conf active at arrival
     else:
-        v1_conf_approach = final['conf_ccw'] > 0.05 or final['conf_cw'] > 0.05
+        # Body never arrived; check final state including conf_fwd
+        v1_conf_approach = max(final['conf_ccw'], final['conf_cw'], final['conf_fwd']) > 0.05
     # V2: asymmetry < 30% (max-min)/(max+min)
     max_conf = max(final['conf_ccw'], final['conf_cw'])
     min_conf = min(final['conf_ccw'], final['conf_cw'])
@@ -107,8 +117,9 @@ def main():
     v4_lateral = lateral_ratio_ccw > 1.0 or lateral_ratio_cw > 1.0  # any trend toward correct side
 
     print("=== Phase A 验收 ===")
+    max_any_conf = max(final['conf_ccw'], final['conf_cw'], final['conf_fwd'])
     print(f"V1 confidence active:    {'PASS' if v1_conf_approach else 'FAIL'} "
-          f"(max conf={max(final['conf_ccw'], final['conf_cw']):.4f})")
+          f"(max any conf={max_any_conf:.4f})")
     print(f"V2 asymmetry < 70%:      {'PASS' if v2_asymmetry else 'FAIL'} "
           f"({asym_pct:.1f}%)")
     print(f"V4 lateralization trend: {'PASS' if v4_lateral else 'FAIL'} "

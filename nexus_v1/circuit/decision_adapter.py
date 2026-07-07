@@ -1,57 +1,89 @@
 """
 DecisionCircuit — 运动势垫支决策框架（T-080）
 
-TYPE:BIO — Phase A: 影子模式（置信度积分器 + 方向观察束）
+TYPE:BIO — Phase A/B: 置信度积分器 + WTA决策 + FSM前向模型
 
 Phase A（影子模式）：
-  - 3个 Capacitor 置信度积分器：监听 spinal_ccw/cw/fwd 激活
-  - 4束全连接方向涌现 MVE 观察束（phasic → spinal，w=0.001，不影响主回路）
+  - 3个 Capacitor 置信度积分器：监听 yaw_ccw/cw/move_x 马达激活
+  - 4束全连接方向涌现 MVE 观察束（§9.3）
   - 所有输出仅报告，不接入马达
+
+Phase B（FSM误差收敛）：
+  - 3个 WTA 决策神经元（dec_ccw/cw/fwd）+ 侧向抑制
+  - 2个预测神经元（pred_dT, pred_domg）
+  - 6束 FSM 束（3马达×2预测，STDP/LMS）
+  - 2个误差神经元（err_dT, err_domg）
+  - GABA 抑制束（误差→决策）
+  - 低通平滑 Capacitor
 
 继承链：DecisionCircuit → VariantCircuit → HebbianCircuit
 
-Phase B/C/D 的 FSM/误差积分/马达接入将在此类中叠加（不修改父类）。
-
 BIO: 基底节 MSN 积分皮质脉冲序列（Mink 1996 Prog Neurobiol 50:381）
-REF: 置信度积分器设计 ← 《运动势垫支决策框架实施方案》§3.1（2026-07-07）
+     小脑 Purkinje 前向模型（Wolpert & Kawato 1998 Neural Netw 11:1317）
+REF: 《运动势垫支决策框架实施方案》§3.1-3.5（2026-07-07）
 """
 
 from typing import List
 
 from .variant_adapter import VariantCircuit
 from ..components.semiconductor import Capacitor
+from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
 from .bundle import SynapticBundle, BundleConfig
 
 
+def _frozen_inh(bid: str, w: float = 0.5) -> BundleConfig:
+    """Frozen inhibitory bundle config (synapse_gain = -1.0)."""
+    return BundleConfig(
+        bundle_id=bid, learning_rule='frozen',
+        initial_weight=w, weight_max=w, stdp_lr=0.0,
+        synapse_gain=-1.0, bundle_role='feedback',
+        remodel_cost_kappa=0.0,
+    )
+
+
+def _frozen_exc(bid: str, w: float = 1.0) -> BundleConfig:
+    """Frozen excitatory bundle config (synapse_gain = +1.0)."""
+    return BundleConfig(
+        bundle_id=bid, learning_rule='frozen',
+        initial_weight=w, weight_max=w, stdp_lr=0.0,
+        synapse_gain=1.0, bundle_role='feedforward',
+        remodel_cost_kappa=0.0,
+    )
+
+
 class DecisionCircuit(VariantCircuit):
-    """Phase A: confidence integrators in shadow mode.
+    """Phase A/B: confidence integrators + WTA + FSM forward model.
 
-    Motor output unchanged. Reads spinal activations → updates Capacitor
-    voltages → reports via summary()['decision']. No current injection.
+    Phase A (shadow): confidence Capacitors monitor motor output,
+    §9.3 MVE observer bundles track lateralization. No motor injection.
 
-    Experiment: exp_T080_decision_shadow.py (5-action monitoring).
+    Phase B (FSM): prediction neurons learn to predict sensory outcomes
+    from motor efference copies. Error neurons inhibit decision neurons
+    (GABA). WTA competition selects the best action.
+
+    Motor connection added in Phase C (_propagate_bundles override).
     """
 
     def __init__(self):
         super().__init__()
 
-        # ── Phase A: Confidence integrators ────────────────────────────────
-        # BIO: striatal MSN integrates cortical spike trains over 5-10s windows
-        #      (Mink 1996 Prog Neurobiol; Plenz 2003 TINS).
-        # SEMI: large Capacitor (C=5000) as leaky integrator.
-        # Q3: τ_conf = C × R_CONF; initial R=5000 → τ=5000 steps.
-        #     Must calibrate from single-burst half-life in Phase A experiment.
+        # ══════════════════════════════════════════════════════════════════
+        # Phase A: Confidence integrators
+        # ══════════════════════════════════════════════════════════════════
+        # BIO: striatal MSN integrates motor cortex spike trains over 5-10s
+        #      windows (Mink 1996; Plenz 2003 TINS).
+        # SEMI: large Capacitor as leaky integrator.
+        # Q3: τ_conf = R_CONF / 1 (Capacitor.leak uses V *= (1 - dt/R));
+        #     R=5000 → τ=5000 steps. Calibrate from Phase A burst half-life.
         self._R_CONF: float = 5000.0
         self._conf_ccw = Capacitor(capacitance=5000.0)
         self._conf_cw  = Capacitor(capacitance=5000.0)
         self._conf_fwd = Capacitor(capacitance=5000.0)
 
-        # ── §9.3: 4-bundle MVE observer bundles ────────────────────────────
-        # BIO: bilateral spinal connections during development (Eccles 1965 J Physiol)
-        # SEMI: STDP observer (eligibility trace, DA-gated) with near-zero initial weight
-        # Q3: w=0.001 → I_obs = act × 0.001 (D1 baseline ≈ 0.050×act → ratio < 2%)
-        #     Negligible influence on spinal activation; pure STDP observer.
-        # MONITOR: after 200k steps, L2L/R2R weight > L2R/R2L → proper lateralization.
+        # ── §9.3: 4-bundle MVE observer bundles ──────────────────────────
+        # BIO: bilateral spinal connections during development (Eccles 1965)
+        # Q3: w=0.001 → I_obs < 2% of D1 contribution (negligible influence)
+        # MONITOR: after 200k steps, L2L/R2R > L2R/R2L → correct lateralization
         _obs_cfg = lambda bid: BundleConfig(
             bundle_id=bid, learning_rule='stdp',
             initial_weight=0.001, weight_max=0.1, stdp_lr=0.01,
@@ -60,80 +92,265 @@ class DecisionCircuit(VariantCircuit):
             use_eligibility_trace=True, eligibility_tau=300.0,
             eligibility_gain=1e-5, eligibility_ltd_rate=0.01,
         )
-        # Sources write nothing (propagate not called). Only STDP traces are used.
-        self._obs_L2L = SynapticBundle(
-            _obs_cfg('obs_phasic_left_to_spinal_ccw'),
-            [self.phasic_left], [self.spinal_ccw])
-        self._obs_L2R = SynapticBundle(
-            _obs_cfg('obs_phasic_left_to_spinal_cw'),
-            [self.phasic_left], [self.spinal_cw])
-        self._obs_R2L = SynapticBundle(
-            _obs_cfg('obs_phasic_right_to_spinal_ccw'),
-            [self.phasic_right], [self.spinal_ccw])
-        self._obs_R2R = SynapticBundle(
-            _obs_cfg('obs_phasic_right_to_spinal_cw'),
-            [self.phasic_right], [self.spinal_cw])
+        self._obs_L2L = SynapticBundle(_obs_cfg('obs_phasic_left_to_spinal_ccw'),  [self.phasic_left],  [self.spinal_ccw])
+        self._obs_L2R = SynapticBundle(_obs_cfg('obs_phasic_left_to_spinal_cw'),   [self.phasic_left],  [self.spinal_cw])
+        self._obs_R2L = SynapticBundle(_obs_cfg('obs_phasic_right_to_spinal_ccw'), [self.phasic_right], [self.spinal_ccw])
+        self._obs_R2R = SynapticBundle(_obs_cfg('obs_phasic_right_to_spinal_cw'),  [self.phasic_right], [self.spinal_cw])
         self._obs_bundles: List[SynapticBundle] = [
             self._obs_L2L, self._obs_L2R, self._obs_R2L, self._obs_R2R
         ]
 
-    # ── Step override: update confidence after main circuit ─────────────────
+        # ══════════════════════════════════════════════════════════════════
+        # Phase B: WTA Decision neurons
+        # ══════════════════════════════════════════════════════════════════
+        # BIO: SNr/GPi thalamic gate neurons — disinhibition allows action
+        #      (DeLong 1990 Trends Neurosci; Mink 1996).
+        # SEMI: Capacitor(C=1) + MOSFET channel (Vth=0.01, gm=1.0)
+        # Q3: τ_dec = C × r_leak = 1.0 × 50.0 = 50 steps (sustained burst needed)
+        def _dec_cfg(nid: str) -> NeuronConfig:
+            return NeuronConfig(
+                neuron_id=nid, capacitance=1.0, r_leak=50.0, region=0x01,
+                spiking=False,
+                channels=[ChannelConfig(name=nid, v_threshold=0.01, gm=1.0)])
+
+        self.dec_ccw = Neuron(_dec_cfg('dec_ccw'))
+        self.dec_cw  = Neuron(_dec_cfg('dec_cw'))
+        self.dec_fwd = Neuron(_dec_cfg('dec_fwd'))
+
+        # Lateral (WTA) inhibition between decision neurons
+        # BIO: Ia reciprocal inhibition — winner suppresses competitors
+        #      (Eccles 1965 J Physiol 150:43)
+        # Q3: w_lateral=0.5, sg=-1.0 → winner (act≈0.3) inhibits by 0.15 >
+        #     loser decay rate (V/r_leak ≈ 0.01) → WTA separation in ~15 steps
+        self._b_dec_ccw_to_cw  = SynapticBundle(_frozen_inh('dec_ccw_inh_cw'),  [self.dec_ccw], [self.dec_cw])
+        self._b_dec_cw_to_ccw  = SynapticBundle(_frozen_inh('dec_cw_inh_ccw'),  [self.dec_cw],  [self.dec_ccw])
+        self._b_dec_fwd_to_ccw = SynapticBundle(_frozen_inh('dec_fwd_inh_ccw'), [self.dec_fwd], [self.dec_ccw])
+        self._b_dec_fwd_to_cw  = SynapticBundle(_frozen_inh('dec_fwd_inh_cw'),  [self.dec_fwd], [self.dec_cw])
+        self._dec_lateral: List[SynapticBundle] = [
+            self._b_dec_ccw_to_cw, self._b_dec_cw_to_ccw,
+            self._b_dec_fwd_to_ccw, self._b_dec_fwd_to_cw,
+        ]
+
+        # Phase B: FSM prediction neurons
+        # BIO: cerebellar granule→Purkinje forward model (Wolpert & Kawato 1998)
+        # SEMI: Capacitor leaky integrator (τ=100 steps) for efference copy
+        # Q3: C=1.0, r_leak=100.0 → τ=100 steps (≈100ms motor-sensory delay)
+        def _pred_cfg(nid: str) -> NeuronConfig:
+            return NeuronConfig(
+                neuron_id=nid, capacitance=1.0, r_leak=100.0, region=0x01,
+                spiking=False,
+                channels=[ChannelConfig(name=nid, v_threshold=0.001, gm=1.0)])
+
+        self.pred_dT   = Neuron(_pred_cfg('pred_dT'))    # predicted ΔT from action
+        self.pred_domg = Neuron(_pred_cfg('pred_domg'))  # predicted Δω from action
+
+        # 6 FSM bundles: 3 motor efference copies × 2 prediction targets
+        # BIO: mossy fiber → parallel fiber → Purkinje cell connections
+        #      (Eccles 1967 The Cerebellum as a Neuronal Machine)
+        # Q3: w0=0.001 (near-zero start); stdp_lr=1e-5 (slow, converges ~50k steps)
+        #     eligibility_tau=500 steps (captures motor-sensory delay)
+        _fsm_lr = 1e-5
+        def _fsm_cfg(bid: str) -> BundleConfig:
+            return BundleConfig(
+                bundle_id=bid, learning_rule='stdp',
+                initial_weight=0.001, weight_max=1.0, stdp_lr=_fsm_lr,
+                synapse_gain=1.0, bundle_role='feedforward',
+                remodel_cost_kappa=0.0,
+                use_eligibility_trace=True, eligibility_tau=500.0,
+                eligibility_gain=1e-5, eligibility_ltd_rate=0.01,
+            )
+
+        _move_x = self.motor_neurons['move_x']
+        self._b_fsm_ccw_dT   = SynapticBundle(_fsm_cfg('fsm_yaw_ccw_to_pred_dT'),   [self.yaw_ccw_neuron], [self.pred_dT])
+        self._b_fsm_cw_dT    = SynapticBundle(_fsm_cfg('fsm_yaw_cw_to_pred_dT'),    [self.yaw_cw_neuron],  [self.pred_dT])
+        self._b_fsm_fwd_dT   = SynapticBundle(_fsm_cfg('fsm_move_x_to_pred_dT'),    [_move_x],             [self.pred_dT])
+        self._b_fsm_ccw_domg = SynapticBundle(_fsm_cfg('fsm_yaw_ccw_to_pred_domg'), [self.yaw_ccw_neuron], [self.pred_domg])
+        self._b_fsm_cw_domg  = SynapticBundle(_fsm_cfg('fsm_yaw_cw_to_pred_domg'),  [self.yaw_cw_neuron],  [self.pred_domg])
+        self._b_fsm_fwd_domg = SynapticBundle(_fsm_cfg('fsm_move_x_to_pred_domg'),  [_move_x],             [self.pred_domg])
+        self._fsm_dT_bundles:   List[SynapticBundle] = [self._b_fsm_ccw_dT,   self._b_fsm_cw_dT,   self._b_fsm_fwd_dT]
+        self._fsm_domg_bundles: List[SynapticBundle] = [self._b_fsm_ccw_domg, self._b_fsm_cw_domg, self._b_fsm_fwd_domg]
+        self._fsm_bundles: List[SynapticBundle] = self._fsm_dT_bundles + self._fsm_domg_bundles
+
+        # Phase B: Error neurons
+        # BIO: climbing fiber → Purkinje cell (prediction error; Bhaskara 2011)
+        #      Fires when ŷ_pred > y_actual (overestimate → wrong action)
+        # SEMI: Capacitor(C=1) + MOSFET(Vth=0.05 = 3σ noise floor)
+        # Q3: C=1.0, r_leak=20.0 → τ=20 steps (quick error response)
+        #     Vth=0.05 calibrated conservatively; update after Phase A quiet measurement
+        def _err_cfg(nid: str) -> NeuronConfig:
+            return NeuronConfig(
+                neuron_id=nid, capacitance=1.0, r_leak=20.0, region=0x01,
+                spiking=False,
+                channels=[ChannelConfig(name=nid, v_threshold=0.05, gm=0.5)])
+
+        self.err_dT   = Neuron(_err_cfg('err_dT'))
+        self.err_domg = Neuron(_err_cfg('err_domg'))
+
+        # pred → error (excitatory, KCL positive side)
+        self._b_pred_dT_to_err   = SynapticBundle(_frozen_exc('pred_dT_to_err_dT'),     [self.pred_dT],   [self.err_dT])
+        self._b_pred_domg_to_err = SynapticBundle(_frozen_exc('pred_domg_to_err_domg'), [self.pred_domg], [self.err_domg])
+
+        # GABA inhibition: error → decision (inhibitory)
+        # BIO: SNr GABA→thalamus (error suppresses wrong-direction action)
+        # Q3: w=1.0, sg=-1.0 → full inhibition when error fires (error act≈0.1 → I_inh=-0.1)
+        self._b_gaba_dT_ccw  = SynapticBundle(_frozen_inh('gaba_err_dT_to_dec_ccw',  1.0), [self.err_dT],   [self.dec_ccw])
+        self._b_gaba_dT_cw   = SynapticBundle(_frozen_inh('gaba_err_dT_to_dec_cw',   1.0), [self.err_dT],   [self.dec_cw])
+        self._b_gaba_dT_fwd  = SynapticBundle(_frozen_inh('gaba_err_dT_to_dec_fwd',  1.0), [self.err_dT],   [self.dec_fwd])
+        self._b_gaba_domg_ccw = SynapticBundle(_frozen_inh('gaba_err_domg_to_dec_ccw', 1.0), [self.err_domg], [self.dec_ccw])
+        self._b_gaba_domg_cw  = SynapticBundle(_frozen_inh('gaba_err_domg_to_dec_cw',  1.0), [self.err_domg], [self.dec_cw])
+        self._b_gaba_domg_fwd = SynapticBundle(_frozen_inh('gaba_err_domg_to_dec_fwd', 1.0), [self.err_domg], [self.dec_fwd])
+        self._gaba_bundles: List[SynapticBundle] = [
+            self._b_gaba_dT_ccw,  self._b_gaba_dT_cw,  self._b_gaba_dT_fwd,
+            self._b_gaba_domg_ccw, self._b_gaba_domg_cw, self._b_gaba_domg_fwd,
+        ]
+
+        # Low-pass smooth Capacitors (Phase C output buffer)
+        # BIO: deep cerebellar nucleus → brainstem RC filter (Eccles 1967)
+        # Q3: τ_smooth = R_SMOOTH / 1 = 500 steps > muscle τ_mech ≈ 100 steps
+        self._smooth_ccw = Capacitor(capacitance=500.0)
+        self._smooth_cw  = Capacitor(capacitance=500.0)
+        self._smooth_fwd = Capacitor(capacitance=500.0)
+        self._R_SMOOTH: float = 500.0
+
+        # Confidence → decision drive gain (calibrate in Phase A)
+        # Q3: _G_CONF=0.001 so V_conf≈100 → I_dec=0.1 (matching dec neuron scale)
+        self._G_CONF: float = 0.001
+
+    # ── Step override ────────────────────────────────────────────────────────
     def step(self, mechanical_inputs, dt: float = 1.0):
-        """Run main circuit, then update confidence integrators."""
+        """Run main circuit, then update all decision sub-circuits."""
         super().step(mechanical_inputs, dt)
 
-        # Read spinal activations (updated by super().step())
-        _act_ccw = max(0.0, self.spinal_ccw.activation)
-        _act_cw  = max(0.0, self.spinal_cw.activation)
-        _act_fwd = max(0.0, self.spinal_fwd.activation)
+        # ── Phase A: Confidence integrators (monitor motor output) ──────────
+        # BIO: striatal MSN monitors motor cortex (layer 5) output (Mink 1996)
+        _act_ccw = max(0.0, self.yaw_ccw_neuron.activation)
+        _act_cw  = max(0.0, self.yaw_cw_neuron.activation)
+        _act_fwd = max(0.0, self.motor_neurons['move_x'].activation)
 
-        # Charge confidence Capacitors (inject activation, then leak)
-        # BIO: MSN charge proportional to firing rate; leak = LTP/LTD balance
-        self._conf_ccw.inject(_act_ccw, dt)
-        self._conf_ccw.leak(1.0 / self._R_CONF, dt)
-        self._conf_cw.inject(_act_cw, dt)
-        self._conf_cw.leak(1.0 / self._R_CONF, dt)
-        self._conf_fwd.inject(_act_fwd, dt)
-        self._conf_fwd.leak(1.0 / self._R_CONF, dt)
+        self._conf_ccw.inject(_act_ccw, dt);  self._conf_ccw.leak(1.0 / self._R_CONF, dt)
+        self._conf_cw.inject(_act_cw, dt);    self._conf_cw.leak(1.0 / self._R_CONF, dt)
+        self._conf_fwd.inject(_act_fwd, dt);  self._conf_fwd.leak(1.0 / self._R_CONF, dt)
 
-    # ── Learning hook: add observer STDP after parent learning ──────────────
+        # ── Phase B: FSM forward model ──────────────────────────────────────
+        # Step 1: propagate efference copy into prediction neurons
+        _i_pred_dT = sum(
+            (b.propagate() or [0.0])[0] for b in self._fsm_dT_bundles)
+        _i_pred_domg = sum(
+            (b.propagate() or [0.0])[0] for b in self._fsm_domg_bundles)
+        self.pred_dT.step(_i_pred_dT, dt)
+        self.pred_domg.step(_i_pred_domg, dt)
+
+        # Step 2: compute actual sensory signals (KCL reference)
+        # ΔT_actual: average thermal top-ring column activation
+        _therm_top_keys = ['therm_top_front', 'therm_top_back',
+                           'therm_top_left',  'therm_top_right']
+        _dT_actual = sum(
+            self.column_neurons[k].activation
+            for k in _therm_top_keys if k in self.column_neurons
+        ) / 4.0
+        # Δω_actual: yaw motor asymmetry (rotation proxy)
+        _domg_actual = abs(_act_ccw - _act_cw)
+
+        # Step 3: error = pred_output - actual (KCL difference)
+        _pred_dT_cur   = (self._b_pred_dT_to_err.propagate()   or [0.0])[0]
+        _pred_domg_cur = (self._b_pred_domg_to_err.propagate() or [0.0])[0]
+        _i_err_dT   = _pred_dT_cur   - _dT_actual
+        _i_err_domg = _pred_domg_cur - _domg_actual
+        self.err_dT.step(_i_err_dT, dt)
+        self.err_domg.step(_i_err_domg, dt)
+
+        # Step 4: WTA decision neurons
+        # GABA inhibition from error neurons (pre-compute before step)
+        _i_gaba_ccw  = sum((b.propagate() or [0.0])[0]
+                           for b in [self._b_gaba_dT_ccw, self._b_gaba_domg_ccw])
+        _i_gaba_cw   = sum((b.propagate() or [0.0])[0]
+                           for b in [self._b_gaba_dT_cw,  self._b_gaba_domg_cw])
+        _i_gaba_fwd  = sum((b.propagate() or [0.0])[0]
+                           for b in [self._b_gaba_dT_fwd, self._b_gaba_domg_fwd])
+        # Lateral inhibition (from previous-step activations)
+        _i_lat_ccw = sum((b.propagate() or [0.0])[0]
+                         for b in [self._b_dec_cw_to_ccw, self._b_dec_fwd_to_ccw])
+        _i_lat_cw  = sum((b.propagate() or [0.0])[0]
+                         for b in [self._b_dec_ccw_to_cw, self._b_dec_fwd_to_cw])
+        # Confidence excitation (scaled Capacitor voltage)
+        _i_exc_ccw = self._conf_ccw.voltage * self._G_CONF
+        _i_exc_cw  = self._conf_cw.voltage  * self._G_CONF
+        _i_exc_fwd = self._conf_fwd.voltage  * self._G_CONF
+        # Step decision neurons
+        self.dec_ccw.step(_i_exc_ccw + _i_gaba_ccw + _i_lat_ccw, dt)
+        self.dec_cw.step( _i_exc_cw  + _i_gaba_cw  + _i_lat_cw,  dt)
+        self.dec_fwd.step(_i_exc_fwd + _i_gaba_fwd,                dt)  # no lateral for fwd
+
+        # Step 5: smooth Capacitor output
+        self._smooth_ccw.inject(max(0.0, self.dec_ccw.activation), dt)
+        self._smooth_ccw.leak(1.0 / self._R_SMOOTH, dt)
+        self._smooth_cw.inject(max(0.0, self.dec_cw.activation), dt)
+        self._smooth_cw.leak(1.0 / self._R_SMOOTH, dt)
+        self._smooth_fwd.inject(max(0.0, self.dec_fwd.activation), dt)
+        self._smooth_fwd.leak(1.0 / self._R_SMOOTH, dt)
+
+    # ── Learning hook ────────────────────────────────────────────────────────
     def _do_learning(self, dt: float):
-        """Extend parent learning with §9.3 observer bundle STDP."""
+        """Extend parent learning with §9.3 observer STDP + FSM learning."""
         super()._do_learning(dt)
 
-        # Observer bundles: same DA gate as D1 arc (gate_col × da_lr_mod × body_lr)
-        # No sync gate (g_sync) — observers not part of motor selection
         da_lr_mod = self.dopamine.gain_factor()
         gate_col  = self.ecm_column.plasticity_gate
         fill      = self.energy_store.fill_fraction
         da_conc   = self.dopamine.concentration
         body_lr   = self.world.body.mass_inertia_factor()
         _gate = gate_col * da_lr_mod * body_lr
+
+        # §9.3 observer bundles (DA-gated STDP)
         for _b in self._obs_bundles:
             _b.learn(dt, plasticity_gate=_gate,
                      fill_fraction=fill, da_concentration=da_conc)
             _b.compute_xin(dt)
 
-    # ── Census registration ─────────────────────────────────────────────────
+        # FSM bundles: eligibility-trace STDP, DA-gated
+        # LMS-like: error provides teaching signal via da_concentration
+        # Prediction error → lower DA → LTD on active motor-prediction connections
+        for _b in self._fsm_bundles:
+            _b.learn(dt, plasticity_gate=_gate,
+                     fill_fraction=fill, da_concentration=da_conc)
+            _b.compute_xin(dt)
+
+    # ── Census registration ──────────────────────────────────────────────────
     def get_all_bundles(self):
-        """Include observer bundles in Noether/Xin census."""
+        """Include all Phase A/B bundles in Noether/Xin census."""
         bundles = super().get_all_bundles()
-        # §9.3: observer bundles visible to ledger but NOT propagated
         bundles.extend(self._obs_bundles)
+        bundles.extend(self._fsm_bundles)
+        # error pathway bundles
+        bundles.extend([self._b_pred_dT_to_err, self._b_pred_domg_to_err])
+        bundles.extend(self._gaba_bundles)
+        bundles.extend(self._dec_lateral)
         return bundles
 
     # ── State reporting ──────────────────────────────────────────────────────
     def summary(self) -> dict:
         d = super().summary()
         d['decision'] = {
-            # Phase A: confidence integrator voltages
+            # Phase A: confidence Capacitor voltages
             'conf_ccw': self._conf_ccw.voltage,
             'conf_cw':  self._conf_cw.voltage,
             'conf_fwd': self._conf_fwd.voltage,
-            # §9.3: observer bundle lateralization diagnostic
-            'obs_L2L_w': self._obs_L2L.mean_weight(),  # correct lateralization
-            'obs_L2R_w': self._obs_L2R.mean_weight(),  # cross connection
-            'obs_R2L_w': self._obs_R2L.mean_weight(),  # cross connection
-            'obs_R2R_w': self._obs_R2R.mean_weight(),  # correct lateralization
+            # §9.3: MVE observer lateralization
+            'obs_L2L_w': self._obs_L2L.mean_weight(),
+            'obs_L2R_w': self._obs_L2R.mean_weight(),
+            'obs_R2L_w': self._obs_R2L.mean_weight(),
+            'obs_R2R_w': self._obs_R2R.mean_weight(),
+            # Phase B: WTA decision activations
+            'dec_ccw': self.dec_ccw.activation,
+            'dec_cw':  self.dec_cw.activation,
+            'dec_fwd': self.dec_fwd.activation,
+            'smooth_ccw': self._smooth_ccw.voltage,
+            'smooth_cw':  self._smooth_cw.voltage,
+            'smooth_fwd': self._smooth_fwd.voltage,
+            # Phase B: prediction and error
+            'pred_dT':    self.pred_dT.activation,
+            'pred_domg':  self.pred_domg.activation,
+            'err_dT':     self.err_dT.activation,
+            'err_domg':   self.err_domg.activation,
         }
         return d
