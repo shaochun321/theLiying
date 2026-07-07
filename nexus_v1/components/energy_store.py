@@ -205,10 +205,10 @@ class EnergyStore:
 
         # P0-3: Mandatory basal metabolic rate — thermodynamic second law.
         # BIO: ATP synthase idling + Na+/K+ pump maintenance; unavoidable in any dissipative structure.
-        # Q3: BMR=0.0025/step (T-064: 0.002→0.0025 +25%, extends foraging window η from 4.6%→>8%).
-        #     Net cold-zone: YolkSac(+0.001) - RC_leak(~0.0001) - BMR(-0.0025) ≈ -0.0016/step → hunger.
+        # Q3: BMR=0.003/step (T-064: 0.002→0.0025→0.003; target η 20-25%).
+        #     Net cold-zone: YolkSac(+0.001) - RC_leak(~0.0001) - BMR(-0.003) ≈ -0.0021/step → hunger.
         # REF: T-064 2026-07-06; PHYS: 热力学第二定律
-        BMR = 0.0025
+        BMR = 0.003
         bmr_drain = min(BMR, self._cap.charge)
         if bmr_drain > 0:
             self._cap.inject(-bmr_drain, 1.0)
