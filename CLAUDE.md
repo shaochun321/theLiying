@@ -301,6 +301,21 @@ Noether 违规出现时立即打印 `violation_counts` 明细（如 `kcl_charge`
 - **发现异常时立即报告**：fill 触零、Noether 新增违规、权重熵跌破 1.0、AGC 饱和
 - **实验结束时**：生成 Markdown 分析报告（见下节"实验报告生成规范"）
 
+### ν探针强制集成规则（2026-07-07 后生效）
+
+**NuProbe 已内置于 VariantCircuit（variant_adapter.py），每步自动 update()，每 1000 步写入 summary()["nu_probe"]。**
+
+禁止行为：
+- 写实验脚本时不打印 `nu.report()` 的 `system_nu` 和 `n_charging`（理由：这是探针存在的意义）
+- 在实验结束时不报告 Top-N |ν| bundle（遗漏最高塑性信号的 bundle）
+- 写新实验脚本时不从 `circuit._nu_probe` 读取或手动实例化一个额外的 NuProbe
+
+**每个长程实验脚本（>10k步）的 SAMPLE 行必须包含：**
+```
+ν_sys（system_nu）| chrg%（charging bundles 占比）
+```
+参考格式：`exp_T071_fixA_step4.py`（2026-07-07 版本）
+
 ### ν探针 / 熵账本运行时的定时采样规则
 
 **凡是实验脚本中启用了 ν探针（nu_probe）或熵账本（entropy_ledger / NoetherProbe）的，无论步数长短，Claude 必须定时读取实验数据，不得全程后台等待。**

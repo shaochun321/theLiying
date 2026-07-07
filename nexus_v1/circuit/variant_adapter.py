@@ -59,7 +59,7 @@ from .circulation import CirculationMeter
 from .motor_decision import MotorDecisionLayer, MotionState
 from ..ledger import (WeightEntropyProbe, TOPRXinLedger, RecursionTracker,
                       UltrametricSpace, StructuralEntropy, StructuralBridge,
-                      EntropyLedger, NoetherProbe, ComponentRegistry)
+                      EntropyLedger, NoetherProbe, ComponentRegistry, NuProbe)
 from .region_topology import (
     REGION_SPINAL, REGION_BRAINSTEM, REGION_MAIN,
     REGION_HYPOTHALAMUS, REGION_SHADOW,
@@ -524,6 +524,12 @@ class VariantCircuit(HebbianCircuit):
         # Tracks energy balance, ISI entropy, layer transfer entropy.
         # Previously existed as dead code (never instantiated).
         self._energy_ledger = EntropyLedger()
+
+        # ── Variant: ν power-flux probe (Xin charging/discharging) ──
+        # BIO: measures whether each bundle is in exploration (ν>0) or consolidation (ν<0).
+        # REF: nexus_v1/ledger/nu_probe.py; runs every step, reports every 1000 steps.
+        self._nu_probe = NuProbe(ema_alpha=0.001)
+        self._nu_report_cache = None   # populated every 1000 steps by _ledger_post_step
 
         # ── Variant: Component Registry (TYPE tags + census visibility) ──
         self._component_registry = ComponentRegistry()
@@ -2262,6 +2268,9 @@ class VariantCircuit(HebbianCircuit):
         # _nu only updates every 10 steps; step every step to maintain τ dynamics.
         self.shadow_nu_neuron.step(self.shadow_sandbox._nu * self._NU_SCALE, dt)
 
+        # ── ν power-flux probe: update every step (reads Xin from bundles) ──
+        self._nu_probe.update(self, self._maturation_tick, dt)
+
         # ── Phase Z: Entropy ledger post-step (slow-scale only) ──
         self._ledger_post_step(self._maturation_tick, dt)
 
@@ -2569,6 +2578,8 @@ class VariantCircuit(HebbianCircuit):
             self._structural_bridge.structural_influence(tick)
             # Energy ledger: global thermodynamic accounting
             self._energy_ledger.record(self, dt)
+            # ν probe: cache latest report for summary() access
+            self._nu_report_cache = self._nu_probe.report(tick)
             # Component registry: scan all live components
             self._component_registry.scan(self, tick)
 
@@ -2735,6 +2746,13 @@ class VariantCircuit(HebbianCircuit):
             "noether": self._noether_probe.summary(),
             # Energy ledger: global thermodynamic accounting
             "energy_ledger": self._energy_ledger.summary(),
+            # ν power-flux probe: exploration/consolidation state per bundle
+            "nu_probe": {
+                "system_nu": self._nu_report_cache.system_nu if self._nu_report_cache else 0.0,
+                "n_charging": self._nu_report_cache.n_charging if self._nu_report_cache else 0,
+                "n_discharging": self._nu_report_cache.n_discharging if self._nu_report_cache else 0,
+                "max_nu_bundle": self._nu_report_cache.max_nu_bundle if self._nu_report_cache else "",
+            },
             # HC-010: AGC removed (energy amplitude handled by VitalOscillator)
         }
 
