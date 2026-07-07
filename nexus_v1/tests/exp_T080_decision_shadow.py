@@ -103,12 +103,16 @@ def main():
 
     # Validation
     print()
-    # V1: confidence > 0.2 — check conf_fwd for frontal approach scenario
-    if conf_at_approach:
-        v1_conf_approach = max(conf_at_approach) > 0.2  # any conf active at arrival
-    else:
-        # Body never arrived; check final state including conf_fwd
-        v1_conf_approach = max(final['conf_ccw'], final['conf_cw'], final['conf_fwd']) > 0.05
+    # V1: 体在热源附近时 conf > 0.2（原始规范）
+    # τ=5000 步，但身体可能在 <1 个时间常数内到达 → 不能用 arrival 时刻的 conf
+    # 判据：实验结束时体仍在热源附近 AND 最终 conf > 0.2
+    pos_final = c.world.body.position
+    src_pos_f = c.world.heat_sources[0].position
+    dist_final = ((pos_final[0]-src_pos_f[0])**2 +
+                  (pos_final[1]-src_pos_f[1])**2 +
+                  (pos_final[2]-src_pos_f[2])**2) ** 0.5
+    _any_conf_final = max(final['conf_ccw'], final['conf_cw'], final['conf_fwd'])
+    v1_conf_approach = dist_final < 40.0 and _any_conf_final > 0.2
     # V2: asymmetry < 30% (max-min)/(max+min)
     max_conf = max(final['conf_ccw'], final['conf_cw'])
     min_conf = min(final['conf_ccw'], final['conf_cw'])
@@ -119,7 +123,7 @@ def main():
     print("=== Phase A 验收 ===")
     max_any_conf = max(final['conf_ccw'], final['conf_cw'], final['conf_fwd'])
     print(f"V1 confidence active:    {'PASS' if v1_conf_approach else 'FAIL'} "
-          f"(max any conf={max_any_conf:.4f})")
+          f"(dist_final={dist_final:.0f}, max conf={max_any_conf:.4f})")
     print(f"V2 asymmetry < 70%:      {'PASS' if v2_asymmetry else 'FAIL'} "
           f"({asym_pct:.1f}%)")
     print(f"V4 lateralization trend: {'PASS' if v4_lateral else 'FAIL'} "

@@ -73,9 +73,11 @@ class DecisionCircuit(VariantCircuit):
         # BIO: striatal MSN integrates motor cortex spike trains over 5-10s
         #      windows (Mink 1996; Plenz 2003 TINS).
         # SEMI: large Capacitor as leaky integrator.
-        # Q3: τ_conf = R_CONF / 1 (Capacitor.leak uses V *= (1 - dt/R));
-        #     R=5000 → τ=5000 steps. Calibrate from Phase A burst half-life.
-        self._R_CONF: float = 5000.0
+        # Q3: Capacitor.leak(R, dt) clamps R≥0.01, τ=R×C.
+        #     To get τ=5000: R_leak = τ/C = 5000/5000 = 1.0. Call leak(1.0, dt).
+        #     V_ss ≈ motor_activation × 1.0 (>>0.2 threshold). Measured τ≈50 when
+        #     calling leak(1/5000): due to R clamp (0.0002<0.01→0.01, τ=50 steps).
+        self._R_CONF: float = 1.0   # R for confidence integrators; τ = R × C = 5000
         self._conf_ccw = Capacitor(capacitance=5000.0)
         self._conf_cw  = Capacitor(capacitance=5000.0)
         self._conf_fwd = Capacitor(capacitance=5000.0)
@@ -154,7 +156,12 @@ class DecisionCircuit(VariantCircuit):
             return BundleConfig(
                 bundle_id=bid, learning_rule='stdp',
                 initial_weight=0.001, weight_max=1.0, stdp_lr=_fsm_lr,
-                synapse_gain=1.0, bundle_role='feedforward',
+                # Q3: Memristor r_max=10 → min conductance = 1/10 = 0.1.
+                # With 2 yaw neurons at act≈2.5 and sg=1.0: min _i_pred = 0.5,
+                # pred_dT ≈ 0.58 > dT_actual ≈ 0.42 → systematic POSITIVE error → B2 FAIL.
+                # Fix sg=0.1: min _i_pred = 0.05, pred_dT ≈ 0.22 < 0.42 → err negative.
+                # FSM can still learn upward via DA-gated LTP until pred ≈ actual.
+                synapse_gain=0.1, bundle_role='feedforward',
                 remodel_cost_kappa=0.0,
                 use_eligibility_trace=True, eligibility_tau=500.0,
                 eligibility_gain=1e-5, eligibility_ltd_rate=0.01,
@@ -210,11 +217,15 @@ class DecisionCircuit(VariantCircuit):
         self._smooth_ccw = Capacitor(capacitance=500.0)
         self._smooth_cw  = Capacitor(capacitance=500.0)
         self._smooth_fwd = Capacitor(capacitance=500.0)
-        self._R_SMOOTH: float = 500.0
+        self._R_SMOOTH: float = 1.0   # R for smooth Capacitors; τ = R × C = 500
 
-        # Confidence → decision drive gain (calibrate in Phase A)
-        # Q3: _G_CONF=0.001 so V_conf≈100 → I_dec=0.1 (matching dec neuron scale)
-        self._G_CONF: float = 0.001
+        # Confidence → decision drive gain
+        # Q3: conf_cw≈1.1, err_sum≈1.7 (Phase A level), W_GABA=0.005
+        #     Need: conf×G - W_GABA×err > Vth/r_leak = 0.01/50 = 0.0002
+        #     1.1×0.01 - 0.005×1.7 = 0.011 - 0.0085 = 0.0025 > 0.0002 ✓
+        #     → dec_cw active (V_ss=0.125) at Phase A residual error level.
+        #     W_GABA=0.005 keeps GABA as soft gate (not hard suppressor).
+        self._G_CONF: float = 0.01
 
     # ── Step override ────────────────────────────────────────────────────────
     def step(self, mechanical_inputs, dt: float = 1.0):
@@ -227,9 +238,9 @@ class DecisionCircuit(VariantCircuit):
         _act_cw  = max(0.0, self.yaw_cw_neuron.activation)
         _act_fwd = max(0.0, self.motor_neurons['move_x'].activation)
 
-        self._conf_ccw.inject(_act_ccw, dt);  self._conf_ccw.leak(1.0 / self._R_CONF, dt)
-        self._conf_cw.inject(_act_cw, dt);    self._conf_cw.leak(1.0 / self._R_CONF, dt)
-        self._conf_fwd.inject(_act_fwd, dt);  self._conf_fwd.leak(1.0 / self._R_CONF, dt)
+        self._conf_ccw.inject(_act_ccw, dt);  self._conf_ccw.leak(self._R_CONF, dt)
+        self._conf_cw.inject(_act_cw, dt);    self._conf_cw.leak(self._R_CONF, dt)
+        self._conf_fwd.inject(_act_fwd, dt);  self._conf_fwd.leak(self._R_CONF, dt)
 
         # ── Phase B: FSM forward model ──────────────────────────────────────
         # Step 1: propagate efference copy into prediction neurons
@@ -241,53 +252,71 @@ class DecisionCircuit(VariantCircuit):
         self.pred_domg.step(_i_pred_domg, dt)
 
         # Step 2: compute actual sensory signals (KCL reference)
-        # ΔT_actual: average thermal top-ring column activation
-        _therm_top_keys = ['therm_top_front', 'therm_top_back',
-                           'therm_top_left',  'therm_top_right']
-        _dT_actual = sum(
-            self.column_neurons[k].activation
-            for k in _therm_top_keys if k in self.column_neurons
-        ) / 4.0
+        # ΔT_actual: ALL thermal column activations (mid + top + bot rings).
+        # Using only therm_top_* was wrong: at X-axis approach (source in +X),
+        # therm_top_* = 0 (Z-axis sensors) → err = pred - 0 = pred → always fires.
+        # Full ring average gives a non-zero reference for any source direction.
+        _all_therm_keys = [
+            'therm_front', 'therm_back', 'therm_left', 'therm_right',
+            'therm_top_front', 'therm_top_back', 'therm_top_left', 'therm_top_right',
+            'therm_bot_front', 'therm_bot_back', 'therm_bot_left', 'therm_bot_right',
+        ]
+        _therm_active = [k for k in _all_therm_keys if k in self.column_neurons]
+        _dT_actual = (sum(self.column_neurons[k].activation for k in _therm_active)
+                      / max(len(_therm_active), 1))
         # Δω_actual: yaw motor asymmetry (rotation proxy)
         _domg_actual = abs(_act_ccw - _act_cw)
 
-        # Step 3: error = pred_output - actual (KCL difference)
-        _pred_dT_cur   = (self._b_pred_dT_to_err.propagate()   or [0.0])[0]
-        _pred_domg_cur = (self._b_pred_domg_to_err.propagate() or [0.0])[0]
-        _i_err_dT   = _pred_dT_cur   - _dT_actual
-        _i_err_domg = _pred_domg_cur - _domg_actual
+        # Step 3: error = pred_activation - actual (direct, no double-propagate)
+        # _b_pred_*_to_err not in get_all_bundles() → no auto-propagation
+        _i_err_dT   = self.pred_dT.activation   - _dT_actual
+        _i_err_domg = self.pred_domg.activation - _domg_actual
         self.err_dT.step(_i_err_dT, dt)
         self.err_domg.step(_i_err_domg, dt)
 
         # Step 4: WTA decision neurons
-        # GABA inhibition from error neurons (pre-compute before step)
-        _i_gaba_ccw  = sum((b.propagate() or [0.0])[0]
-                           for b in [self._b_gaba_dT_ccw, self._b_gaba_domg_ccw])
-        _i_gaba_cw   = sum((b.propagate() or [0.0])[0]
-                           for b in [self._b_gaba_dT_cw,  self._b_gaba_domg_cw])
-        _i_gaba_fwd  = sum((b.propagate() or [0.0])[0]
-                           for b in [self._b_gaba_dT_fwd, self._b_gaba_domg_fwd])
-        # Lateral inhibition (from previous-step activations)
-        _i_lat_ccw = sum((b.propagate() or [0.0])[0]
-                         for b in [self._b_dec_cw_to_ccw, self._b_dec_fwd_to_ccw])
-        _i_lat_cw  = sum((b.propagate() or [0.0])[0]
-                         for b in [self._b_dec_ccw_to_cw, self._b_dec_fwd_to_cw])
-        # Confidence excitation (scaled Capacitor voltage)
+        # GABA/lateral bundles not in get_all_bundles() → compute directly from activations.
+        # GABA: w=1.0, sg=-1.0 → I = -err.activation
+        _W_GABA = 0.005  # soft gate: GABA suppresses proportionally but doesn't hard-clamp
+        _W_LAT  = 0.5   # matches _frozen_inh(w=0.5)
+        # BIO: GABA fires only for POSITIVE prediction error (overestimate → wrong action).
+        # Negative error (pred < actual, body in good environment) must not excite dec via sign-reversal.
+        # err_dT is multi-channel → activation = vm (can be negative); clip before use.
+        _err_sum = max(0.0, self.err_dT.activation) + max(0.0, self.err_domg.activation)
+        _i_gaba_any = -_W_GABA * _err_sum   # same for all dec neurons
+        # Lateral inhibition: only ACTIVE (positive) competitors suppress.
+        # BIO: Ia reciprocal inhibition only fires when antagonist is active;
+        # a deeply hyperpolarized neuron cannot excite via sign-reversal.
+        _i_lat_ccw = -_W_LAT * (max(0.0, self.dec_cw.activation) + max(0.0, self.dec_fwd.activation))
+        _i_lat_cw  = -_W_LAT * (max(0.0, self.dec_ccw.activation) + max(0.0, self.dec_fwd.activation))
         _i_exc_ccw = self._conf_ccw.voltage * self._G_CONF
         _i_exc_cw  = self._conf_cw.voltage  * self._G_CONF
         _i_exc_fwd = self._conf_fwd.voltage  * self._G_CONF
-        # Step decision neurons
-        self.dec_ccw.step(_i_exc_ccw + _i_gaba_ccw + _i_lat_ccw, dt)
-        self.dec_cw.step( _i_exc_cw  + _i_gaba_cw  + _i_lat_cw,  dt)
-        self.dec_fwd.step(_i_exc_fwd + _i_gaba_fwd,                dt)  # no lateral for fwd
+        self.dec_ccw.step(_i_exc_ccw + _i_gaba_any + _i_lat_ccw, dt)
+        self.dec_cw.step( _i_exc_cw  + _i_gaba_any + _i_lat_cw,  dt)
+        self.dec_fwd.step(_i_exc_fwd + _i_gaba_any,               dt)  # no lateral for fwd
 
         # Step 5: smooth Capacitor output
         self._smooth_ccw.inject(max(0.0, self.dec_ccw.activation), dt)
-        self._smooth_ccw.leak(1.0 / self._R_SMOOTH, dt)
+        self._smooth_ccw.leak(self._R_SMOOTH, dt)
         self._smooth_cw.inject(max(0.0, self.dec_cw.activation), dt)
-        self._smooth_cw.leak(1.0 / self._R_SMOOTH, dt)
+        self._smooth_cw.leak(self._R_SMOOTH, dt)
         self._smooth_fwd.inject(max(0.0, self.dec_fwd.activation), dt)
-        self._smooth_fwd.leak(1.0 / self._R_SMOOTH, dt)
+        self._smooth_fwd.leak(self._R_SMOOTH, dt)
+
+        # ── Phase C: Motor connection ────────────────────────────────────
+        # BIO: BG/SNr disinhibition → thalamus → motor cortex L5 →
+        #      spinal pattern generators (Mink 1996 Prog Neurobiol 50:381).
+        # SEMI: smooth Capacitor (τ=500 steps) acts as RC filter on dec output.
+        #       inject() adds to membrane voltage; activation computed next step.
+        # Q3: smooth_ccw ≈ 0.2 at steady WTA, _DECISION_GAIN=0.1 →
+        #     I_inject = 0.02 per step. yaw_ccw natural activation ≈ 2.0 →
+        #     Phase C contribution ≈ 1% — modulates direction without hijacking.
+        #     Too large → motor saturation + loss of thermal feedback; too small → no effect.
+        _DECISION_GAIN = 0.1
+        self.yaw_ccw_neuron._membrane.inject(self._smooth_ccw.voltage * _DECISION_GAIN, dt)
+        self.yaw_cw_neuron._membrane.inject(self._smooth_cw.voltage * _DECISION_GAIN, dt)
+        self.motor_neurons['move_x']._membrane.inject(self._smooth_fwd.voltage * _DECISION_GAIN, dt)
 
     # ── Learning hook ────────────────────────────────────────────────────────
     def _do_learning(self, dt: float):
@@ -317,14 +346,18 @@ class DecisionCircuit(VariantCircuit):
 
     # ── Census registration ──────────────────────────────────────────────────
     def get_all_bundles(self):
-        """Include all Phase A/B bundles in Noether/Xin census."""
+        """Include Phase A obs bundles in Noether/Xin census.
+
+        Phase B bundles (FSM, pred→err, GABA, lateral) are NOT included here
+        because their targets are Phase B neurons (pred_dT, err_dT, dec_*)
+        which are stepped manually in step(). Including them would cause
+        double-stepping: apply_to_targets() calls tgt.step() AND our override
+        also calls tgt.step(). obs_bundles target spinal_ccw/cw (main circuit
+        neurons stepped by the main bundle graph) so they're correctly included.
+        """
         bundles = super().get_all_bundles()
         bundles.extend(self._obs_bundles)
-        bundles.extend(self._fsm_bundles)
-        # error pathway bundles
-        bundles.extend([self._b_pred_dT_to_err, self._b_pred_domg_to_err])
-        bundles.extend(self._gaba_bundles)
-        bundles.extend(self._dec_lateral)
+        # Phase B bundles excluded from auto-propagation; learning called in _do_learning()
         return bundles
 
     # ── State reporting ──────────────────────────────────────────────────────
