@@ -2908,7 +2908,12 @@ class VariantCircuit(HebbianCircuit):
             # "DA sleeps" at w=0.05 was due to gm=8.0 bug (saturation at V>0.135), not weight.
             weight_max=0.5,          # reduced ceiling consistent with innate prior weight
             stdp_lr=0.005,           # retained for reference but unused (frozen)
-            synapse_gain=1.0,        # col activation is now bounded by spiking
+            # T-084 FIX: sg 1.0→0.1. 实测 shadow_to_da 撤源期涨到 3.5A (7 饱和 col ×
+            # G(0.05)=0.105 × sg=1.0 ≈ 1.17A/da_neuron) 顶死 DA=1.0。col calcium_rate
+            # 全饱和(cri_v_clamp=1.0)是 shadow 内部问题；此处降有效增益 10× 使先天先验
+            # ≈0.12A/neuron 不 railed DA。REF: STDP修复方案补充_评判与实测修正_2026-07-08 §四.
+            # NOTE: col 饱和根因(shadow-internal θ_M/输入增益)留作后续，见报告。
+            synapse_gain=0.1,        # was 1.0; col activation bounded by spiking but sums over 7 cols
             bundle_role="feedforward",
             remodel_cost_kappa=0.002,
         )
@@ -3155,11 +3160,18 @@ class VariantCircuit(HebbianCircuit):
         #     V_ss_max = 1.0 × r_leak=1.0 = 1.0V; D2R GIRK kicks in at [DA]>0.3 → self-limiting.
         #     Peak phasic burst ≈ 1s (τ_D2=1000steps) then D2R damps to steady state.
         # REF: 最终架构裁决 P0-2, 2026-07-05
+        # T-084 FIX: sg 1.0→0.05. 原注释误判 conduct=w×v → V_ss_max=1.0；实际
+        # conduct=G(w)×v，Memristor G(w=1.0)=1/r_min=10（封顶）→ 电流是设想的 10×。
+        # 实测进食期 intake 注入 8~14A/da (act≈0.47×10×1.0≈4.7A/neuron) 顶死 DA=1.0。
+        # 目标对齐已标定 RPE 奖励量级 (L1832-1836: 峰值 V≈0.6, Schultz 1997 3× burst):
+        # 峰值 act=1.0 时电流应≈0.5A → sg = 0.5/(1.0×G(1.0)=10) = 0.05。
+        # D2R(ec50=0.3) 在 V→0.6 时自限，符合原设计意图。用 sg(线性稳健)而非 w(w=1 附近 G 陡峭).
+        # REF: STDP修复方案补充_评判与实测修正_2026-07-08 §四.
         cfg_intake_da = BundleConfig(
             bundle_id='intake_to_da_reward',
             learning_rule='frozen',
             initial_weight=1.0,
-            synapse_gain=1.0,
+            synapse_gain=0.05,       # was 1.0; G(w=1.0)=10 → sg=0.05 gives peak ≈0.5A/neuron → V≈0.6
             bundle_role='feedforward',
             remodel_cost_kappa=0.0,
         )
