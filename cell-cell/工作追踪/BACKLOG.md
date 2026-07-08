@@ -9,7 +9,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| T-071-fix-A Step4 | sp2y_w=0.200 × 200k 长程验证 + NuProbe | 2026-07-07 | 实验脚本已更新含ν，待重新启动 | 启动后台任务并定时采样 |
+| DA-rebal 验证 | T-083 DA可逆性120k对照（brj4e5jx7）：baseline(已重标)vs fix2 | 2026-07-08 | 运行中 | 确认撤源DA回落+新源相位爆发；追加报告§五 |
 
 ---
 
@@ -17,9 +17,12 @@
 
 | ID        | 任务描述                                                            | 优先级 | 依赖  | 来源文档            |
 | :-------- | :-------------------------------------------------------------- | :-- | :-- | :-------------- |
-| T-080     | 运动势垫支决策框架阶段A（DecisionCircuit影子模式）                               | P2  | T-071-fix-A完成 | claudecode方案/运动势垫支决策框架_实施方案 |
-| T-039b-rerun | T-078 fix-A后重跑J2确认（w_ccw漂移<0.01）                           | P3  | T-071-fix-A完成 | — |
-| T-静默MVE | 4束全连接方向涌现MVE（phasic→spinal全连接200k）                           | P3  | T-080阶段A完成 | 运动势垫支实施方案§9.3 |
+| DA-P1 shadow饱和 | shadow内部根因：col calcium_rate全饱和(cri_v_clamp=1.0)→加快θ_M或降shadow输入增益；当前仅sg掩盖 | P1 | DA-rebal | STDP修复方案补充_评判与实测修正 §四 |
+| 死锁二 增益调制 | STDP目标从方向极性→增益调制（thermo→yaw插可学习增益门控，分流抑制物理化，走三问） | P1 | DA-rebal PASS | STDP无效根因复核 §六 / 修复方案补充 §四 |
+| 死锁二 前置 | 三问审查：G_eff乘法门控的Sources→Bundle→Targets+参数推导 | P1 | — | 修复方案补充 §四 |
+| T-039b-rerun | T-078 fix-A后重跑J2确认（w_ccw漂移<0.01）                          | P3  | — | — |
+| T-静默MVE | 4束全连接方向涌现MVE（phasic→spinal全连接200k）                      | P3  | 死锁二完成 | 运动势垫支实施方案§9.3 |
+| T-Z验证 | Z轴热觉验证实验（解锁Z轴，热源偏Z±20单位，检验top/bot差异化）      | P3  | — | T-084实施说明 |
 
 ---
 
@@ -35,7 +38,12 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
-| NuProbe集成 | NuProbe 挂入 VariantCircuit 主循环（每步update/1000步report），import+init+_ledger_post_step+summary()；CLAUDE.md强制规范更新 | 2026-07-07 | 待提交 |
+| DA源重标(总闸门) | 修DA=1.0饱和：intake_to_da sg1.0→0.05(G(w=1)=10致10×超标)/shadow_to_da sg1.0→0.1(col饱和);拒绝AG Fix-2(satiety-5.0→DA≡0);实测DA恢复动态范围(接近1.0→进食0.2→撤源0.06);21/21 PASS | 2026-07-08 | 928d92a |
+| STDP根因复核+方案评判 | ①STDP无意义两层根因(冗余+DA饱和)②DA=1.0修订版Fix-2评判(可逆性破坏)③修复方案补充评判(实测T-084修正病灶:intake+8~14A为真凶,非shadow BCM缺θ_M)；4份报告 | 2026-07-08 | — |
+| T-080 运动势垫支 | DecisionCircuit三阶段全PASS：Phase A置信积分器/Phase B FSM+WTA/Phase C马达连接;6项修复(Memristor floor/GABA符号/dT_actual全列);体步骤3721到源驻留;21/21 PASS | 2026-07-08 | 4bb83b1 |
+| T-071-fix-A Step4 | sp2y_w=0.200 × 200k长程：J1=1882步(PASS)/J3=0.0%漂移(PASS)/J5 ν=10^13量纲待诊断；Top-10 noci高Xin正常 | 2026-07-07 | — |
+| T-084/T-085 | Z轴热觉8束（col_therm_top/bot_*→move_z ±2.5）+ spinal_fwd双侧收敛前进核团（1神经元+3束），21/21 PASS | 2026-07-07 | f1a44c9 |
+| NuProbe集成 | NuProbe 挂入 VariantCircuit 主循环（每步update/1000步report），import+init+_ledger_post_step+summary()；CLAUDE.md强制规范更新 | 2026-07-07 | 3b03e6a |
 | T-078 | w_cw异常衰减根因分析+修复：phasic.energy→0.001时_apply_metabolic_tax触发（7000×预期），fix-A=max(energy,0.5)；21/21 PASS | 2026-07-07 | c727201 |
 | T-071-fix-A Step1-3 | sp2y_w 0.020→0.050→0.100→0.200；Step3 approach_step=1960（最佳），DR5=73.8%，无振荡；回归21/21 PASS | 2026-07-07 | 432406b |
 | T-065 | 物理驱逐实验（100k步热源瞬移）：3/4 PASS；J2=43步重定位新源（vs设计30k步上限）；J3最近距=0.3；J4 FAIL=找源太快fill未下降5%（正向副作用）；热趋性泛化能力确认 | 2026-07-07 | 86c0821 |
