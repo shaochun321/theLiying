@@ -38,16 +38,22 @@ from ..components.binding_temporal import TemporalBindingLayer
 from ..components.yolk_sac import YolkSac
 from ..components.da_differential_gate import DADifferentialGate
 from ..components.shadow_sandbox import ShadowSandbox
-from ..components.world import World, Body, HeatSource
+from ..components.world import World, Body, HeatSource, SkinPatch
+from ..components.skin_network import fibonacci_sphere_points, compute_coupling_weights
 from ..components.heat_source import CylindricalHeatSource
 from ..components.thermal_mouth import ThermalMouth
 from ..components.digestive_interface import DigestiveInterface
 from ..components.thermal_membrane import ThermalMembrane
 from ..components.muscle import MuscleSystem
-from ..vestibular.chain import VestibularChain
+from ..vestibular.chain import (
+    VestibularChain,
+    _met_config as _vestibular_met_config,
+    _SENSORY_POS as _vestibular_sensory_pos,
+)
 from ..somatosensory.chain import SomatosensoryChain
 from ..somatosensory.transducer_neurons import (
-    ThermalDeltaNeuron, make_thermo_delta_to_da_bundle)
+    ThermalDeltaNeuron, make_thermo_delta_to_da_bundle,
+    _thermo_haircell_config, make_thermo_l1_to_hc_bundle)
 from ..components.energy_store import EnergyStore
 from ..components.vital_oscillator import VitalOscillator
 from ..components.cpg_neuron import CPGNeuron
@@ -115,6 +121,358 @@ class _ThermalDelayBuffer:
         # Advance head (circular buffer)
         self._head = (self._head + 1) % self._delay
         return output
+
+
+# ── 量子元路径 模块级常量 ────────────────────────────────────────────────────
+_QUANTUM_DIRECTIONS = [
+    ("yaw_pos",   "yaw",   +1),   # 右转
+    ("yaw_neg",   "yaw",   -1),   # 左转
+    ("pitch_pos", "pitch", +1),   # 上仰
+    ("pitch_neg", "pitch", -1),   # 下俯
+    ("roll_pos",  "roll",  +1),   # 顺滚
+    ("roll_neg",  "roll",  -1),   # 逆滚
+    ("otox_pos",  "oto_x", +1),   # 右移
+    ("otox_neg",  "oto_x", -1),   # 左移
+    ("otoy_pos",  "oto_y", +1),   # 上移
+    ("otoy_neg",  "oto_y", -1),   # 下移
+    ("otoz_pos",  "oto_z", +1),   # 前进
+    ("otoz_neg",  "oto_z", -1),   # 后退
+]
+_Q_N_ENSEMBLE       = 10       # 每方向 ensemble 神经元数
+_Q_BIAS_STEP        = -0.12    # 阶梯偏置步长：bc_current = _Q_BIAS_STEP*(k+1), k=0..9
+                                # 推导：覆盖量程 0.12*10/3.8 ≈ 0.316 ≈ MET 峰值 0.32
+_Q_VDD              = 1.0
+_Q_INPUT_W0         = 3.8      # MET→ensemble 初始权重
+                                # 推导：W0_min = |bc_k9|/V_met_peak = 1.2/0.32 = 3.75 → 3.8 留余量
+                                # V_met=0.32 时 k=9 净电流 3.8*0.32-1.2 = 0.016 > 0 刚好激活
+_Q_COLLECT_W0       = 0.1      # ensemble→collector 每路权重（10×0.1=1.0 满载）
+_Q_COLLECT_THR      = 0.85     # collector channel v_threshold（严格 AND 门）
+_Q_COLLECT_TAU_GATE = 3.0      # collector PSC 积分窗（步）
+                                # PHYS：阶梯阈值使 k=0 在 t≈0、k=9 在 t≈8 发放。
+                                # tau_gate=3 给脉冲指数尾巴，10 波叠加峰值≈1.0 可靠过 0.85。
+                                # exp(-8/3)≈0.07，最早脉冲残留 7%，足够粘合异步脉冲流。
+
+
+def _quantum_ensemble_config(dir_name: str, k: int, region: int = 0x00,
+                              position=None) -> NeuronConfig:
+    """TYPE:BIO — 量子元 ensemble 神经元，阶梯阈值温度计编码。
+
+    BIO: 脊髓中间神经元群体编码，对应运动皮层 population vector coding。
+    REF: Georgopoulos 1986 Science 233:1416.
+    Q3: bc_current = _Q_BIAS_STEP*(k+1)；W0=3.8 时 V_met=0.32 → k=9 净电流 0.016>0。
+    地址: region/position 复用输入源（met/antimet）坐标——群体编码中间神经元与其
+          初级传入解剖上共处同一前庭核微环路，不新增坐标推导公式（无计算效应元数据）。
+    """
+    return NeuronConfig(
+        neuron_id=f"quantum_{dir_name}_{k}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.005,
+        tau_w=2.0,
+        capacitance=0.5,
+        r_leak=10.0,
+        inertia=0.5,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        use_bias_current=True,
+        bc_current=_Q_BIAS_STEP * (k + 1),
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+def _quantum_collector_config(dir_name: str, region: int = 0x00,
+                               position=None) -> NeuronConfig:
+    """TYPE:BIO — 量子检测器，AND 门：全激活才发放量子 spike。
+
+    BIO: 脊髓 α 运动神经元，需足够多突触前汇聚才去极化。
+    PHYS: tau_gate=_Q_COLLECT_TAU_GATE 提供积分窗，粘合阶梯阈值导致的异步脉冲。
+    地址: region 暂归脑干（0x02，与 ensemble 同区，过渡状态）——collector 当前未接
+          Body/Motor；待未来接运动时应迁移至 REGION_MAIN(0x03)。
+    """
+    return NeuronConfig(
+        neuron_id=f"quantum_collector_{dir_name}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.01,
+        tau_w=1.0,
+        capacitance=1.0,
+        r_leak=10.0,
+        inertia=1.0,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        channels=[ChannelConfig(
+            name="default",
+            v_threshold=_Q_COLLECT_THR,
+            gm=3.0,
+            tau_gate=_Q_COLLECT_TAU_GATE,
+            reversal=1.0,
+            sign=1.0,
+        )],
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+# ── 感温量子元路径 模块级常量（V2：多级物理传感器 + 球面局部生成元）────────────
+# BIO: 皮肤游离神经末梢感受野密度化阵列，Fibonacci sphere 均匀采样。
+# REF: 见 cell-cell/claudecode方案/感温链路量子元重构_球面网络生成元_实施方案_2026-07-11.md
+_THERM_LOCAL_N = 32            # 球面采样点数（Fibonacci sphere；数值待后续调整，结构非数值是重点）
+_THERM_LOCAL_R = 2.0            # 采样球半径，与前庭 _default_skin_patches 的 effective_radius=2.0 同量级
+
+# 感温量子元 ensemble/collector 专属校准常量（独立于前庭 _Q_* 常量，避免共享
+# 牵连前庭已验证的校准）。推导依据：实测 Level2(热觉毛细胞) 在零输入下静息
+# vm≈0.11-0.115（v_rest + leak 平衡点），dT=0.001~0.1 驱动下 vm 范围约
+# 0.14~1.54（见 2026-07-11 感温链路重构实测）。
+_THERM_Q_INPUT_W0    = 2.0      # Level2→ensemble 权重
+                                # 推导：净电流=W0*vm+bc(k)。要求静息vm=0.11时
+                                # k=0净电流<0（不应静默误触发）：2.0*0.11-0.3=-0.08<0 ✓
+_THERM_Q_BIAS_STEP   = -0.3     # 阶梯偏置步长：bc_current=_THERM_Q_BIAS_STEP*(k+1)
+                                # 推导：bias_step/W0≈0.15，覆盖静息(0.11)到强信号(1.5)区间：
+                                # dT=0.02(vm=0.63)→4/10发放；dT=0.1(vm=1.54)→10/10发放
+_THERM_Q_COLLECT_W0       = 0.1   # ensemble→collector 每路权重（10×0.1=1.0满载）
+_THERM_Q_COLLECT_THR      = 0.85  # collector channel v_threshold（严格AND门，同前庭）
+_THERM_Q_COLLECT_TAU_GATE = 3.0   # collector PSC 积分窗，粘合阶梯阈值异步脉冲（同前庭）
+
+
+# ── 感温耦合生成元 Ω 模块级常量（方向性 Ω_dir ×6 + 中心-周围 Ω_div ×1）────
+# BIO: 脊髓背角 WDR 神经元对初级传入的空间会聚——方向性感受野由传入纤维
+#      终末在背角的解剖分布决定，非学习（Willis & Coggeshall 2004）；
+#      中心-周围拮抗类比 Mach-band 侧抑制。
+# REF: cell-cell/交叉方案/感温链路局部—耦合生成元.md（理论骨架），本实现
+#      对该方案两处物理错误做了修正（见下方 Q3 标定说明）。
+#
+# 标定依据（2026-07-14 实测，nexus_v1/tests/_calib_omega_xi_pretrace.py）：
+#   合成 dT 直接注入 thermpt0，dT=0.001 时 collector 从不发放
+#   （peak pre_trace=0）；dT>=0.005 时 collector.pre_trace 迅速饱和到
+#   ~1.0（dT=0.005/0.02/0.05/0.1 结果几乎相同：1.000/1.002/1.002/1.000），
+#   不再随 dT 增大而增大。故 Ω 层看到的每个"热"xi 源贡献近似饱和值 1.0，
+#   方向/散度差异来自"多少个源同时越过阈值"，不是单源强度梯度。
+# Q3: Ω 束经 SynapticBundle.propagate() 读 xi collector 的 pre_trace（spiking
+#     源规则，见 bundle.py:253-254），不是原方案文档写的 _membrane.voltage。
+#     Memristor.conduct(v_in)=v_in*conductance(w)，conductance 是 w 的非线性
+#     函数（resistance=r_min+(r_max-r_min)*(1-w), r_min=0.1/r_max=10.0），
+#     cos²(θ) 权重直接写入 w 只保证方向选择性的单调性（cos²越大→w越大→
+#     conductance越大→电流越大），不是电流的线性正比——项目既有前庭 RF
+#     实现用的是同一套约定，此处沿用而非新造线性化公式（避免过度设计）。
+_RF_DIRECTIONS = [
+    (1.0, 0.0, 0.0), (-1.0, 0.0, 0.0),
+    (0.0, 1.0, 0.0), (0.0, -1.0, 0.0),
+    (0.0, 0.0, 1.0), (0.0, 0.0, -1.0),
+]
+_RF_SHARPNESS_P = 2.0    # cos²衰减指数，约90°锥角接收野（同原方案）
+# 标定第二轮实测（2026-07-14，_diag_omega_current_chain.py 诊断）：xi 层
+# 各点的 L1→L2/L2→ensemble/ensemble→collector 束各自独立按
+# hash((bundle_id,i_s,i_t)) 做 ±25% 对称性打破扰动（bundle.py:170-171，
+# bundle_id 含点索引），导致不同点在同一 dT 驱动下发放可靠性差异很大——
+# 6 个 cos²最高的点同时以 dT=0.02 驱动 2000 步，collector pre_trace 只到
+# ~0.02（偶发脉冲，非持续饱和），远低于单独驱动 point0 时测得的 ~1.0
+# 稳态饱和值。这是 xi 层自身已标注 TODO-CALIBRATE 的既有特性（母本代码，
+# 不在本次改动范围内），Ω 层必须对此容错：不能假设"对齐点必然稳定饱和"。
+# 故取 base_weight=1.0（cos²=1 时 w=1.0，conductance=1/(0.1+9.9*0)=10，
+# 与 xi 层自身 L2→ensemble 束的最大电导同量级），使哪怕单次偶发脉冲
+# （pre_trace 瞬时凸起）也能提供足够电流触发 ensemble 阶梯至少一级。
+# TODO-CALIBRATE：真实 World 长程热源接近场景下，同一瞬间实际会有多少个
+# xi 源可靠越过各自发放阈值，仍需专门的长程接近实验测定（同 ξ 层性质）。
+_RF_BASE_WEIGHT = 1.0
+
+# Ω_div：兴奋路径（中心代理）+ 抑制路径（周围代理），均匀覆盖全部64个
+# xi源（原方案的已知局限：并非真正空间中心-周围拓扑，见下方 init 方法
+# docstring）。两路径权重均为正（Memristor.w 不能取负），抑制通过束级
+# synapse_gain=-1.0 实现（Memristor.conduct 内部 resistance 钳制到
+# w∈[0,1]，负权重物理上不成立，见 semiconductor.py:222）。权重同 _RF_
+# BASE_WEIGHT 一并上调（同一次诊断发现：多数 xi 源在同一 dT 下发放不
+# 可靠，需要更高电导补偿），保持约 3:2 兴奋:抑制比例。
+_DIV_CENTER_W   = 0.6    # 兴奋路径 w，conductance(0.6)=1/(0.1+9.9*0.4)≈0.253
+_DIV_SURROUND_W = 0.4    # 抑制路径 w（配 synapse_gain=-1.0），conductance(0.4)≈0.145
+
+# 标定第三轮实测（2026-07-14，_diag_omega_burst.py 诊断）：Ω ensemble 若直接
+# 复用 xi 层的 _thermal_quantum_ensemble_config（capacitance=0.5），即使
+# 瞬时电流达到 2.76（远超 k=0 阶梯阈值 0.3），也从不发放——根因是膜电容
+# RC 积分器 dV=I*dt/C，dt=0.001 下单步电压增量仅 ~0.0074，而 xi 层输出
+# 本身是阵发性的（burst-decay，非持续饱和，见 _RF_BASE_WEIGHT 段标定注释），
+# 实测单次爆发只持续 ~10-15 步，累计电压涨幅（~0.11）不到 v_peak(0.23)
+# 的一半，达不到阈值。这是"复用同一工厂函数"埋下的时间尺度失配——xi 层
+# 自己的 ensemble 是为"单一非 spiking 连续源持续整个窗口"标定的，Ω 层
+# 面对的是"多个 spiking 源的阵发性总和"，动态特征本质不同，不应共享同一
+# 组容值常量（同 xi 层自身"独立复制一份，不牵连前庭校准"的既定原则）。
+# 修正：Ω 专属 ensemble 电容降至 xi 层的 1/10（capacitance=0.05），使同样
+# 电流在同样爆发时长内的累计充电量提高 10 倍，足以在单次爆发窗口内充过
+# v_peak。r_leak 同比例下调，保持 RC 时间常数结构一致，只是尺度收缩。
+# 实测（_diag_omega_burst.py）：ensemble k=0 修正后能可靠发放（pre_trace
+# 峰值达 1.0~2.5），但典型只有 10 档中的 1 档（k=0，最低阈值）能被短促
+# 爆发触发，其余高阶梯(k>=1)阈值在爆发时长内达不到——Ω 层因此退化为
+# "粗粒度 1-bit 阈值检测"而非 xi 层设计的"10 级精细温度计"，这是本轮
+# 阵发性输入特征下的合理折衷（Phase 1 范围内只需方向/散度的有/无信号，
+# 不需要精细分级）。
+_OMEGA_ENSEMBLE_CAPACITANCE = 0.05
+_OMEGA_ENSEMBLE_R_LEAK      = 1.0
+# collector 电容同理独立标定：即使 ensemble k=0 可靠发放，collector 若沿用
+# 0.01（ensemble 的 1/5）仍不足以在 ensemble 的间歇性发放窗口内充够——
+# collector 面对的是"ensemble 10 档中仅 1 档间歇发放"的更稀疏输入，需要
+# 比 ensemble 更小的电容才能积累到位。实测 0.002（ensemble 的 1/25）时
+# RF collector 峰值 pre_trace=10.0（封顶），Ω_div collector 峰值=4.76，
+# 均可靠越过发放阈值（见 test_thermal_coupling_generators.py T-Ω2/T-Ω4）。
+_OMEGA_COLLECTOR_CAPACITANCE = 0.002
+_OMEGA_COLLECTOR_R_LEAK      = 1.0
+# ensemble→collector 权重：xi 层的 0.1 是按"AND 门，10 路阶梯全激活求和
+# =1.0"设计的；Ω 的实际爆发窗口通常只够越过 k=0（最低阈值 0.3）这一档，
+# 高阶梯(k>=1)的更高阈值在短暂爆发内达不到，故典型只有 1/10 路贡献。用
+# 更高权重补偿单路贡献不足，而不是继续假设"10 路全激活"这一在 Ω 场景下
+# 不成立的前提。
+_OMEGA_COLLECT_W0 = 0.5
+
+
+def _thermal_quantum_ensemble_config(label: str, k: int, region: int = 0x00,
+                                      position=None) -> NeuronConfig:
+    """TYPE:BIO — 感温量子元 ensemble 神经元，阶梯阈值温度计编码。
+
+    结构与 _quantum_ensemble_config 完全相同（同一"结构生成元"配方），独立复制
+    一份而非直接调用前庭版本，因为感温源（Level2 热觉毛细胞）的峰值量级与
+    MET 不同，参数需独立校准，不应共享同一组模块常量导致牵连前庭校准。
+    Q3: 实测 Level2 零输入静息 vm≈0.11，dT=0.001~0.1 驱动下 vm≈0.14~1.54。
+        _THERM_Q_INPUT_W0=2.0/_THERM_Q_BIAS_STEP=-0.3：k=0 净电流在静息态
+        2.0*0.11-0.3=-0.08<0（不误触发），dT=0.1(vm=1.54)时k=9净电流
+        2.0*1.54-3.0=0.08>0（可激活），覆盖静息到强信号区间。
+    """
+    return NeuronConfig(
+        neuron_id=f"thermq_{label}_{k}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.005,
+        tau_w=2.0,
+        capacitance=0.5,
+        r_leak=10.0,
+        inertia=0.5,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        use_bias_current=True,
+        bc_current=_THERM_Q_BIAS_STEP * (k + 1),
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+def _thermal_quantum_collector_config(label: str, region: int = 0x00,
+                                       position=None) -> NeuronConfig:
+    """TYPE:BIO — 感温量子检测器，AND 门：全激活才发放量子 spike。
+
+    结构与 _quantum_collector_config 完全相同，独立复制一份理由同上（独立常量
+    _THERM_Q_COLLECT_THR/_THERM_Q_COLLECT_TAU_GATE，数值暂同前庭起点）。
+    """
+    return NeuronConfig(
+        neuron_id=f"thermq_collector_{label}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.01,
+        tau_w=1.0,
+        capacitance=1.0,
+        r_leak=10.0,
+        inertia=1.0,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        channels=[ChannelConfig(
+            name="default",
+            v_threshold=_THERM_Q_COLLECT_THR,
+            gm=3.0,
+            tau_gate=_THERM_Q_COLLECT_TAU_GATE,
+            reversal=1.0,
+            sign=1.0,
+        )],
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+def _omega_ensemble_config(label: str, k: int, region: int = 0x00,
+                            position=None) -> NeuronConfig:
+    """TYPE:BIO — Ω 耦合生成元 ensemble 神经元，阶梯阈值编码。
+
+    与 _thermal_quantum_ensemble_config 同配方，唯独 capacitance/r_leak
+    独立标定（不复用 xi 层数值）——见 _OMEGA_ENSEMBLE_CAPACITANCE 段注释：
+    xi 层输出是阵发性的（单次爆发仅持续 ~10-15 步），Ω 若沿用 xi 层的
+    capacitance=0.5，膜电容 RC 积分跟不上爆发时长，永不发放（2026-07-14
+    _diag_omega_burst.py 实测：电流 2.76 持续 15 步，累计电压仍不到
+    v_peak 一半）。bias 阶梯沿用同一 _THERM_Q_BIAS_STEP 形状（对聚合后的
+    电流量级仍适配，问题只在电容太"重"，不在阈值本身）。
+    """
+    return NeuronConfig(
+        neuron_id=f"omega_{label}_{k}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.005,
+        tau_w=2.0,
+        capacitance=_OMEGA_ENSEMBLE_CAPACITANCE,
+        r_leak=_OMEGA_ENSEMBLE_R_LEAK,
+        inertia=0.5,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        use_bias_current=True,
+        bc_current=_THERM_Q_BIAS_STEP * (k + 1),
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+def _omega_collector_config(label: str, region: int = 0x00,
+                             position=None) -> NeuronConfig:
+    """TYPE:BIO — Ω 耦合生成元检测器，AND 门。
+
+    与 _thermal_quantum_collector_config 同配方，capacitance/r_leak 独立
+    标定，理由同 _omega_ensemble_config。
+    """
+    return NeuronConfig(
+        neuron_id=f"omega_collector_{label}",
+        region=region,
+        position=position,
+        spiking=True,
+        v_peak=0.23,
+        v_reset=0.077,
+        b_adapt=0.01,
+        tau_w=1.0,
+        capacitance=_OMEGA_COLLECTOR_CAPACITANCE,
+        r_leak=_OMEGA_COLLECTOR_R_LEAK,
+        inertia=1.0,
+        vdd=_Q_VDD,
+        r_supply=0.05,
+        channels=[ChannelConfig(
+            name="default",
+            v_threshold=_THERM_Q_COLLECT_THR,
+            gm=3.0,
+            tau_gate=_THERM_Q_COLLECT_TAU_GATE,
+            reversal=1.0,
+            sign=1.0,
+        )],
+        use_voltage_regulator=True,
+        vr_base_rate=0.05,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
 
 
 class VariantCircuit(HebbianCircuit):
@@ -1107,6 +1465,41 @@ class VariantCircuit(HebbianCircuit):
         self.shadow_sandbox.initialize(self)
         self._init_shadow_input_bundles()
 
+        # ── 量子元路径（MET→12方向ensemble→collector）──
+        self.quantum_antimet: dict    = {}   # axis → Neuron（反相 MET，对侧半规管，6 个）
+        self.quantum_ensembles: dict  = {}   # dir_name → List[Neuron](10)
+        self.quantum_collectors: dict = {}   # dir_name → Neuron
+        self.bundles_quantum_in:      list = []  # 12 条 1→10 input bundles
+        self.bundles_quantum_collect: list = []  # 12 条 10→1 collector bundles
+        self._init_quantum_pathways()
+
+        # ── 感温量子元路径（V2：球面局部生成元 + 多级物理传感器）──
+        # 与 body.skin_patches / SomatosensoryChain / ThermalMembrane 完全隔离的
+        # 第三套并行温感系统，仅供本量子化结构使用。
+        self._thermal_quantum_patches: list = []   # N 个独立 SkinPatch
+        self.thermal_quantum_l1_warm: dict  = {}   # point_id → ThermalDeltaNeuron(+dT)
+        self.thermal_quantum_l1_cool: dict  = {}   # point_id → ThermalDeltaNeuron(-dT)
+        self.thermal_quantum_hc_warm: dict  = {}   # point_id → 热觉毛细胞(Level2)
+        self.thermal_quantum_hc_cool: dict  = {}
+        self.thermal_quantum_ensembles: dict  = {} # f"{point_id}_{warm|cool}" → List[Neuron](10)
+        self.thermal_quantum_collectors: dict = {}
+        self.bundles_thermal_quantum_l1_to_hc:  list = []  # N×2 条 Level1→Level2
+        self.bundles_thermal_quantum_in:        list = []  # N×2 条 Level2→ensemble
+        self.bundles_thermal_quantum_collect:   list = []  # N×2 条 ensemble→collector
+        self._init_quantum_thermal_pathways()
+
+        # ── 感温耦合生成元路径 Ω（方向性×6 + 中心-周围×1，止于 collector，
+        #    不接 Motor——Motor 对接留待 Γ 组织生成元层设计完成后）──
+        self.rf_ensembles: dict  = {}   # dir_idx(0..5) → List[Neuron](10)
+        self.rf_collectors: dict = {}   # dir_idx(0..5) → collector Neuron
+        self.div_ensemble: list  = []   # List[Neuron](10)，兴奋+抑制共用
+        self.div_collector = None
+        self.bundles_rf:      list = []  # 6×2 条：fan-in(64 xi源→10 ensemble) + (10 ensemble→1 collector)
+        self.bundles_div_exc = None      # 1 条 64→10，synapse_gain=+1.0
+        self.bundles_div_inh = None      # 1 条 64→10，synapse_gain=-1.0
+        self.bundle_div_collect = None   # 1 条 10 ensemble→1 collector
+        self._init_thermal_coupling_generators()
+
     def _init_shadow_input_bundles(self):
         """Wire Motor / relay / energy → shadow layer (frozen, low-gain, observer-only).
 
@@ -1193,6 +1586,398 @@ class VariantCircuit(HebbianCircuit):
                     [self.average_energy_neuron], [tgt_n])
                 self._shadow_input_bundles.append(b)
                 sb.bundles[bid] = b
+
+    def _init_quantum_pathways(self):
+        """TYPE:BIO — 12 方向量子元链路：MET/antimet 模拟量→AdEx ensemble→AND 门 collector。
+
+        BIO: 脊髓/脑干中间神经元群体，将连续前庭信号转为离散运动量子。
+        REF: Georgopoulos 1986 Science — population vector coding in motor cortex.
+        PHYS: 正方向源=同侧 MET；负方向源=antimet（对侧半规管，喂 −deflection）。
+              整流由各传感器自身 MOSFET 天然涌现（亚阈→activation=0），无 if/sign 硬编码。
+              L3 afferent 脉冲率非负、方向信息已丢失，故源头必须是 MET 层模拟量。
+
+        Q1. BIO: 脑干前庭核→小脑颗粒细胞群体编码通路（前庭小脑）。
+            bilateral push-pull canal pair (Goldberg & Fernández 1971 J Neurophysiol 34:635).
+            REF: Bloedel & Courville 1981 Handbook Physiology §2.
+        Q2. met/antimet[axis] → [frozen, sg=+1] → quantum_{dir}_0..9 → [frozen] → quantum_collector_{dir}
+        Q3. _Q_INPUT_W0=3.8：W0_min = 1.2/0.32 = 3.75，留余量确保 k=9 可激活。
+            _Q_BIAS_STEP=-0.12：均匀覆盖 0~0.32 范围（0.12*10/3.8≈0.316）。
+            antimet: 复用 _met_config(axis)，零新参数。
+
+        地址化（region/position，纯元数据，zero effect on computation——同
+        _assign_regions() docstring 的既定约定）：
+          - antimet/ensemble/collector 均归 REGION_BRAINSTEM（0x02，与前庭核 met/hc/aff
+            同区，_assign_regions 既有前缀规则一致）。collector 未来接 Motor 时应迁 0x03。
+          - antimet.position = _SENSORY_POS[axis] 的 x 分量取反（对侧半规管镜像坐标占位，
+            左右轴约定未定案，无计算效应，见量子元网络化方案 2026-07-09）。
+          - ensemble/collector.position 复用其输入源坐标（同一前庭核微环路，不新增坐标公式）。
+        本次接入刻意不加入 get_all_neurons()（保护 T4.1 col→motor 选择性，既定边界不变），
+        故不经过 _assign_regions()；地址在此处于构造时直接写入（同 soma_proj 的做法）。
+        """
+        # BIO: 对侧半规管（6 个 antimet 传感器，每轴一个）
+        # REF: bilateral push-pull canal pair — Goldberg & Fernández 1971
+        _axes_seen: set = set()
+        for _, axis, _ in _QUANTUM_DIRECTIONS:
+            if axis not in _axes_seen:
+                _axes_seen.add(axis)
+                cfg_anti = _vestibular_met_config(axis)
+                cfg_anti.neuron_id = f"antimet_{axis}"
+                cfg_anti.region = REGION_BRAINSTEM
+                base_pos = _vestibular_sensory_pos.get(axis)
+                cfg_anti.position = (
+                    (-base_pos[0], base_pos[1], base_pos[2]) if base_pos else None
+                )
+                self.quantum_antimet[axis] = Neuron(cfg_anti)
+
+        for dir_name, axis, sign in _QUANTUM_DIRECTIONS:
+            # 选源：正方向=同侧 MET，负方向=反相传感器（对侧半规管）
+            src = (self.vestibular.met_neurons[axis] if sign > 0
+                   else self.quantum_antimet[axis])
+            src_pos = src.config.position
+
+            # 10 个 ensemble 神经元（阶梯阈值温度计）
+            ensemble = [Neuron(_quantum_ensemble_config(
+                            dir_name, k, region=REGION_BRAINSTEM, position=src_pos))
+                        for k in range(_Q_N_ENSEMBLE)]
+            self.quantum_ensembles[dir_name] = ensemble
+
+            # collector AND 门（region 暂归 0x02，过渡状态，见工厂函数 docstring）
+            collector = Neuron(_quantum_collector_config(
+                dir_name, region=REGION_BRAINSTEM, position=src_pos))
+            self.quantum_collectors[dir_name] = collector
+
+            # input bundle: src(1) → ensemble(10)，synapse_gain=+1（整流由传感器层完成）
+            cfg_in = BundleConfig(
+                bundle_id=f"quantum_in_{dir_name}",
+                learning_rule="frozen",
+                initial_weight=_Q_INPUT_W0,
+                weight_max=_Q_INPUT_W0,
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            b_in = SynapticBundle(cfg_in, [src], ensemble)
+            self.bundles_quantum_in.append(b_in)
+
+            # collector bundle: ensemble(10) → collector(1)
+            cfg_col = BundleConfig(
+                bundle_id=f"quantum_collect_{dir_name}",
+                learning_rule="frozen",
+                initial_weight=_Q_COLLECT_W0,
+                weight_max=_Q_COLLECT_W0,
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            b_col = SynapticBundle(cfg_col, ensemble, [collector])
+            self.bundles_quantum_collect.append(b_col)
+
+    def _step_quantum_pathways(self, mechanical_inputs: dict, dt: float):
+        """TYPE:INFRA — 量子元路径每步传播 + stepping，frozen 不学习。
+
+        调用时机：super().step() 之后（MET.activation 已更新）。
+        mechanical_inputs: 与 VariantCircuit.step() 同名 dict，用于驱动 antimet 传感器。
+        """
+        # BIO: 对侧半规管换能（−deflection），MOSFET 天然整流（activation ≥ 0）
+        for axis, antimet in self.quantum_antimet.items():
+            antimet.step(-float(mechanical_inputs.get(axis, 0.0)), dt)
+
+        for b_in, b_col, (dir_name, _, _) in zip(
+                self.bundles_quantum_in,
+                self.bundles_quantum_collect,
+                _QUANTUM_DIRECTIONS):
+            ensemble  = self.quantum_ensembles[dir_name]
+            collector = self.quantum_collectors[dir_name]
+
+            # src(met or antimet) → ensemble
+            currents_in = b_in.propagate()
+            for k, neuron in enumerate(ensemble):
+                neuron.step(currents_in[k] if k < len(currents_in) else 0.0, dt)
+
+            # ensemble → collector（AND 门汇聚）
+            currents_col = b_col.propagate()
+            collector.step(currents_col[0] if currents_col else 0.0, dt)
+            # frozen: 不调用 learn()，不 compute_xin()
+
+    def _init_quantum_thermal_pathways(self):
+        """TYPE:BIO — 感温量子元路径 V2：球面局部生成元 + 多级物理传感器。
+
+        BIO: 皮肤游离神经末梢感受野密度化阵列（Fibonacci sphere 均匀采样），
+             每点独立 warm/cool 双通道，经 Level1(初级换能)→Level2(热觉毛细
+             胞，多通道HH等效)→Level3(量子元ensemble+collector) 三级物理链。
+        REF: cell-cell/claudecode方案/感温链路量子元重构_球面网络生成元_实施方案_2026-07-11.md
+
+        Q1. BIO: TRP channel family thermosensation (Vriens 2014); 热感受器
+            适应 (Cesare & McNaughton 1996); Ca2+释放 (Roberts 1990)。
+        Q2. SkinPatch_i(独立实例，不挂 body.skin_patches).sample()→(T,dT)
+            → ThermalDeltaNeuron(±dT, Level1, 复用现有类不改)
+            → [frozen bundle] → 热觉毛细胞(Level2, 新建多通道)
+            → [frozen bundle] → ensemble(10, Level3)→collector(AND门)
+        Q3. N=32 点，R=2.0（同前庭 patch 量级）；Level2 通道参数结构复制自
+            _haircell_config，数值待校准（TODO-CALIBRATE，见工厂函数文档）。
+        本轮不做：跨点/跨方向耦合（Ω 层），不用 dot product 计算方向权重；
+        不接 Body/Motor，不做 WTA，不加学习。三套温感系统（本系统 +
+        SomatosensoryChain + ThermalMembrane）完全并行隔离，互不修改。
+        """
+        positions = fibonacci_sphere_points(_THERM_LOCAL_N, _THERM_LOCAL_R)
+
+        for i, pos in enumerate(positions):
+            pid = f"thermpt{i}"
+
+            # 独立 SkinPatch（与 body.skin_patches 完全隔离，纯采样用途）
+            patch = SkinPatch(patch_id=pid, local_offset=list(pos))
+            self._thermal_quantum_patches.append(patch)
+
+            for polarity in ("warm", "cool"):
+                label = f"{pid}_{polarity}"
+
+                # Level 1：初级换能（复用现有类，不改构造签名；cool 支路喂 -dT 由 step 端完成）
+                l1 = ThermalDeltaNeuron(patch_id=label, position=pos)
+                # 地址：ThermalDeltaNeuron 构造函数无 region 形参（该类被既有
+                # 12-patch 系统共享，不可改签名），构造后直接赋值，同 Level2/3
+                # 及前庭 antimet 传感器的既定做法（cfg.region 构造后设置）。
+                l1.config.region = REGION_SPINAL
+
+                # Level 2：热觉毛细胞（新建，多通道 HH 等效 + Ca2+ 释放）
+                hc = Neuron(_thermo_haircell_config(
+                    label, position=pos, region=REGION_SPINAL))
+
+                # Level 3：量子元 ensemble(10) + collector（复用同构工厂函数）
+                ensemble = [Neuron(_thermal_quantum_ensemble_config(
+                                label, k, region=REGION_SPINAL, position=pos))
+                            for k in range(_Q_N_ENSEMBLE)]
+                collector = Neuron(_thermal_quantum_collector_config(
+                    label, region=REGION_SPINAL, position=pos))
+
+                # Level1 → Level2
+                b_l1_hc = make_thermo_l1_to_hc_bundle(label, l1, hc)
+
+                # Level2 → ensemble
+                cfg_in = BundleConfig(
+                    bundle_id=f"thermq_in_{label}",
+                    learning_rule="frozen",
+                    initial_weight=_THERM_Q_INPUT_W0,
+                    weight_max=_THERM_Q_INPUT_W0,
+                    synapse_gain=1.0,
+                    bundle_role="feedforward",
+                    remodel_cost_kappa=0.0,
+                )
+                b_in = SynapticBundle(cfg_in, [hc], ensemble)
+
+                # ensemble → collector
+                cfg_col = BundleConfig(
+                    bundle_id=f"thermq_collect_{label}",
+                    learning_rule="frozen",
+                    initial_weight=_THERM_Q_COLLECT_W0,
+                    weight_max=_THERM_Q_COLLECT_W0,
+                    synapse_gain=1.0,
+                    bundle_role="feedforward",
+                    remodel_cost_kappa=0.0,
+                )
+                b_col = SynapticBundle(cfg_col, ensemble, [collector])
+
+                if polarity == "warm":
+                    self.thermal_quantum_l1_warm[pid] = l1
+                    self.thermal_quantum_hc_warm[pid] = hc
+                else:
+                    self.thermal_quantum_l1_cool[pid] = l1
+                    self.thermal_quantum_hc_cool[pid] = hc
+                self.thermal_quantum_ensembles[label] = ensemble
+                self.thermal_quantum_collectors[label] = collector
+                self.bundles_thermal_quantum_l1_to_hc.append(b_l1_hc)
+                self.bundles_thermal_quantum_in.append(b_in)
+                self.bundles_thermal_quantum_collect.append(b_col)
+
+    def _init_thermal_coupling_generators(self):
+        """TYPE:BIO — 感温耦合生成元 Ω：ξ 局部生成元的空间会聚，止于 collector。
+
+        BIO: 脊髓背角 WDR 神经元对初级传入纤维的解剖性空间会聚——方向性
+             感受野和中心-周围拮抗由传入终末的固定分布决定，是构造期几何
+             接线，不是学习（Willis & Coggeshall 2004, spinal dorsal horn
+             convergence）。
+        REF: cell-cell/交叉方案/感温链路局部—耦合生成元.md（ξ→Ω→Γ 生成元
+             分类骨架）；本实现修正原方案两处物理错误——见模块常量注释
+             （_RF_BASE_WEIGHT 段）：(1) Ω 经 Bundle 读 xi collector 的
+             pre_trace 而非 _membrane.voltage；(2) 抑制路径用 Memristor
+             正权重 + synapse_gain=-1.0，而非负权重（物理上不成立）。
+
+        本轮范围：6 个方向性 Ω_dir + 1 个中心-周围 Ω_div，止于 collector 的
+        脉冲输出，不接 Body/Motor（留待 Γ 组织生成元层设计完成后）。所有束
+        frozen，构造期算死权重，运行期不学习。
+
+        已知局限（Ω_div）：兴奋/抑制两路径均匀覆盖全部 64 个 xi 源，是"总
+        强度/散度代理"而非真正空间中心-周围拓扑（真正的 Mach-band 需中心
+        权重集中于邻近点、周围权重覆盖远点）。按原方案的均匀实现落地，
+        留待后续按 xi 源间距细化。
+        """
+        positions = fibonacci_sphere_points(_THERM_LOCAL_N, _THERM_LOCAL_R)
+        # 64 个 xi collector 作为 Ω 的信号源：每点 warm/cool 共享同一坐标，
+        # 顺序需与 rf_weights 的列索引对齐（点 i 的 warm 在 2i，cool 在 2i+1）。
+        xi_sources = []
+        xi_positions = []
+        for i in range(_THERM_LOCAL_N):
+            for polarity in ("warm", "cool"):
+                label = f"thermpt{i}_{polarity}"
+                xi_sources.append(self.thermal_quantum_collectors[label])
+                xi_positions.append(positions[i])
+
+        # ── 6 个方向性 Ω_dir ──
+        rf_weights = compute_coupling_weights(
+            xi_positions, _RF_DIRECTIONS, _RF_SHARPNESS_P, _RF_BASE_WEIGHT)
+        for d_idx, dir_vec in enumerate(_RF_DIRECTIONS):
+            dir_label = f"omega_rf_{d_idx}"
+            ensemble = [Neuron(_omega_ensemble_config(
+                            dir_label, k, region=REGION_SPINAL, position=dir_vec))
+                        for k in range(_Q_N_ENSEMBLE)]
+            collector = Neuron(_omega_collector_config(
+                dir_label, region=REGION_SPINAL, position=dir_vec))
+
+            cfg = BundleConfig(
+                bundle_id=f"omega_rf_{d_idx}_in",
+                learning_rule="frozen",
+                initial_weight=_RF_BASE_WEIGHT,
+                weight_max=_RF_BASE_WEIGHT,
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            bundle = SynapticBundle(cfg, xi_sources, ensemble)
+            # 逐 (source, target) 写入构造期算死的 cos² 方向权重——阶梯区分
+            # 靠 ensemble 的 bias 阶梯（复用 xi 层同一工厂函数），不靠权重，
+            # 故对同一 source 的 10 个 target 写入相同权重。
+            for i_s in range(len(xi_sources)):
+                w = rf_weights[d_idx][i_s]
+                for i_t in range(_Q_N_ENSEMBLE):
+                    bundle._memristors[i_s][i_t].w = w
+
+            cfg_col = BundleConfig(
+                bundle_id=f"omega_rf_{d_idx}_collect",
+                learning_rule="frozen",
+                initial_weight=_OMEGA_COLLECT_W0,
+                weight_max=_OMEGA_COLLECT_W0,
+                synapse_gain=1.0,
+                bundle_role="feedforward",
+                remodel_cost_kappa=0.0,
+            )
+            bundle_col = SynapticBundle(cfg_col, ensemble, [collector])
+
+            self.rf_ensembles[d_idx] = ensemble
+            self.rf_collectors[d_idx] = collector
+            self.bundles_rf.append(bundle)
+            self.bundles_rf.append(bundle_col)
+
+        # ── 1 个中心-周围 Ω_div ──
+        self.div_ensemble = [Neuron(_omega_ensemble_config(
+                                "omega_div", k, region=REGION_SPINAL))
+                              for k in range(_Q_N_ENSEMBLE)]
+        self.div_collector = Neuron(_omega_collector_config(
+            "omega_div", region=REGION_SPINAL))
+
+        cfg_exc = BundleConfig(
+            bundle_id="omega_div_exc",
+            learning_rule="frozen",
+            initial_weight=_DIV_CENTER_W,
+            weight_max=_DIV_CENTER_W,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundles_div_exc = SynapticBundle(cfg_exc, xi_sources, self.div_ensemble)
+
+        cfg_inh = BundleConfig(
+            bundle_id="omega_div_inh",
+            learning_rule="frozen",
+            initial_weight=_DIV_SURROUND_W,
+            weight_max=_DIV_SURROUND_W,
+            synapse_gain=-1.0,   # 抑制：Memristor.w 不能为负，靠 gain 符号
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundles_div_inh = SynapticBundle(cfg_inh, xi_sources, self.div_ensemble)
+
+        cfg_div_col = BundleConfig(
+            bundle_id="omega_div_collect",
+            learning_rule="frozen",
+            initial_weight=_OMEGA_COLLECT_W0,
+            weight_max=_OMEGA_COLLECT_W0,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        )
+        self.bundle_div_collect = SynapticBundle(
+            cfg_div_col, self.div_ensemble, [self.div_collector])
+
+    def _step_quantum_thermal_pathways(self, world, body, dt: float):
+        """TYPE:INFRA — 感温量子元路径每步传播 + stepping，frozen 不学习。
+
+        调用时机：super().step() 之后。world/body 仅用于独立 SkinPatch 采
+        样，与 body.skin_patches / SomatosensoryChain 完全隔离——不共享
+        patch 对象，不影响既有体感/温感系统的能量核算。
+        """
+        for i, patch in enumerate(self._thermal_quantum_patches):
+            pid = f"thermpt{i}"
+            _T, dT = patch.sample(world, body, dt)
+
+            # warm 支路喂 +dT，cool 支路喂 -dT（同一类复用，整流由 MOSFET
+            # 半波 max(0,...) 天然涌现，无 if/sign 新增）
+            self.thermal_quantum_l1_warm[pid].step(dT, dt)
+            self.thermal_quantum_l1_cool[pid].step(-dT, dt)
+
+        for b_l1_hc, b_in, b_col in zip(
+                self.bundles_thermal_quantum_l1_to_hc,
+                self.bundles_thermal_quantum_in,
+                self.bundles_thermal_quantum_collect):
+            # Level1 → Level2（热觉毛细胞，多通道 HH 等效）
+            currents_hc = b_l1_hc.propagate()
+            hc_target = b_l1_hc.targets[0]
+            hc_target.step(currents_hc[0] if currents_hc else 0.0, dt)
+
+            # Level2 → ensemble（阶梯阈值温度计）
+            ensemble = b_in.targets
+            currents_in = b_in.propagate()
+            for k, neuron in enumerate(ensemble):
+                neuron.step(currents_in[k] if k < len(currents_in) else 0.0, dt)
+
+            # ensemble → collector（AND 门汇聚）
+            collector = b_col.targets[0]
+            currents_col = b_col.propagate()
+            collector.step(currents_col[0] if currents_col else 0.0, dt)
+            # frozen: 不调用 learn()，不 compute_xin()
+
+    def _step_thermal_coupling_generators(self, dt: float):
+        """TYPE:INFRA — 感温耦合生成元 Ω 路径每步传播，frozen 不学习。
+
+        调用时机：紧接 _step_quantum_thermal_pathways 之后（xi collector 已
+        完成本步 step()，Ω 读取的是本步更新后的 xi pre_trace）。三级传播与
+        xi 层同构：bundle.propagate() → ensemble.step() → collector.step()。
+        """
+        # 6 个方向性 Ω_dir：bundles_rf 按方向顺序两两一组 [in_bundle, collect_bundle]
+        for d_idx in range(len(_RF_DIRECTIONS)):
+            bundle_in = self.bundles_rf[d_idx * 2]
+            bundle_col = self.bundles_rf[d_idx * 2 + 1]
+            ensemble = self.rf_ensembles[d_idx]
+
+            currents_in = bundle_in.propagate()
+            for k, neuron in enumerate(ensemble):
+                neuron.step(currents_in[k] if k < len(currents_in) else 0.0, dt)
+
+            collector = self.rf_collectors[d_idx]
+            currents_col = bundle_col.propagate()
+            collector.step(currents_col[0] if currents_col else 0.0, dt)
+            # frozen: 不调用 learn()，不 compute_xin()
+
+        # 1 个中心-周围 Ω_div：兴奋 + 抑制两路径叠加注入同一 ensemble
+        currents_exc = self.bundles_div_exc.propagate()
+        currents_inh = self.bundles_div_inh.propagate()
+        for k, neuron in enumerate(self.div_ensemble):
+            c_exc = currents_exc[k] if k < len(currents_exc) else 0.0
+            c_inh = currents_inh[k] if k < len(currents_inh) else 0.0
+            neuron.step(c_exc + c_inh, dt)
+
+        currents_div_col = self.bundle_div_collect.propagate()
+        self.div_collector.step(
+            currents_div_col[0] if currents_div_col else 0.0, dt)
+        # frozen: 不调用 learn()，不 compute_xin()
 
     def _assign_regions(self):
         """Assign brain region codes to all neurons based on functional identity.
@@ -1910,6 +2695,15 @@ class VariantCircuit(HebbianCircuit):
         if self.governance is not None:
             tick = getattr(self, '_maturation_tick', 0)
             self.governance.post_step(self, tick, dt)
+
+        # ── 2c. 量子元路径 step（MET.activation 在 super().step() 后已更新）──
+        self._step_quantum_pathways(mechanical_inputs, dt)
+
+        # ── 2d. 感温量子元路径 step（V2：球面局部生成元，独立 SkinPatch 采样）──
+        self._step_quantum_thermal_pathways(self.world, self.world.body, dt)
+
+        # ── 2e. 感温耦合生成元 Ω 路径 step（读取本步 xi collector 的 pre_trace）──
+        self._step_thermal_coupling_generators(dt)
 
         # ── 3. Post-hoc modulation of Aff membrane ──
         # Apply oscillatory gain modulation to the ALREADY-computed
@@ -3482,6 +4276,18 @@ class VariantCircuit(HebbianCircuit):
         # Satiety circuit neurons (intake_sensor, fill_rate_sensor, dwell_sensor, satiety_neuron)
         # also excluded — metabolically passive transducers; same rationale as D1.
         # Satiety bundles ARE in get_all_bundles() for Noether/Xin tracking.
+        # Quantum pathway neurons (132 = 12×11) excluded: same rationale as D1/satiety —
+        # adding them dilutes energy_per_neuron → ECM gate_col shift → T4.1 regression.
+        # Quantum bundles (24) ARE in get_all_bundles() for Noether/Xin accounting.
+        # Thermal quantum pathway neurons (V2: N=32 points × 2 polarity ×
+        # (1 Level1 + 1 Level2 + 10 ensemble + 1 collector) = 32×2×13 = 832)
+        # excluded for the same reason. Thermal quantum bundles ARE in
+        # get_all_bundles() for Noether/Xin accounting.
+        # Omega coupling-generator neurons (6 directional × 11 + 1 divergence
+        # × 11 = 77: rf_ensembles/rf_collectors/div_ensemble/div_collector)
+        # excluded for the same reason (frozen/passive, would dilute
+        # energy_per_neuron → T4.1 regression). Omega bundles ARE in
+        # get_all_bundles() for Noether/Xin accounting.
         return neurons
 
     def get_all_bundles(self):
@@ -3572,6 +4378,22 @@ class VariantCircuit(HebbianCircuit):
         # P0-2: IntakeSensor → DA consummatory reward pulse
         if self.bundle_intake_to_da_reward is not None:
             bundles.append(self.bundle_intake_to_da_reward)
+        # 量子元路径 bundles（MET→ensemble, ensemble→collector, 共 24 条）
+        # Included for Noether/Xin accounting; neurons excluded from census (see get_all_neurons).
+        bundles.extend(self.bundles_quantum_in)
+        bundles.extend(self.bundles_quantum_collect)
+        # 感温量子元路径 bundles（V2：Level1→Level2, Level2→ensemble, ensemble→collector）
+        # Included for Noether/Xin accounting; neurons excluded from census (see get_all_neurons).
+        bundles.extend(self.bundles_thermal_quantum_l1_to_hc)
+        bundles.extend(self.bundles_thermal_quantum_in)
+        bundles.extend(self.bundles_thermal_quantum_collect)
+        # 感温耦合生成元 Ω 路径 bundles（6×2 方向性 + 2 中心-周围 + 1 collect）
+        # Included for Noether/Xin accounting; neurons excluded from census
+        # (see get_all_neurons — same T4.1 rationale as thermal_quantum xi).
+        bundles.extend(self.bundles_rf)
+        bundles.append(self.bundles_div_exc)
+        bundles.append(self.bundles_div_inh)
+        bundles.append(self.bundle_div_collect)
         return bundles
 
     @property
