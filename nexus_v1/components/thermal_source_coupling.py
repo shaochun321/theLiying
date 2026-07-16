@@ -164,6 +164,17 @@ def couple(
     `sum(couple(...).values()) == power` by construction — no separate
     renormalization step is needed. Returns a dict directly usable as
     `ThermalFieldGraph.step(dt, external_injections=couple(...))`.
+
+    NOT ATOMIC (critique-9 §一, plan §十八): this calls `source.release(dt)`
+    first, which immediately debits `source.energy_remaining` — if the
+    caller subsequently fails to deliver the returned injections to a
+    graph (e.g. a separate `guarded_step()` call raises because the graph
+    is unstable), that energy is lost across the source-graph boundary.
+    This low-level function is kept for composability/testing (T-TSC-2~5
+    test `release()`/`couple()` in isolation); production call sites
+    should use `couple_and_step()` below, which orders the stability
+    check and locator query BEFORE the only side-effecting call
+    (`release()`), achieving atomicity without a transaction object.
     """
     power = source.release(dt)
     if power == 0.0:
@@ -196,3 +207,42 @@ def guarded_step(
             f"max diffusion_number={max_dn:.4g} > eta={eta}"
         )
     graph.step(dt, external_injections)
+
+
+def couple_and_step(
+    source: DynamicHeatSource,
+    locator: ThermalFieldLocator,
+    graph: ThermalFieldGraph,
+    dt: float,
+    eta: float = 1.0,
+) -> None:
+    """Atomic source-to-graph injection (W2A fix, critique-9 §一/十八.3).
+
+    Fixes a real gap `couple()` + `guarded_step()` had when called as two
+    separate steps: `couple()` debits `source.energy_remaining` via
+    `release()` BEFORE any confirmation that `graph.step()` will actually
+    run, so a subsequent `guarded_step()` rejection loses that energy
+    across the source-graph boundary (verified: `release()` unconditionally
+    does `self.energy_remaining -= actual_energy` — see `DynamicHeatSource
+    .release()`).
+
+    Fix is a reordering, not a transaction object: `is_stable()` depends
+    only on the graph's own kappa/capacitance (not on injection amount —
+    see `diffusion_number(graph, dt)` signature), and `locator.locate()`
+    is read-only and independent of power too. So both checks can run
+    BEFORE `release()` (the only side-effecting call in this whole
+    pipeline), making `release()` the single commit point: if either
+    check fails, neither `source` nor `graph` has been touched.
+    """
+    if not is_stable(graph, dt, eta):
+        max_dn = max(diffusion_number(graph, dt).values())
+        raise ValueError(
+            f"Unstable thermal diffusion configuration: "
+            f"max diffusion_number={max_dn:.4g} > eta={eta}"
+        )
+    weights = locator.locate(source.position, graph)
+    power = source.release(dt)
+    if power == 0.0:
+        return
+    injections = {node_id: power * w for node_id, w in weights.items()}
+    graph.step(dt, injections)

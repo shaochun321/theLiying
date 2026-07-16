@@ -15,14 +15,19 @@
 二级验收（共同尺度不变性/真实ξ输入/三元扩展/升格r_ρ）留作 T3-C，
 本文件不覆盖。
 
-已知发现（方案第十七节 17.5）：`bundle_rpart_xi_a_to_channel`/
-`bundle_rpart_xi_b_to_channel` 用不同 `bundle_id` 字符串，`Memristor`
-按 `hash((bundle_id,i_s,i_t))` 施加对称性打破扰动（`bundle.py:169-171`，
-T1 已记录的同一机制），导致两条 Bundle 标称权重相同但实际电导不同
-（实测比值约 1.05，量级视 `PYTHONHASHSEED` 而定）。这是电路结构本身
-的真实特性（DN 池数学本身精确对称，扰动来自更上游的 Bundle 级），
-T-RPT-2/T-RPT-4 因此用容差断言而非精确相等——同 T1 T-TRP-5/T-TRP-8
-先例，测试应适应这个已知的物理噪声源，不强行让它"消失"。
+已知发现（方案第十七节 17.5，容差已在 T3-C0 按实测数据收紧，见十八.4
+第3/5点）：`bundle_rpart_xi_a_to_channel`/`bundle_rpart_xi_b_to_channel`
+用不同 `bundle_id` 字符串，`Memristor` 按 `hash((bundle_id,i_s,i_t))`
+施加对称性打破扰动（`bundle.py:169-171`，T1 已记录的同一机制），导致
+两条 Bundle 标称权重相同但实际电导不同。这是电路结构本身的真实特性
+（DN 池数学本身精确对称，扰动来自更上游的 Bundle 级），T-RPT-2/T-RPT-4
+因此用容差断言而非精确相等——同 T1 T-TRP-5/T-TRP-8 先例，测试应适应
+这个已知的物理噪声源，不强行让它"消失"。
+
+容差校准（`_diag_t3_c0_multiseed.py` 实测，3个固定 PYTHONHASHSEED={0,1,42}）：
+eps_equal/eps_swap/eps_ratio 实测范围 [0.0000, 0.0525]，1.5x 余量后取
+`_HASH_JITTER_REL_TOL=0.08`（原 0.25 是首次发现时的粗略保守值，未经
+实测校准；本次基于真实多 seed 数据收紧，不是拍脑袋改数字）。
 """
 
 import sys
@@ -36,9 +41,11 @@ from nexus_v1.circuit.variant_adapter import VariantCircuit
 DT = 0.001
 _N_STEPS = 200  # 驱动步数，足够让 channel collector RC 积分到稳态
 
-# Bundle 级 hash 扰动容差：实测比值约 1.05（5%），留足余量覆盖不同
-# PYTHONHASHSEED 下的扰动幅度（见模块 docstring "已知发现"）。
-_HASH_JITTER_REL_TOL = 0.25
+# Bundle 级 hash 扰动容差：T3-C0 多seed实测范围[0,0.0525]（3个固定seed），
+# 但不设PYTHONHASHSEED的常规测试运行中观测到~0.07量级（说明3个采样点
+# 未覆盖全部扰动范围），故取约2x余量=0.10，而非1.5x的0.08——留更多
+# 安全边际，避免固定seed样本量不足导致偶发失败（见模块docstring"容差校准"）。
+_HASH_JITTER_REL_TOL = 0.10
 
 
 def _drive(i_a: float, i_b: float, n_steps: int = _N_STEPS) -> dict:
@@ -160,6 +167,47 @@ def test_census_override_correct():
     print(f"  T-RPT-6 PASS: census bundle={base_bundle_count}+2，关系神经元正确排除")
 
 
+def test_pool_relation_ledger():
+    """T-RPT-7：共享池关系层账本（T3-C0第4点，方案第十八节18.4）。
+
+    验证：① 每步只更新一次（pool_step_count == 驱动步数）；② 两路 dt=0
+    读出不改变池状态（已在 T3 路径判别阶段验证过，这里额外确认账本计数
+    不会被只读读出误计入）；③ 新实例之间 pool 不共享（不同电路实例的
+    共享池是不同对象，互不干扰）。
+    """
+    c1 = RPartCircuitT3()
+    stats0 = c1.rpart_relation_pool_stats()
+    assert stats0["pool_instance_count"] == 1, "T-RPT-7 FAIL: pool_instance_count应为1"
+    assert stats0["pool_step_count"] == 0, "T-RPT-7 FAIL: 初始pool_step_count应为0"
+    assert stats0["pool_activity"] == 0.0, "T-RPT-7 FAIL: 初始pool_activity应为0"
+
+    n_steps = 50
+    for _ in range(n_steps):
+        c1.rpart_xi_a.pre_trace = 1.0
+        c1.rpart_xi_b.pre_trace = 0.5
+        c1.step_rpart(dt=DT)
+    stats1 = c1.rpart_relation_pool_stats()
+    assert stats1["pool_step_count"] == n_steps, (
+        f"T-RPT-7 FAIL: {n_steps}步驱动后pool_step_count应为{n_steps}，"
+        f"实际={stats1['pool_step_count']}（每步只更新一次，dt=0只读不应计入）"
+    )
+    assert stats1["pool_activity"] > 0.0, "T-RPT-7 FAIL: 驱动后pool_activity应大于0"
+
+    c2 = RPartCircuitT3()
+    assert c1.rpart_shared_pool is not c2.rpart_shared_pool, (
+        "T-RPT-7 FAIL: 不同电路实例的共享池不应是同一对象"
+    )
+    stats2 = c2.rpart_relation_pool_stats()
+    assert stats2["pool_step_count"] == 0, (
+        "T-RPT-7 FAIL: 新实例的pool_step_count不应受c1驱动影响"
+    )
+    assert stats2["pool_activity"] == 0.0, (
+        "T-RPT-7 FAIL: 新实例的pool_activity不应受c1驱动影响"
+    )
+    print(f"  T-RPT-7 PASS: pool_step_count={stats1['pool_step_count']}（=驱动步数），"
+          f"pool_activity={stats1['pool_activity']:.4g}，新实例不共享池")
+
+
 # ─────────────────────────────────────────────────────────────
 # 主程序
 # ─────────────────────────────────────────────────────────────
@@ -170,6 +218,7 @@ TESTS = [
     ("T-RPT-4 等强输入近似相等", test_equal_input_approximately_equal_output),
     ("T-RPT-5 静默无虚假占比", test_silence_no_spurious_ratio),
     ("T-RPT-6 census覆写正确", test_census_override_correct),
+    ("T-RPT-7 共享池关系层账本", test_pool_relation_ledger),
 ]
 
 if __name__ == "__main__":

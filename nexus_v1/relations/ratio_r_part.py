@@ -165,12 +165,30 @@ class RPartCircuitT3(VariantCircuit):
         self.bundle_rpart_xi_b_to_channel = _frozen_bundle(
             "rpart_xi_b_to_channel", [xi_b], [self.rpart_channel_b], _W_XI_TO_CHANNEL)
 
+        # ── 共享池关系层账本计数器（T3-C0 第4点，方案第十八节18.4）：
+        # DivisiveNormalizationReceptor 本身不记录调用次数，由本类代持。
+        self._rpart_pool_step_count = 0
+
     # ── 关系层账本用的枚举（不进全局 census，见方案约束1）──
     def rpart_relation_neurons(self):
         return [self.rpart_channel_a, self.rpart_channel_b]
 
     def rpart_relation_bundles(self):
         return [self.bundle_rpart_xi_a_to_channel, self.bundle_rpart_xi_b_to_channel]
+
+    def rpart_relation_pool_stats(self) -> Dict[str, float]:
+        """T3-C0 第4点（方案第十八节18.4）：共享分流池的关系层独立账本读数。
+
+        DN 池既不是 Neuron 也不是 Bundle，不进入全局/关系层 census——
+        这里作为补充读数暴露，供审计"每步只更新一次/新实例间不共享"等
+        性质（同第七节约束1"关系层独立账本"的既定模式，不强行塞进
+        get_all_neurons()/get_all_bundles()）。
+        """
+        return {
+            "pool_instance_count": 1,  # 本电路只持有一个共享池实例
+            "pool_step_count": self._rpart_pool_step_count,
+            "pool_activity": self.rpart_shared_pool.pool_activity,
+        }
 
     def get_all_bundles(self):
         """同 T1 `RPrecCircuitT1.get_all_bundles()` 的既定修正（批判三点3）：
@@ -195,6 +213,7 @@ class RPartCircuitT3(VariantCircuit):
 
         # 2. 共享池按两路电流之和更新一次（真实 dt）。
         self.rpart_shared_pool.normalize(i_a_raw + i_b_raw, dt)
+        self._rpart_pool_step_count += 1
 
         # 3. 分别只读读出（dt=0，不产生副作用，12.2 第1点已验证的技术）。
         y_a = self.rpart_shared_pool.normalize(i_a_raw, 0.0)

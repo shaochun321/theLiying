@@ -13,6 +13,10 @@ W2A 范围：`nexus_v1.components.thermal_source_coupling`（`ThermalFieldLocato
   T-TSC-4  热源耗尽后不再注入
   T-TSC-5  移动热源位置后，注入总量仍精确等于释放功率
   T-TSC-6  guarded_step() 对不稳定配置在执行前拒绝，且 graph 状态不被修改
+  T-TSC-7  couple_and_step() 原子性修复（第十八节 18.3，批判九发现的真实缺口）：
+           不稳定配置下抛出前，source.energy_remaining 与 graph 状态均未被修改
+           （旧的 couple()+guarded_step() 两次调用模式会先扣热源能量再失败，
+           造成能量跨组件丢失——couple_and_step() 通过调整调用顺序修复）
 """
 
 import sys
@@ -23,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from nexus_v1.components.dynamic_thermal_field import build_fibonacci_shell_graph
 from nexus_v1.components.thermal_source_coupling import (
-    ThermalFieldLocator, DynamicHeatSource, couple, guarded_step,
+    ThermalFieldLocator, DynamicHeatSource, couple, guarded_step, couple_and_step,
 )
 
 _TEST_CAPACITANCE = 1.0
@@ -151,6 +155,53 @@ def test_guarded_step_rejects_unstable_config():
     print("  T-TSC-6 PASS: 稳定配置下 guarded_step() 正常执行")
 
 
+def test_couple_and_step_atomic_on_rejection():
+    """T-TSC-7：couple_and_step() 原子性修复（第十八节18.3，批判九发现的真实缺口）。
+
+    不稳定配置下拒绝时，source.energy_remaining 与 graph 状态均未被修改——
+    验证的正是"旧模式 couple()+guarded_step() 两次独立调用会先扣热源能量
+    再失败，能量在跨组件提交窗口中丢失"这个真实 bug 已被修复。
+    """
+    graph = build_fibonacci_shell_graph(
+        n_nodes=10, radius=2.0, k_neighbors=4,
+        capacitance=1.0, kappa=1000.0, r_leak_ambient=None,
+    )
+    locator = ThermalFieldLocator(k=4)
+    source = DynamicHeatSource(position=graph.cells[0].position, energy_remaining=100.0, power=2.0)
+    charges_before = {nid: c.capacitor.charge for nid, c in graph.cells.items()}
+    energy_before = source.energy_remaining
+
+    raised = False
+    try:
+        couple_and_step(source, locator, graph, dt=1.0)
+    except ValueError as e:
+        raised = True
+        assert "Unstable" in str(e), f"T-TSC-7 FAIL: 错误信息未包含诊断内容: {e}"
+
+    assert raised, "T-TSC-7 FAIL: 不稳定配置应抛出 ValueError"
+    assert source.energy_remaining == energy_before, (
+        f"T-TSC-7 FAIL: 不稳定配置拒绝后 source.energy_remaining 被修改"
+        f"（{energy_before} -> {source.energy_remaining}），能量跨组件丢失的原bug未修复"
+    )
+    charges_after = {nid: c.capacitor.charge for nid, c in graph.cells.items()}
+    assert charges_before == charges_after, (
+        "T-TSC-7 FAIL: 不稳定配置拒绝后 graph 状态被修改"
+    )
+    print(f"  T-TSC-7 PASS: 不稳定配置拒绝后 source.energy_remaining={source.energy_remaining} "
+          f"未变（原bug已修复），graph 状态也未被修改")
+
+    # 对照：稳定配置下 couple_and_step() 应正常执行且能量确实被扣（不是永远不扣）。
+    stable_graph = _build_test_graph()
+    stable_source = DynamicHeatSource(
+        position=stable_graph.cells[0].position, energy_remaining=100.0, power=2.0)
+    couple_and_step(stable_source, locator, stable_graph, dt=1.0)
+    assert stable_source.energy_remaining == 98.0, (
+        f"T-TSC-7 FAIL: 稳定配置下应正常扣账，实际energy_remaining={stable_source.energy_remaining}"
+    )
+    print(f"  T-TSC-7 PASS: 稳定配置下 couple_and_step() 正常执行，"
+          f"energy_remaining={stable_source.energy_remaining}")
+
+
 # ─────────────────────────────────────────────────────────────
 # 主程序
 # ─────────────────────────────────────────────────────────────
@@ -161,6 +212,7 @@ TESTS = [
     ("T-TSC-4 热源耗尽后不再注入", test_source_stops_injecting_after_exhausted),
     ("T-TSC-5 移动热源注入仍守恒", test_moved_source_injection_still_conserved),
     ("T-TSC-6 guarded_step拒绝不稳定配置", test_guarded_step_rejects_unstable_config),
+    ("T-TSC-7 couple_and_step原子性修复", test_couple_and_step_atomic_on_rejection),
 ]
 
 if __name__ == "__main__":
