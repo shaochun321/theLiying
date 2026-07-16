@@ -117,6 +117,7 @@ def circuit_collector_labels(circuit):
 def test_adjacency_is_genuine_nearest_neighbor():
     import math
     from nexus_v1.components.skin_network import fibonacci_sphere_points
+    from nexus_v1.relations.site_selection import recompute_for_verification
 
     positions = fibonacci_sphere_points(
         FROZEN_THERMAL_SITES["n_sphere_points"],
@@ -142,8 +143,18 @@ def test_adjacency_is_genuine_nearest_neighbor():
     assert measured <= global_min * 1.01, \
         f"T1 边距离 {measured:.4f} 明显大于全局最小距离 {global_min:.4f}，不是真正的局部邻接"
 
+    # 批判三修正点1：FROZEN_THERMAL_SITES 现在是字面常量，不再由几何公式
+    # 实时生成——这里显式核对"冻结常量"与"当前几何公式重算结果"是否
+    # 一致（recompute_for_verification 只用于验证，不是生产选择路径）。
+    recomputed = recompute_for_verification()
+    assert recomputed["center"] == FROZEN_THERMAL_SITES["t2_chain"]["hub"], \
+        "当前几何公式重算的枢纽点与冻结常量不一致——母本几何公式已变化，需人工复核冻结值"
+    assert {recomputed["nb1"], recomputed["nb2"]} == \
+        {FROZEN_THERMAL_SITES["t2_chain"]["order"][0], FROZEN_THERMAL_SITES["t2_chain"]["order"][2]}, \
+        "当前几何公式重算的邻居点与冻结常量不一致——母本几何公式已变化，需人工复核冻结值"
+
     print(f"  T-T0-2 PASS: T1 边距离={measured:.4f} ≈ 全局最小距离={global_min:.4f}，"
-          f"确认为真实局部邻接")
+          f"确认为真实局部邻接；冻结常量与当前几何公式重算结果一致")
 
 
 # ─────────────────────────────────────────────────────────────

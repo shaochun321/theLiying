@@ -290,6 +290,19 @@ class RPrecCircuitT1(VariantCircuit):
     def rprec_relation_bundles(self):
         return self.bundles_rprec_xi_to_trace + self.bundles_rprec_to_collector
 
+    def get_all_bundles(self):
+        """批判三修正点3：约束1原文"新 bundles → 进 get_all_bundles()"，
+        只有关系*神经元*应排除全局 census（护 T4.1 energy_per_neuron），
+        关系 *Bundle* 必须进入 census，供 Noether/Xin/运输成本/结构账本
+        读取——初版遗漏了这个覆写，是真实的实现 bug（T-TRP-1 曾把"Bundle
+        不在 census 里"断言成 PASS，与本计划自己的约束正面冲突，现已改回）。
+
+        纯子类覆写，不改动 `VariantCircuit.get_all_bundles()` 本体——普通
+        `VariantCircuit()` 实例不受影响，只有 `RPrecCircuitT1` 的账本能看到
+        这 12 条新增关系 Bundle。
+        """
+        return super().get_all_bundles() + self.rprec_relation_bundles()
+
     def step_rprec(self, dt: float = DT):
         """手动传播一步 r≺ 生成元链路（T1 原型不接入 circuit.step() 主循环，
         独立由测试驱动，同 Ω/xi 层测试的手动传播方法论）。"""
