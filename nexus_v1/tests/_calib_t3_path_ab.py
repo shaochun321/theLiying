@@ -72,31 +72,96 @@ def run_path_b(i_a, i_b, sigma=1.0, pool_capacitance=5.0, pool_r_leak=5.0):
 
 
 def run_path_b_synced(i_a, i_b, sigma=1.0, pool_capacitance=5.0, pool_r_leak=5.0):
-    """路径B（同步共享池版，批判三修正点8，实测反驳"实现超出现有组件"）：
-    只用 DivisiveNormalizationReceptor 已公开的两个成员——`.normalize()`
-    方法和 `.pool_activity` 属性（compensation.py:337-338，非本次新增）：
+    """路径B（同步共享池版 v2，批判五修正，取代 v1 的 norm_factor 手算版）：
 
-      1. 调用一次 `dn.normalize(i_a+i_b, dt)`，池按**总电流**更新一次
-         （返回值本身丢弃，只用于触发池更新）；
-      2. 读公开的 `dn.pool_activity`，手算与 normalize() 内部相同的
-         `norm_factor = sigma/(sigma+pool)` 公式；
-      3. 把同一个 norm_factor 分别乘到 i_a、i_b 上。
+    v1（批判三修正点8）用 `dn.pool_activity` 手算 `norm_factor=sigma/(sigma+pool)`——
+    批判五指出：即便读的是真实池状态，这个除法公式仍是在调度代码里**重写**了
+    `normalize()` 内部的归一化公式，不算"只用现有组件"。
 
-    全程未新增方法、未修改/直接读写内部 `_pool_voltage`，是合法的"只用
-    现有组件"实现，两路输出保证用的是同一次池更新后的增益（回应批判
-    第9点"必须验证所有通道使用同一次 pool 更新后的 G"）。
+    v2（本版，批判五修正点1）：**不重算任何公式，只调用 `.normalize()` 本身**：
+      1. `dn.normalize(i_a+i_b, dt)`：真实 dt，池按总电流更新一次（返回值丢弃）；
+      2. `dn.normalize(i_a, 0.0)`：dt=0，走 normalize() 自己的除法逻辑做只读
+         （dt=0 时 `abs_input*dt/C=0` 不注入电荷，`exp(-dt/tau)=exp(0)=1` 不衰减，
+         池状态原地不变，但 `norm_factor=sigma/(sigma+pool)` 仍会用当前池值算出
+         并乘上 i_a 返回——这就是 normalize() 自身的除法逻辑，不是外部重写）；
+      3. 同理 `dn.normalize(i_b, 0.0)`。
+
+    实测 5 项检验全部精确通过（见 `test_shared_pool_synced_interface_legality`）：
+    池状态在 dt=0 读取间完全不变 / 等强输入精确对称(差值0) / 调用顺序交换
+    结果不变 / 二通道比值精确2.0000 / 三通道比值精确3.0/2.0。这是比 v1 更"合法"
+    的实现——全程只调用两个已有公开成员（`.normalize()` 方法本身 + 其 dt=0
+    只读特性），不重写除法公式，不新增/修改 `DivisiveNormalizationReceptor`
+    任何接口。
     """
     dn = DivisiveNormalizationReceptor(
         sigma=sigma, pool_capacitance=pool_capacitance, pool_r_leak=pool_r_leak)
     y_a = 0.0
     y_b = 0.0
     for _ in range(N_STEPS):
-        dn.normalize(i_a + i_b, DT)  # 触发池按总电流更新一次；返回值丢弃
-        denom = max(sigma + dn.pool_activity, sigma * 0.01)
-        norm_factor = sigma / denom
-        y_a = i_a * norm_factor
-        y_b = i_b * norm_factor
+        dn.normalize(i_a + i_b, DT)   # 真实dt：池按总电流更新一次，返回值丢弃
+        y_a = dn.normalize(i_a, 0.0)  # dt=0：只读，走 normalize() 自己的除法逻辑
+        y_b = dn.normalize(i_b, 0.0)  # dt=0：只读，同上
     return max(0.0, y_a), max(0.0, y_b)
+
+
+def test_shared_pool_synced_interface_legality():
+    """批判五修正点1的 5 项检验：验证 dt=0 只读方案的接口合法性。
+
+    Gate D 的前置要求（批判五 R2/T3-A）：这 5 项检验全部通过，才能说
+    路径B"只使用项目现有组件，不在调度层重写归一化公式"。
+    """
+    sigma, pool_capacitance, pool_r_leak = 1.0, 5.0, 5.0
+
+    # 检验1+2+3：池状态在 dt=0 读取间完全不变；调用顺序无关
+    dn = DivisiveNormalizationReceptor(sigma=sigma, pool_capacitance=pool_capacitance, pool_r_leak=pool_r_leak)
+    i_a, i_b = 2.0, 1.0
+    for _ in range(N_STEPS):
+        dn.normalize(i_a + i_b, DT)
+        pool_before = dn.pool_activity
+        y_a = dn.normalize(i_a, 0.0)
+        pool_mid = dn.pool_activity
+        y_b = dn.normalize(i_b, 0.0)
+        pool_after = dn.pool_activity
+    assert pool_before == pool_mid == pool_after, \
+        f"检验1失败：dt=0 读取间池状态发生变化 {pool_before} vs {pool_mid} vs {pool_after}"
+
+    # 交换调用顺序，结果应完全不变（检验3）
+    dn2 = DivisiveNormalizationReceptor(sigma=sigma, pool_capacitance=pool_capacitance, pool_r_leak=pool_r_leak)
+    for _ in range(N_STEPS):
+        dn2.normalize(i_a + i_b, DT)
+        y_b2 = dn2.normalize(i_b, 0.0)  # 先读 b
+        y_a2 = dn2.normalize(i_a, 0.0)  # 后读 a
+    assert abs(y_a - y_a2) < 1e-12 and abs(y_b - y_b2) < 1e-12, \
+        f"检验3失败：调用顺序交换后结果不同 ({y_a},{y_b}) vs ({y_a2},{y_b2})"
+
+    # 检验2：等强输入精确对称
+    dn3 = DivisiveNormalizationReceptor(sigma=sigma, pool_capacitance=pool_capacitance, pool_r_leak=pool_r_leak)
+    for _ in range(N_STEPS):
+        dn3.normalize(2.0, DT)
+        y_eq_a = dn3.normalize(1.0, 0.0)
+        y_eq_b = dn3.normalize(1.0, 0.0)
+    assert y_eq_a == y_eq_b, f"检验2失败：等强输入不精确对称 {y_eq_a} vs {y_eq_b}"
+
+    # 检验4：二通道比值精确
+    ratio = y_a / y_b
+    assert abs(ratio - 2.0) < 1e-9, f"检验4失败：二通道比值 {ratio} 应精确为 2.0"
+
+    # 检验5：三通道同池，比值精确
+    dn4 = DivisiveNormalizationReceptor(sigma=sigma, pool_capacitance=pool_capacitance, pool_r_leak=pool_r_leak)
+    for _ in range(N_STEPS):
+        dn4.normalize(3.0 + 2.0 + 1.0, DT)
+        y3a = dn4.normalize(3.0, 0.0)
+        y3b = dn4.normalize(2.0, 0.0)
+        y3c = dn4.normalize(1.0, 0.0)
+    assert abs(y3a / y3c - 3.0) < 1e-9 and abs(y3b / y3c - 2.0) < 1e-9, \
+        f"检验5失败：三通道比值应精确 3.0/2.0，实测 {y3a/y3c:.4f}/{y3b/y3c:.4f}"
+
+    print("  接口合法性 5 项检验全部通过：")
+    print(f"    ① 池状态dt=0读取间不变: {pool_before:.6f}=={pool_mid:.6f}=={pool_after:.6f}")
+    print(f"    ② 等强输入精确对称: {y_eq_a:.6f}=={y_eq_b:.6f}")
+    print(f"    ③ 调用顺序交换结果不变: ({y_a:.6f},{y_b:.6f})==({y_a2:.6f},{y_b2:.6f})")
+    print(f"    ④ 二通道比值精确: {ratio:.6f}")
+    print(f"    ⑤ 三通道比值精确: {y3a/y3c:.6f} / {y3b/y3c:.6f}")
 
 
 import math
@@ -114,6 +179,10 @@ SCENARIOS = [
 
 
 def main():
+    print("批判五修正点1：先做接口合法性探针（Gate D 前置要求，T3-A）：")
+    test_shared_pool_synced_interface_legality()
+    print()
+
     print(f"{'场景':<24} {'I_a':>5} {'I_b':>5} | "
           f"{'路径A y_a':>10} {'路径A y_b':>10} {'A比值':>8} | "
           f"{'路径B y_a':>10} {'路径B y_b':>10} {'B比值':>8}")
@@ -161,9 +230,9 @@ def main():
     print(f"  路径A 输出总量(y_a+y_b)随放大变化: 1x={r1[3]+r1[4]:.4f} 2x={r2[3]+r2[4]:.4f} 4x={r3[3]+r3[4]:.4f}")
     print(f"  路径B(顺序调用) 输出总量随放大变化: 1x={r1[6]+r1[7]:.4f} 2x={r2[6]+r2[7]:.4f} 4x={r3[6]+r3[7]:.4f}")
 
-    # 批判三修正点8/9：验证"同步共享池"（只用现有公开接口）与常数增益假设的排除
+    # 验证"同步共享池 dt=0 只读版"（批判五修正点1）与常数增益假设的排除（批判三修正点9）
     print("\n" + "="*100)
-    print("批判三修正点8：路径B 同步共享池版（只用现有公开接口 .normalize()+.pool_activity）：")
+    print("路径B 同步共享池版（dt=0 只读，批判五修正点1，取代批判三 v1 的 norm_factor 手算版）：")
     print(f"{'场景':<24} {'I_a':>5} {'I_b':>5} {'y_a(同步)':>10} {'y_b(同步)':>10} {'比值':>8}")
     synced_results = []
     for name, i_a, i_b in SCENARIOS:

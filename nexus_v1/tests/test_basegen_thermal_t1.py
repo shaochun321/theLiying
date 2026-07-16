@@ -24,6 +24,14 @@
            时序说明见测试内注释**（真实源有 ~400 步启动延迟 + 驱动停止
            后的残余自励振荡，不适合作为精确时序判别的驱动源，这是 T1
            分析报告记录的已知局限，不是本测试要断言的正确性目标）
+  T-TRP-8  输入交换协变性（纳入交叉比对第五份批判 R1 节）：比 T-TRP-5
+           的宽容差(ratio<3.0)更严格——验证 A 先触发时 a_prec_b 与互换
+           角色后 B 先触发时 b_prec_a 量级接近，证明两个方向的 config
+           工厂函数处理对称、无隐藏方向偏置
+
+真实 ξ^occ 发生顺序的精确验证（"B2"，用真实 Collector 发生时刻而非外部
+dT 命令时刻作真值）见独立测试文件
+`test_basegen_thermal_t1_real_occurrence.py`（纳入交叉比对第五份批判点4）。
 
 驱动方式：T-TRP-3~6 直接对 `RPrecCircuitT1` 的 `rprec_xi_a`/`rprec_xi_b`
 （既有 spiking collector 神经元）手动赋值 `.pre_trace`，绕开真实感温
@@ -76,13 +84,20 @@ def _propagate_xi_point(circuit, point_idx, dT_value, dt=DT):
         collector.step(currents_col[0] if currents_col else 0.0, dt)
 
 
-def _run_synthetic(delay, pulse_len, n_steps):
-    """合成脉冲测试夹具：直接控制 xi_a/xi_b 的 pre_trace（绕开真实感温链路）。"""
+def _run_synthetic(delay, pulse_len, n_steps, swap=False):
+    """合成脉冲测试夹具：直接控制 xi_a/xi_b 的 pre_trace（绕开真实感温链路）。
+
+    swap=False（默认）：A 先脉冲 [0,pulse_len)，B 后脉冲 [delay,delay+pulse_len)。
+    swap=True（T-TRP-8 协变性测试用）：角色互换，B 先脉冲，A 后脉冲——
+    用于验证 config 工厂函数对两个方向是否真正对称（不是靠 A/B 变量名
+    恰好排在前面就产生偏置）。
+    """
     c = _build_circuit()
     peak = {"ab_fast": 0.0, "ba_fast": 0.0, "ab_slow": 0.0, "ba_slow": 0.0}
+    early, late = (c.rprec_xi_b, c.rprec_xi_a) if swap else (c.rprec_xi_a, c.rprec_xi_b)
     for step in range(n_steps):
-        c.rprec_xi_a.pre_trace = 1.0 if 0 <= step < pulse_len else 0.0
-        c.rprec_xi_b.pre_trace = 1.0 if delay <= step < delay + pulse_len else 0.0
+        early.pre_trace = 1.0 if 0 <= step < pulse_len else 0.0
+        late.pre_trace = 1.0 if delay <= step < delay + pulse_len else 0.0
         c.step_rprec()
         peak["ab_fast"] = max(peak["ab_fast"], c.rprec_collector_a_prec_b_fast.pre_trace)
         peak["ba_fast"] = max(peak["ba_fast"], c.rprec_collector_b_prec_a_fast.pre_trace)
@@ -204,6 +219,49 @@ def test_symmetric_case_no_spurious_bias():
 
 
 # ─────────────────────────────────────────────────────────────
+# T-TRP-8：输入交换协变性（纳入交叉比对第五份批判 R1 节）
+#
+# T-TRP-5 的"同时触发容差<3.0"过宽，不能充分证明无方向偏置——它只检查
+# "同时触发时两方向响应都不为0且量级接近"，不检查"角色互换后关系是否
+# 正确跟随互换"。更严格的判据：F(a先b后) 与 swap(F(b先a后)) 应近似相等，
+# 即 D_{a≺b}^{before}（A先触发） ≈ D_{b≺a}^{after}（互换后B先触发）——
+# 这是输入交换协变性 F(a,b)=swap(F(b,a))，比单次宽容差判据更可靠。
+# ─────────────────────────────────────────────────────────────
+def test_swap_covariance():
+    # 场景1：A 先触发（delay=30，A的trace在B触发时仍有残留）
+    peak_a_first = _run_synthetic(delay=30, pulse_len=20, n_steps=300, swap=False)
+    # 场景2：角色互换（swap=True），B 先触发、A 后触发——用 _run_synthetic
+    # 的 swap 参数真正对调"谁先脉冲"，而不是重复调用相同参数。验证
+    # config 工厂函数对两个方向是否真正对称（不是靠 A/B 变量名恰好排在
+    # 前面就产生偏置）。
+    peak_b_first = _run_synthetic(delay=30, pulse_len=20, n_steps=300, swap=True)
+
+    ab_when_a_first = peak_a_first["ab_fast"]       # A先触发 → a_prec_b 强响应（正确方向）
+    ba_when_b_first = peak_b_first["ba_fast"]        # 对称场景：B先触发 → b_prec_a 强响应（互换后同样正确方向）
+
+    assert ab_when_a_first > 0.5, f"A先触发时a_prec_b应强响应，实际={ab_when_a_first}"
+    assert ba_when_b_first > 0.5, f"互换后B先触发时b_prec_a应强响应，实际={ba_when_b_first}"
+
+    # 协变性核心判据：两个"正确方向"响应的量级应接近（同一套config工厂
+    # 处理两个方向，不应有方向偏置导致其中一个系统性更弱）
+    covariance_ratio = max(ab_when_a_first, ba_when_b_first) / max(min(ab_when_a_first, ba_when_b_first), 1e-9)
+    assert covariance_ratio < 2.0, \
+        (f"输入交换协变性：A先触发时a_prec_b={ab_when_a_first:.4f} 应与"
+         f"互换后B先触发时b_prec_a={ba_when_b_first:.4f} 量级接近，"
+         f"实际比值={covariance_ratio:.2f}（应<2.0，说明config工厂对称、无方向偏置）")
+
+    # 交叉检验：A先触发时b_prec_a应为0（错误方向不响应）；互换场景同理
+    assert peak_a_first["ba_fast"] == 0.0, \
+        f"A先触发时b_prec_a（错误方向）不应响应，实际={peak_a_first['ba_fast']}"
+    assert peak_b_first["ab_fast"] == 0.0 or peak_b_first["ab_fast"] < 0.01, \
+        f"对称场景ab方向不应主导，实际={peak_b_first['ab_fast']}"
+
+    print(f"  T-TRP-8 PASS: 输入交换协变性——A先触发 a_prec_b={ab_when_a_first:.4f}，"
+          f"互换后B先触发 b_prec_a={ba_when_b_first:.4f}，量级接近"
+          f"（ratio={covariance_ratio:.2f}<2.0），config工厂对两方向对称无偏置")
+
+
+# ─────────────────────────────────────────────────────────────
 # T-TRP-6：静息
 # ─────────────────────────────────────────────────────────────
 def test_rest_state():
@@ -256,6 +314,7 @@ TESTS = [
     ("T-TRP-5 对称情形无偏置", test_symmetric_case_no_spurious_bias),
     ("T-TRP-6 静息", test_rest_state),
     ("T-TRP-7 真实ξ^occ集成冒烟测试", test_real_xi_integration_smoke),
+    ("T-TRP-8 输入交换协变性", test_swap_covariance),
 ]
 
 if __name__ == "__main__":
