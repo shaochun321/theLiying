@@ -4,6 +4,14 @@ TYPE:BIO — Analogous to hydrothermal vent: physical volume, finite energy,
 Gaussian thermal diffusion from cylindrical surface.
 
 BIO: REF: hydrothermal vent thermal plume (Kelley et al. 2002, Science 301).
+
+Thermal-field paradigm (W0, 2026-07-16): `temperature_at()` below is a
+spatial snapshot of a steady-state Gaussian profile — an INSTANT QUERY
+FUNCTION, not a transient propagating wavefront (`dt` in `step()` only
+drives slow source-strength regeneration, not spatial propagation of a
+temperature value). Part of the "InstantFieldWorld" paradigm together
+with `world.py`; kept unmodified as the regression/compatibility baseline
+for `nexus_v1.components.dynamic_thermal_field` (W1+, additive, opt-in).
 """
 import math
 from dataclasses import dataclass, field

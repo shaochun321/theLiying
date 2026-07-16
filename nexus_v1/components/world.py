@@ -13,6 +13,18 @@ Heat source ecology (C3'):
 
 Physics: F = ma - μv (Newtonian + viscous drag in fluid medium)
 Thermal: T(pos) = Σ src.temperature × max(0, 1 - d/r) + ambient
+
+Thermal-field paradigm (W0, 2026-07-16): `temperature_at()` is an
+INSTANT QUERY FUNCTION T=F(x) — no propagation speed/time term, no
+local state, no flux between positions. This is the "InstantFieldWorld"
+paradigm, kept as-is for full backward compatibility (all existing
+regression/thermotaxis experiments depend on it). A separate, additive
+process-based alternative — `nexus_v1.components.dynamic_thermal_field`
+(ThermalCell/ThermalLink, local energy state + diffusion/advection flux)
+— is being built alongside it (W1+) to support relation generators that
+need genuine environmental propagation (e.g. r_flux). See
+`cell-cell/工作报告/` W0~W1 report and plan §十四 for rationale. This
+file is NOT modified in that effort — DynamicThermalField is opt-in only.
 """
 
 from __future__ import annotations
