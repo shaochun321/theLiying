@@ -67,6 +67,26 @@ Physical mechanism — Q1/Q2/Q3 (RULES.md 强制三问):
   exactly as T1's r≺ generator needed a 5-round calibration pass after its
   initial physically-derived starting point (see T1 report). W1's unit
   tests exist precisely to surface that need early, in isolation.
+
+Dimensional mode (W1.5, added 2026-07-16 per critique-7 §一.1 — see plan
+§十五): this module currently operates in **normalized mode**, not
+**physical-anchor mode**. Concretely:
+  - `capacitance` is a dimensionless numeric convention (default 1.0,
+    matching the project-wide `Capacitor` default), not `C_th=ρ·c_p·V_i`
+    (no per-node volume is tracked).
+  - `kappa_ij = kappa_0 / d_ij` omits the interface-area factor a true
+    finite-volume conductance would carry (`G_ij = k·A_ij/d_ij`); there is
+    no per-edge `A_ij`.
+  - `kappa_0` IS anchored to the real seawater diffusivity constant (see
+    `_TAU_REF_STEPS` derivation below), so it is not an arbitrary number —
+    but the anchoring is incomplete (area/volume terms missing), so the
+    module as a whole cannot yet claim to be a physical-anchor model.
+  `THERMAL_FIELD_MODE` below records this explicitly so future code/tests
+  can check it rather than assume. A physical-anchor mode (explicit
+  `A_ij`/`V_i`, real J/K/W units) is deferred until W2+ actually needs
+  precise physical calibration (e.g. connecting to a real `HeatSource`
+  power budget) — building it now would be premature given W1 has no
+  consumer requiring that precision yet.
 """
 
 from __future__ import annotations
@@ -77,6 +97,14 @@ from typing import Dict, List, Optional, Tuple
 
 from nexus_v1.components.semiconductor import Capacitor
 from nexus_v1.components.skin_network import fibonacci_sphere_points
+
+# W1.5 (critique-7 §一.1, plan §十五): explicit dimensional-mode declaration.
+# "normalized" = capacitance/kappa are dimensionless numeric conventions
+# (kappa_0 anchored to real diffusivity, but no area/volume factors).
+# "physical-anchor" = full real units (A_ij, V_i, J, K, W) — not implemented
+# in this file; deferred to whenever W2+ actually needs precise physical
+# calibration. See module docstring "Dimensional mode" section.
+THERMAL_FIELD_MODE: str = "normalized"
 
 # ── Physical anchor constants ──────────────────────────────────────────
 # REF: thermal diffusivity of seawater at ambient ocean temperature,
@@ -251,6 +279,43 @@ class ThermalFieldGraph:
         return abs(delta_e - self._total_injected + self._total_leaked_ambient)
 
 
+def diffusion_number(graph: "ThermalFieldGraph", dt: float) -> Dict[int, float]:
+    """Per-node explicit-diffusion stability number: Δt·(Σ_j κ_ij)/C_i.
+
+    W1.5 addition (critique-7 §二.4/§三.2, plan §十五 point 5): numerical
+    stability (no NaN/divergence) does not imply the chosen parameters are
+    physically sensible — a large diffusion number means one step moves
+    more energy across a link than the sending node currently holds,
+    which is the explicit-Euler analogue of violating a CFL condition.
+
+    This is a READ-ONLY diagnostic. It does not change `step()` behavior
+    and does not implement automatic substepping — per critique-7's own
+    guidance ("不应靠调小测试输入掩盖，应给出明确诊断"), the responsibility
+    to act on a large diffusion number belongs to the caller (choose a
+    smaller dt, or fewer/weaker links), not to a silent internal fix.
+    Automatic substepping is deferred as a separate, larger behavioral
+    change if it turns out to be needed.
+    """
+    result: Dict[int, float] = {nid: 0.0 for nid in graph.cells}
+    for link in graph.links:
+        result[link.i] += link.kappa
+        result[link.j] += link.kappa
+    for nid, kappa_sum in result.items():
+        capacitance = max(graph.cells[nid].capacitor.capacitance, 1e-9)
+        result[nid] = dt * kappa_sum / capacitance
+    return result
+
+
+def is_stable(graph: "ThermalFieldGraph", dt: float, eta: float = 1.0) -> bool:
+    """True iff every node's diffusion_number is <= eta (default eta=1.0).
+
+    REF: explicit finite-difference diffusion stability bound, standard
+    form Δt·Σκ/C <= η with η<=1 (critique-7 §二.4). This checks the bound;
+    it does not enforce it.
+    """
+    return all(v <= eta for v in diffusion_number(graph, dt).values())
+
+
 def build_fibonacci_shell_graph(
     n_nodes: int,
     radius: float,
@@ -260,6 +325,18 @@ def build_fibonacci_shell_graph(
     r_leak_ambient: Optional[float] = DEFAULT_R_LEAK_AMBIENT,
 ) -> ThermalFieldGraph:
     """Build a minimal-viable (~10^2 node) sparse thermal graph on a sphere shell.
+
+    TEST FIXTURE ONLY (W1.5, critique-7 §二.2, plan §十五 point 4). Do NOT
+    use this directly as the production world coordinate space in W2's
+    body-world coupling — skin points are ALSO placed with this same
+    `fibonacci_sphere_points` generator (see `variant_adapter.py`'s thermal
+    quantum pathway init), so reusing it for world-node placement risks
+    silently conflating "world space" with "body surface space" (e.g. a
+    world node landing exactly on a skin sample point isn't meaningful,
+    it's a coincidence of sharing one geometry generator). A production
+    world topology (sparse 3D grid / fixed point cloud / adaptive node
+    graph, fixed in world coordinates, independent of body-frame geometry)
+    is W2 `ThermalFieldLocator` design scope — not implemented here.
 
     Reuses `fibonacci_sphere_points` (existing pure-geometry utility, already
     used for T0's skin-point sampling — see `skin_network.py` docstring: "no

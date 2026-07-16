@@ -12,6 +12,9 @@ W1 范围：`nexus_v1.components.dynamic_thermal_field` 是完全独立的旁路
   T-DTF-3  热源局部注入后正确形成空间梯度（被注入节点温度 > 远端节点）
   T-DTF-4  ThermalLink 通量方向物理正确（净流动方向从热到冷，Fourier 定律符号）
   T-DTF-5  纯扩散（无注入无耗散）应使全场趋向均匀（熵增/梯度耗散方向正确）
+  T-DTF-6  数值稳定守卫（W1.5）：稳定参数下 is_stable()=True 且长程运行确认不发散
+  T-DTF-7  数值稳定守卫（W1.5）：明显超过 η=1 的参数下 is_stable()=False 能被正确
+           识别（只验证诊断准确，不断言系统必须崩溃——诊断职责与行为兜底分离）
 
 全量回归 21/21 的确认作为独立步骤单独运行（`python -m nexus_v1.tests.test_regression`），
 不嵌入本文件——嵌套子进程运行完整回归套件会引入不必要的超时/缓冲复杂度，
@@ -36,6 +39,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from nexus_v1.components.dynamic_thermal_field import (
     ThermalCell, ThermalLink, ThermalFieldGraph, build_fibonacci_shell_graph,
     DEFAULT_CAPACITANCE, DEFAULT_KAPPA_0, DEFAULT_R_LEAK_AMBIENT,
+    diffusion_number, is_stable,
 )
 from nexus_v1.components.semiconductor import Capacitor
 
@@ -164,6 +168,52 @@ def test_pure_diffusion_equalizes_field():
           f"能量守恒 residual={residual:.3e}")
 
 
+def test_stability_guard_accepts_stable_params():
+    """T-DTF-6（W1.5）：稳定参数下 is_stable()=True 且长程运行确认不发散。"""
+    graph = build_fibonacci_shell_graph(
+        n_nodes=30, radius=2.0, k_neighbors=4,
+        capacitance=_TEST_CAPACITANCE, kappa=_TEST_KAPPA_0,
+        r_leak_ambient=_TEST_R_LEAK_AMBIENT,
+    )
+    assert is_stable(graph, dt=1.0), (
+        f"T-DTF-6 FAIL: 测试尺度参数被诊断为不稳定，"
+        f"max diffusion_number={max(diffusion_number(graph, dt=1.0).values()):.4g}"
+    )
+    for step in range(500):
+        graph.step(dt=1.0, external_injections={0: 1.0} if step < 200 else {})
+    for cell in graph.cells.values():
+        t = cell.temperature
+        assert t == t, "T-DTF-6 FAIL: 温度出现 NaN"
+        assert abs(t) < 1e6, f"T-DTF-6 FAIL: 温度发散 T={t}"
+    print(f"  T-DTF-6 PASS: is_stable=True，500步后无NaN/无发散，"
+          f"max diffusion_number={max(diffusion_number(graph, dt=1.0).values()):.4g}")
+
+
+def test_stability_guard_flags_unstable_params():
+    """T-DTF-7（W1.5）：明显超过 η=1 的参数下 is_stable()=False 能被正确识别。
+
+    只验证诊断准确，不断言系统"必须崩溃"——诊断职责与行为兜底分离（不做
+    隐式子步进/不做参数拒绝，只如实报告）。
+    """
+    # kappa 远大于 capacitance，dt=1.0 下扩散数远超 1（一步转移的能量超过
+    # 发送节点当前持有的能量，是显式欧拉扩散失稳的典型构造）。
+    graph = build_fibonacci_shell_graph(
+        n_nodes=10, radius=2.0, k_neighbors=4,
+        capacitance=1.0, kappa=1000.0,
+        r_leak_ambient=None,
+    )
+    dn = diffusion_number(graph, dt=1.0)
+    assert max(dn.values()) > 1.0, (
+        f"T-DTF-7 FAIL: 构造的参数未能产生扩散数>1，"
+        f"max diffusion_number={max(dn.values()):.4g}（测试构造本身有误）"
+    )
+    assert not is_stable(graph, dt=1.0, eta=1.0), (
+        "T-DTF-7 FAIL: 扩散数已超过 η=1，但 is_stable() 仍返回 True"
+    )
+    print(f"  T-DTF-7 PASS: 不稳定参数被正确识别，"
+          f"max diffusion_number={max(dn.values()):.4g} > η=1.0")
+
+
 # ─────────────────────────────────────────────────────────────
 # 主程序
 # ─────────────────────────────────────────────────────────────
@@ -173,6 +223,8 @@ TESTS = [
     ("T-DTF-3 注入后梯度形成", test_gradient_forms_under_injection),
     ("T-DTF-4 通量方向正确", test_link_flux_direction_correct),
     ("T-DTF-5 纯扩散场趋于均匀", test_pure_diffusion_equalizes_field),
+    ("T-DTF-6 稳定参数诊断正确", test_stability_guard_accepts_stable_params),
+    ("T-DTF-7 不稳定参数诊断正确", test_stability_guard_flags_unstable_params),
 ]
 
 if __name__ == "__main__":
