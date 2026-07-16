@@ -138,7 +138,19 @@ _TAU_REF_STEPS: float = _TAU_REF_S / _DT_STEP_S
 # two-node RC time constant tau=1/kappa_0 (for C_i=C_j=1) matches
 # _TAU_REF_STEPS in simulation steps.
 DEFAULT_CAPACITANCE: float = 1.0
-DEFAULT_KAPPA_0: float = 1.0 / max(_TAU_REF_STEPS, 1e-6)
+
+# W1.5+ (critique-8 §一.4, plan §十六.3): split naming to stop one constant
+# from doing double duty as both "mechanism-test parameter" and "claimed
+# real-physical parameter". SEAWATER_DIFFUSIVITY_REFERENCE names the fact
+# that this value traces back to a real diffusivity constant (it is NOT
+# an arbitrary number); NORMALIZED_KAPPA_DEFAULT is the preferred name
+# going forward, marking it as belonging to THERMAL_FIELD_MODE="normalized"
+# (no area/volume factors — see module docstring "Dimensional mode").
+# `DEFAULT_KAPPA_0` is kept as a backward-compatible alias (already
+# referenced by W1/W1.5 tests) — do not remove it.
+SEAWATER_DIFFUSIVITY_REFERENCE: float = 1.0 / max(_TAU_REF_STEPS, 1e-6)
+NORMALIZED_KAPPA_DEFAULT: float = SEAWATER_DIFFUSIVITY_REFERENCE
+DEFAULT_KAPPA_0: float = NORMALIZED_KAPPA_DEFAULT
 
 # Ambient dissipation: leakage of each cell to the surrounding (unmodeled,
 # effectively infinite) ambient water body at baseline temperature. Chosen
