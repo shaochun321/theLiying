@@ -234,6 +234,13 @@ class JointThermalRuntime:
         self.registry = registry
         self.applied_plan_registry = AppliedJointPlanRegistry()
         self.runtime_uid = f"joint-runtime:{id(self)}"
+        # P1-C2（批判二十五长程浸泡测试暴露的真实bug）：plan_id 此前只由
+        # registry.revision/dt/边数量拼接，冻结拓扑下连续多步 prepare() 会
+        # 生成完全相同的 plan_id，第二次 apply() 立即被"重复提交"检测拒绝
+        # ——不是真的重复提交，是两次不同时刻的合法新步骤恰好产生了同一个
+        # 字符串。用一个纯粹的单调序号消除歧义，不代表任何物理量，只保证
+        # 每次 prepare() 调用的 plan_id 唯一。
+        self._prepare_sequence: int = 0
 
 
 def prepare_joint_thermal_step(
@@ -422,9 +429,13 @@ def prepare_joint_thermal_step(
                 f"prepare_joint_thermal_step: joint instability at skin patch {pid}: "
                 f"eta_joint={eta_s:.4g} > eta={eta}")
 
-    # 11. 返回不可变计划。
+    # 11. 返回不可变计划。plan_id 纳入单调序号（P1-C2修复：仅
+    #     registry.revision/dt/边数量拼接在冻结拓扑连续多步场景下会重复，
+    #     见 JointThermalRuntime.__init__ 的 `_prepare_sequence` 注释）。
+    sequence = runtime._prepare_sequence
+    runtime._prepare_sequence += 1
     plan_id = (f"joint-plan:{runtime.runtime_uid}:{registry.revision}:{dt}:"
-               f"{len(transport_links)}:{len(contacts)}")
+               f"{len(transport_links)}:{len(contacts)}:{sequence}")
     return JointThermalStepPlan(
         plan_id=plan_id,
         dt=dt,
@@ -647,3 +658,85 @@ def apply_joint_thermal_step(
         node_ledger_residuals=node_ledger_residuals,
         edge_ledger_residuals=edge_ledger_residuals,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# P1-C2: 连续物理轨迹与谱系输出（批判二十五，2026-07-17）
+# ══════════════════════════════════════════════════════════════════════
+
+@dataclass(frozen=True)
+class JointThermalTrajectoryStep:
+    """P1-C2（批判二十五）：单步的连续物理轨迹记录——`Γ^phys` 的一个采样点
+    `{X^n, Q_source^n, Q_diff^n, Q_contact^n, Q_oet^n, Q_loss^n}`。**只记录
+    已经在 `JointThermalStepPlan`/`JointThermalStepReceipt` 里存在的分项
+    数值**（`node_source_injection`/`node_contact_injection`/
+    `node_transport_net`来自plan，扩散/泄漏来自`world_graph`自己刚更新的
+    图级诊断），不新增计算、不添加事件分段标签、不添加"对象/方向/成功/
+    失败"等语义——纯粹是"这一步各物理通道各贡献了多少"的原始记录，供未来
+    对某个历史关系做保留/阻断对照时使用（结构/行为算子资格门，见V4）。
+    """
+    step_index: int
+    dt: float
+    world_charges: Dict[int, float]      # X^n（世界侧），提交后的charge
+    skin_charges: Dict[int, float]       # X^n（皮肤侧），提交后的charge
+    q_source: Dict[int, float]           # 世界节点 -> 本步源注入能量（已乘dt）
+    q_diff: Dict[int, float]             # 世界节点 -> 本步扩散净流入能量
+    q_contact: Dict[int, float]          # 世界节点 -> 本步接触净注入能量
+    q_oet: Dict[int, float]              # 世界节点 -> 本步传输净注入能量
+    q_loss: Dict[int, float]             # 世界节点 -> 本步环境泄漏能量
+
+
+class JointThermalTrajectory:
+    """P1-C2：纯数据容器，长期累积`JointThermalTrajectoryStep`序列。不持有
+    `world_graph`/`runtime`的引用，不做任何物理计算——只负责`append()`调用方
+    已经算好的记录，同`AppliedJointPlanRegistry`一样是最小职责对象。
+    """
+
+    def __init__(self):
+        self._steps: List[JointThermalTrajectoryStep] = []
+
+    def append(self, step: JointThermalTrajectoryStep) -> None:
+        self._steps.append(step)
+
+    def __len__(self) -> int:
+        return len(self._steps)
+
+    def __getitem__(self, index: int) -> JointThermalTrajectoryStep:
+        return self._steps[index]
+
+    def steps(self) -> Tuple[JointThermalTrajectoryStep, ...]:
+        return tuple(self._steps)
+
+
+def record_trajectory_step(
+    trajectory: JointThermalTrajectory,
+    step_index: int,
+    world_graph: ThermalFieldGraph,
+    skins_by_patch_id: Dict[int, SkinThermalState],
+    plan: JointThermalStepPlan,
+) -> None:
+    """P1-C2：从一次已成功`apply_joint_thermal_step()`调用之后的状态+其
+    `plan`里的冻结分项，组装一条轨迹记录并追加。调用方负责在
+    `apply_joint_thermal_step()`成功返回后立即调用本函数（`plan`与
+    `world_graph`/`skins_by_patch_id`必须是同一次调用用到的那一组，否则
+    记录的`q_*`分项与`world_charges`/`skin_charges`不是同一步的）。
+    """
+    world_charges = {nid: cell.capacitor.charge for nid, cell in world_graph.cells.items()}
+    skin_charges = {pid: skin.capacitor.charge for pid, skin in skins_by_patch_id.items()}
+    q_source = {nid: v * plan.dt for nid, v in plan.node_source_injection.items()}
+    q_contact = {nid: v * plan.dt for nid, v in plan.node_contact_injection.items()}
+    q_oet = {nid: v * plan.dt for nid, v in plan.node_transport_net.items()}
+    q_diff = {nid: -world_graph._last_divergence_dt.get(nid, 0.0) for nid in world_graph.cells}
+    q_loss = {nid: world_graph._last_leak.get(nid, 0.0) for nid in world_graph.cells}
+
+    trajectory.append(JointThermalTrajectoryStep(
+        step_index=step_index,
+        dt=plan.dt,
+        world_charges=world_charges,
+        skin_charges=skin_charges,
+        q_source=q_source,
+        q_diff=q_diff,
+        q_contact=q_contact,
+        q_oet=q_oet,
+        q_loss=q_loss,
+    ))
