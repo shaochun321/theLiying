@@ -134,6 +134,37 @@ def _restore_capacitor_triple(cap: Capacitor, snapshot: CapacitorTriple) -> None
     cap.charge, cap._q_in, cap._q_out = snapshot
 
 
+def _graph_diagnostic_snapshot(graph: ThermalFieldGraph) -> dict:
+    """批判二十三②: `ThermalFieldGraph.step()` 除了节点 Capacitor 状态外，
+    还会更新图级的本步诊断快照（`_last_injection`/`_last_leak`/
+    `_last_divergence_dt`/`_last_charge_before`/`_last_dt`，`closure_residual()`
+    依赖它们）与累计账本（`_total_injected`/`_total_leaked_ambient`，
+    `conservation_residual()`依赖它们）。世界侧`step()`成功、皮肤侧随后失败
+    时，若只回滚Capacitor三元组，这些图级字段仍停留在"已发生"状态——回滚后
+    `closure_residual()`/`conservation_residual()`会读到与实际物理状态不符
+    的幽灵记录。必须与Capacitor三元组同一次备份/恢复。
+    """
+    return {
+        "_last_injection": dict(graph._last_injection),
+        "_last_leak": dict(graph._last_leak),
+        "_last_divergence_dt": dict(graph._last_divergence_dt),
+        "_last_charge_before": dict(graph._last_charge_before),
+        "_last_dt": graph._last_dt,
+        "_total_injected": graph._total_injected,
+        "_total_leaked_ambient": graph._total_leaked_ambient,
+    }
+
+
+def _restore_graph_diagnostic_snapshot(graph: ThermalFieldGraph, snapshot: dict) -> None:
+    graph._last_injection = snapshot["_last_injection"]
+    graph._last_leak = snapshot["_last_leak"]
+    graph._last_divergence_dt = snapshot["_last_divergence_dt"]
+    graph._last_charge_before = snapshot["_last_charge_before"]
+    graph._last_dt = snapshot["_last_dt"]
+    graph._total_injected = snapshot["_total_injected"]
+    graph._total_leaked_ambient = snapshot["_total_leaked_ambient"]
+
+
 @dataclass(frozen=True)
 class JointThermalStepPlan:
     """不可变联合计划——一次性从同一物理快照生成。`world_injections`/
@@ -173,30 +204,20 @@ class AppliedJointPlanRegistry:
 class JointThermalRuntime:
     """P1-C0: 持久化联合调度运行时——长期持有`world_graph`/`registry`/
     `applied_plan_registry`/`runtime_uid`，不由单步调用者临时创建（闭合
-    批判二十二点2/3）。`runtime_uid`取自`id(world_graph)`：绑定到实际存活
-    的图对象本身，不是其内容——两个地址/revision/charge完全相同但独立
-    构造的"镜像图"会有不同的`id()`，据此在apply时被拒绝。
+    批判二十二点2/3）。`runtime_uid`取自`id(self)`（批判二十三修复：不是
+    `id(world_graph)`）——绑定到具体的 runtime 实例本身，不是它包装的图。
+    两个独立构造的`JointThermalRuntime`即使包装同一个`world_graph`，也会
+    有不同的`runtime_uid`和各自独立的`applied_plan_registry`：若仍用
+    `id(world_graph)`，两个runtime的`runtime_uid`会相同，一个plan可以在
+    runtime_A提交后，把状态精确复原，再通过runtime_B（独立registry，从未
+    见过这个plan_id）二次提交——已用代码实测复现验证（批判二十三①）。
     """
 
     def __init__(self, world_graph: ThermalFieldGraph, registry: AddressRegistry):
         self.world_graph = world_graph
         self.registry = registry
         self.applied_plan_registry = AppliedJointPlanRegistry()
-        self.runtime_uid = f"joint-runtime:{id(world_graph)}"
-
-
-def _peek_source_release(source: DynamicHeatSource, dt: float) -> Tuple[float, float]:
-    """只读复制`DynamicHeatSource.release(dt)`的计算公式，不调用`release()`
-    本身（不提前扣减`energy_remaining`）。返回`(actual_power, actual_energy)`
-    ——`apply_joint_thermal_step()`直接用`actual_energy`扣减，不重新调用
-    `release()`（同P1-B3"apply不重算物理量"纪律）。
-    """
-    if source.energy_remaining <= 0.0 or source.power <= 0.0 or dt <= 0.0:
-        return 0.0, 0.0
-    requested_energy = source.power * dt
-    actual_energy = min(requested_energy, source.energy_remaining)
-    actual_power = (actual_energy / dt) * source.efficiency
-    return actual_power, actual_energy
+        self.runtime_uid = f"joint-runtime:{id(self)}"
 
 
 def prepare_joint_thermal_step(
@@ -288,9 +309,10 @@ def prepare_joint_thermal_step(
     }
     source_energy_snapshot = source.energy_remaining
 
-    # 5. 只读计算：定位权重 + 热源拟释放功率（复制 release() 公式，不调用它）。
+    # 5. 只读计算：定位权重 + 热源拟释放功率（`preview_release()`只读预览，
+    #    与`release()`共用同一份公式，不调用`release()`本身——批判二十三④）。
     weights = locator.locate(source.position, world_graph)
-    source_actual_power, source_actual_energy = _peek_source_release(source, dt)
+    source_actual_power, source_actual_energy = source.preview_release(dt)
 
     # 6. 只读计算：接触通量（复用 ThermalContact.flux()，从预步快照读取）。
     contact_flux_by_index: List[float] = []
@@ -489,6 +511,7 @@ def apply_joint_thermal_step(
         for pid in plan.skin_state_snapshots
     }
     source_backup = source.energy_remaining
+    graph_diag_backup = _graph_diagnostic_snapshot(world_graph)
 
     e_world_before = world_graph.total_energy()
     e_skin_before = sum(skins_by_patch_id[pid].capacitor.charge for pid in plan.skin_state_snapshots)
@@ -515,6 +538,7 @@ def apply_joint_thermal_step(
         for pid, snapshot in skin_backup.items():
             _restore_capacitor_triple(skins_by_patch_id[pid].capacitor, snapshot)
         source.energy_remaining = source_backup
+        _restore_graph_diagnostic_snapshot(world_graph, graph_diag_backup)
         raise
 
     runtime.applied_plan_registry.mark_applied(plan.plan_id)

@@ -137,17 +137,30 @@ class DynamicHeatSource:
     power: float
     efficiency: float = 1.0
 
+    def preview_release(self, dt: float) -> Tuple[float, float]:
+        """P1-C0补丁（批判二十三④）: 只读复制`release()`会算出的确切结果
+        `(actual_power, actual_energy)`，不修改`energy_remaining`。`release()`
+        与`joint_thermal_step_plan.prepare_joint_thermal_step()`都调用这一
+        个函数——此前后者在自己文件里复制了一份公式，两处若以后分别改动
+        （效率/输出上限/账本字段/耗尽状态转换）会不同步；现在只有一处
+        计算逻辑，`release()`负责提交（扣减`energy_remaining`），联合计划的
+        `prepare()`只读取预览值、`apply()`直接扣减已冻结的`actual_energy`
+        （不重新调用`release()`）。
+        """
+        if self.energy_remaining <= 0.0 or self.power <= 0.0 or dt <= 0.0:
+            return 0.0, 0.0
+        requested_energy = self.power * dt
+        actual_energy = min(requested_energy, self.energy_remaining)
+        actual_power = (actual_energy / dt) * self.efficiency
+        return actual_power, actual_energy
+
     def release(self, dt: float) -> float:
         """Return the actual power injected this step (<= self.power),
         respecting the finite energy budget: power*dt <= energy_remaining.
         Depletes energy_remaining accordingly. Returns 0.0 once exhausted.
         """
-        if self.energy_remaining <= 0.0 or self.power <= 0.0 or dt <= 0.0:
-            return 0.0
-        requested_energy = self.power * dt
-        actual_energy = min(requested_energy, self.energy_remaining)
+        actual_power, actual_energy = self.preview_release(dt)
         self.energy_remaining -= actual_energy
-        actual_power = (actual_energy / dt) * self.efficiency
         return actual_power
 
 
