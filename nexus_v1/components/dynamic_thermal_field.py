@@ -206,6 +206,23 @@ class ThermalLink:
         """Positive value = heat currently flowing from node i to node j."""
         return self.kappa * (cells[self.i].temperature - cells[self.j].temperature)
 
+    def temperature_difference(self, cells: Dict[int, "ThermalCell"]) -> float:
+        """L2 (plan §二十一 21.7): dT_e = T_i - T_j — the unscaled numerator
+        of `flux()`. Kept sign-consistent with `flux()` (positive when i is
+        warmer than j, matching the same "i→j positive" convention already
+        established by `flux()`) rather than introducing a second, opposite
+        sign convention — self-consistency with the already-shipped method
+        takes priority over any external illustrative example.
+        """
+        return cells[self.i].temperature - cells[self.j].temperature
+
+    # `heat_flux` is an explicit alias for `flux()` — L2 (plan §二十一 21.7)
+    # confirmed `flux()` already IS the requested "heat_flux(edge)" read-out
+    # (J_e = κ_e·dT_e), so no new computation is added; this alias exists
+    # only so callers following the plan's naming can find it without having
+    # to know `flux()` predates this naming discussion.
+    heat_flux = flux
+
 
 class ThermalFieldGraph:
     """TYPE:HYBRID — a sparse graph of ThermalCell nodes coupled by ThermalLink edges.
@@ -232,6 +249,23 @@ class ThermalFieldGraph:
         self._total_leaked_ambient: float = 0.0
         self._initial_total_energy: float = self.total_energy()
 
+        # L2 (plan §二十一 21.7): per-node instantaneous bookkeeping for
+        # `closure_residual()`. S_i (injection) and L_i (leak) previously
+        # only existed as local variables inside `step()` — this promotes
+        # them to queryable node state WITHOUT changing what `step()`
+        # actually computes or applies (same values, just also stored).
+        # `_last_divergence_dt` stores the EXACT per-node diffusion delta
+        # (D_i*dt) taken from step()'s own pre-step flux snapshot, so
+        # `closure_residual()` checks against what was truly applied, not
+        # a value re-derived from (possibly already-changed) current state.
+        self._last_injection: Dict[int, float] = {nid: 0.0 for nid in self.cells}
+        self._last_leak: Dict[int, float] = {nid: 0.0 for nid in self.cells}
+        self._last_divergence_dt: Dict[int, float] = {nid: 0.0 for nid in self.cells}
+        self._last_charge_before: Dict[int, float] = {
+            nid: c.capacitor.charge for nid, c in self.cells.items()
+        }
+        self._last_dt: float = 0.0
+
     def total_energy(self) -> float:
         """Sum of all node energies (Σ Q_i, the conserved quantity)."""
         return sum(c.capacitor.charge for c in self.cells.values())
@@ -246,6 +280,14 @@ class ThermalFieldGraph:
         """
         external_injections = external_injections or {}
 
+        # L2 bookkeeping: snapshot pre-step charge (for closure_residual's
+        # ΔQ_i term) and reset this step's S_i/D_i*dt/L_i readouts.
+        self._last_charge_before = {nid: c.capacitor.charge for nid, c in self.cells.items()}
+        self._last_dt = dt
+        self._last_injection = {nid: 0.0 for nid in self.cells}
+        self._last_divergence_dt = {nid: 0.0 for nid in self.cells}
+        self._last_leak = {nid: 0.0 for nid in self.cells}
+
         # Step 1: snapshot all link fluxes from the CURRENT (pre-update)
         # state — see class docstring on why this must not interleave with
         # node updates.
@@ -259,12 +301,18 @@ class ThermalFieldGraph:
             d_e = j_ij * dt
             deltas[link.i] -= d_e
             deltas[link.j] += d_e
+            # L2: D_i*dt (net outflow, positive = node i losing heat via
+            # this link) — exact snapshot value actually applied above,
+            # not re-derived later from possibly-changed state.
+            self._last_divergence_dt[link.i] += d_e
+            self._last_divergence_dt[link.j] -= d_e
 
         # Step 3: external injection (only place energy enters the system).
         for nid, current in external_injections.items():
             d_e = current * dt
             deltas[nid] += d_e
             self._total_injected += d_e
+            self._last_injection[nid] += d_e
 
         # Step 4: apply all deltas in one pass, via the wrapped Capacitor's
         # own inject() (dt=1.0 since dt is already folded into the delta).
@@ -276,7 +324,9 @@ class ThermalFieldGraph:
             for cell in self.cells.values():
                 q_before = cell.capacitor.charge
                 cell.capacitor.leak(self.r_leak_ambient, dt)
-                self._total_leaked_ambient += (q_before - cell.capacitor.charge)
+                leaked = q_before - cell.capacitor.charge
+                self._total_leaked_ambient += leaked
+                self._last_leak[cell.node_id] += leaked
 
     def conservation_residual(self) -> float:
         """|ΔE_total - injected + leaked|. Should be ≈0 (floating-point only).
@@ -289,6 +339,28 @@ class ThermalFieldGraph:
         """
         delta_e = self.total_energy() - self._initial_total_energy
         return abs(delta_e - self._total_injected + self._total_leaked_ambient)
+
+    def closure_residual(self, node_id: int) -> float:
+        """L2 (plan §二十一 21.7): per-node conservation residual — the
+        node-level counterpart to `conservation_residual()` (graph-level)
+        and `ThermalCell.kcl_imbalance` (Capacitor-level). Should be ≈0
+        (floating-point only), same guarantee as those two.
+
+        R_i = ΔQ_i - S_i + D_i·dt + L_i
+        (ΔQ_i = charge change since the last `step()` call; S_i/D_i·dt/L_i
+        read from the bookkeeping `step()` stores alongside its existing
+        computation — see `__init__`/`step()` comments. Uses the EXACT
+        per-step snapshot, not values re-derived from current state, so
+        this is a true closure check of what `step()` actually did, not
+        an approximation.)
+        """
+        if node_id not in self.cells:
+            raise KeyError(f"closure_residual: unknown node_id={node_id}")
+        delta_q = self.cells[node_id].capacitor.charge - self._last_charge_before[node_id]
+        s_i = self._last_injection[node_id]
+        d_i_dt = self._last_divergence_dt[node_id]
+        l_i = self._last_leak[node_id]
+        return abs(delta_q - s_i + d_i_dt + l_i)
 
 
 def diffusion_number(graph: "ThermalFieldGraph", dt: float) -> Dict[int, float]:
@@ -316,6 +388,57 @@ def diffusion_number(graph: "ThermalFieldGraph", dt: float) -> Dict[int, float]:
         capacitance = max(graph.cells[nid].capacitor.capacitance, 1e-9)
         result[nid] = dt * kappa_sum / capacitance
     return result
+
+
+def node_divergence(graph: "ThermalFieldGraph") -> Dict[int, float]:
+    """L2 (plan §二十一 21.7): per-node instantaneous flux divergence,
+    D_i = Σ_e B_ie·J_e (positive = node i currently net-losing heat via
+    diffusion to its neighbors, at the CURRENT state — not tied to any
+    particular `step()` call, unlike `ThermalFieldGraph.closure_residual()`
+    which checks the exact snapshot a specific step applied).
+
+    READ-ONLY diagnostic, same style/contract as `diffusion_number()`:
+    does not mutate graph state, does not change `step()` behavior. This
+    re-aggregates `ThermalLink.flux()` values already computed per-edge —
+    no new physical mechanism, only a node-view of existing edge relations
+    (批判十三 B1 point, verified — see plan §二十一 21.2).
+    """
+    result: Dict[int, float] = {nid: 0.0 for nid in graph.cells}
+    for link in graph.links:
+        j_ij = link.flux(graph.cells)
+        result[link.i] += j_ij
+        result[link.j] -= j_ij
+    return result
+
+
+def incoming_flux(graph: "ThermalFieldGraph", node_id: int) -> float:
+    """L2: Σ of flux magnitude currently flowing INTO node_id (sum over
+    incident links where this node is the receiving end, at current state).
+    """
+    total = 0.0
+    for link in graph.links:
+        if link.i == node_id or link.j == node_id:
+            j_ij = link.flux(graph.cells)
+            if link.j == node_id and j_ij > 0:
+                total += j_ij
+            elif link.i == node_id and j_ij < 0:
+                total += -j_ij
+    return total
+
+
+def outgoing_flux(graph: "ThermalFieldGraph", node_id: int) -> float:
+    """L2: Σ of flux magnitude currently flowing OUT of node_id (sum over
+    incident links where this node is the sending end, at current state).
+    """
+    total = 0.0
+    for link in graph.links:
+        if link.i == node_id or link.j == node_id:
+            j_ij = link.flux(graph.cells)
+            if link.i == node_id and j_ij > 0:
+                total += j_ij
+            elif link.j == node_id and j_ij < 0:
+                total += -j_ij
+    return total
 
 
 def is_stable(graph: "ThermalFieldGraph", dt: float, eta: float = 1.0) -> bool:
