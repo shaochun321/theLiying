@@ -311,7 +311,7 @@ def test_c2_7_frozen_segment_soak_with_trajectory():
     for step in range(n_steps):
         plan = prepare_joint_thermal_step(runtime, [], {}, [link], source, locator, dt=dt)
         receipt = apply_joint_thermal_step(runtime, plan, {}, source)
-        record_trajectory_step(trajectory, step, graph, {}, plan)
+        record_trajectory_step(trajectory, step, runtime, {}, plan, receipt)
 
         for r_i in receipt.node_ledger_residuals.values():
             assert r_i < 1e-6, f"第{step}步节点级账本未闭合: {r_i}"
@@ -330,8 +330,8 @@ def test_c2_7_frozen_segment_soak_with_trajectory():
     # 轨迹不携带事件/语义标签——只检查字段集合是原始物理量。
     assert len(trajectory) == n_steps
     sample = trajectory[0]
-    expected_fields = {"step_index", "dt", "world_charges", "skin_charges",
-                        "q_source", "q_diff", "q_contact", "q_oet", "q_loss"}
+    expected_fields = {"step_index", "dt", "runtime_uid", "plan_id", "world_charges",
+                        "skin_charges", "q_source", "q_diff", "q_contact", "q_oet", "q_loss"}
     assert set(sample.__dataclass_fields__.keys()) == expected_fields
 
 

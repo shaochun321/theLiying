@@ -674,9 +674,16 @@ class JointThermalTrajectoryStep:
     图级诊断），不新增计算、不添加事件分段标签、不添加"对象/方向/成功/
     失败"等语义——纯粹是"这一步各物理通道各贡献了多少"的原始记录，供未来
     对某个历史关系做保留/阻断对照时使用（结构/行为算子资格门，见V4）。
+
+    P2-A0（批判二十八）新增`runtime_uid`/`plan_id`：轨迹现在承担P2-A的
+    "发生元标定证据"用途（启动/峰值/burst/衰减/静息测量），`record_
+    trajectory_step()`据此核对这两个字段确实对应一次真实提交，不是伪造
+    组合——记录下来供事后审计复查，不只在写入时检查一次。
     """
     step_index: int
     dt: float
+    runtime_uid: str                     # 本步来自哪个runtime实例
+    plan_id: str                         # 本步对应哪个已提交的计划
     world_charges: Dict[int, float]      # X^n（世界侧），提交后的charge
     skin_charges: Dict[int, float]       # X^n（皮肤侧），提交后的charge
     q_source: Dict[int, float]           # 世界节点 -> 本步源注入能量（已乘dt）
@@ -690,12 +697,22 @@ class JointThermalTrajectory:
     """P1-C2：纯数据容器，长期累积`JointThermalTrajectoryStep`序列。不持有
     `world_graph`/`runtime`的引用，不做任何物理计算——只负责`append()`调用方
     已经算好的记录，同`AppliedJointPlanRegistry`一样是最小职责对象。
+
+    P2-A0（批判二十八）：`append()`新增`step_index`严格递增校验——轨迹
+    必须从0开始、逐步append，不允许跳步/乱序/重复，否则拒绝（同一批判
+    指出"轨迹已经开始承担标定证据"，不能再只靠调用方自律）。
     """
 
     def __init__(self):
         self._steps: List[JointThermalTrajectoryStep] = []
 
     def append(self, step: JointThermalTrajectoryStep) -> None:
+        expected_index = len(self._steps)
+        if step.step_index != expected_index:
+            raise JointThermalStepError(
+                f"JointThermalTrajectory.append: step_index必须严格递增"
+                f"（期望{expected_index}，实际{step.step_index}）——不允许"
+                f"跳步/乱序/重复写入轨迹")
         self._steps.append(step)
 
     def __len__(self) -> int:
@@ -711,16 +728,33 @@ class JointThermalTrajectory:
 def record_trajectory_step(
     trajectory: JointThermalTrajectory,
     step_index: int,
-    world_graph: ThermalFieldGraph,
+    runtime: JointThermalRuntime,
     skins_by_patch_id: Dict[int, SkinThermalState],
     plan: JointThermalStepPlan,
+    receipt: JointThermalStepReceipt,
 ) -> None:
-    """P1-C2：从一次已成功`apply_joint_thermal_step()`调用之后的状态+其
-    `plan`里的冻结分项，组装一条轨迹记录并追加。调用方负责在
-    `apply_joint_thermal_step()`成功返回后立即调用本函数（`plan`与
-    `world_graph`/`skins_by_patch_id`必须是同一次调用用到的那一组，否则
-    记录的`q_*`分项与`world_charges`/`skin_charges`不是同一步的）。
+    """P2-A0（批判二十八）：从一次**已核实真实提交**的
+    `apply_joint_thermal_step()`结果组装一条轨迹记录并追加。此前
+    （P1-C2）只接收`plan`+裸`world_graph`，纯粹依赖调用方自律保证两者
+    对应同一步——现在轨迹要承担P2-A的发生元标定证据用途，改为要求传入
+    `runtime`+`receipt`（提交回执，证明真的applied过，不是只prepare()
+    没apply()）并三层核对：
+    1. `receipt.plan_id == plan.plan_id`（回执与计划配对一致）；
+    2. `runtime.applied_plan_registry.is_applied(plan.plan_id)`为真
+       （这个计划确实已经提交到这个runtime，不是伪造的回执）；
+    3. `JointThermalTrajectory.append()`自己核对`step_index`严格递增。
+    任何一项不满足都拒绝记录，不静默接受。
     """
+    if receipt.plan_id != plan.plan_id:
+        raise JointThermalStepError(
+            f"record_trajectory_step: receipt.plan_id({receipt.plan_id!r}) "
+            f"与 plan.plan_id({plan.plan_id!r}) 不一致——回执与计划不是同一步")
+    if not runtime.applied_plan_registry.is_applied(plan.plan_id):
+        raise JointThermalStepError(
+            f"record_trajectory_step: plan {plan.plan_id!r} 未在本runtime上"
+            f"确认提交过（is_applied()为False）——不能记录未经确认提交的步骤")
+
+    world_graph = runtime.world_graph
     world_charges = {nid: cell.capacitor.charge for nid, cell in world_graph.cells.items()}
     skin_charges = {pid: skin.capacitor.charge for pid, skin in skins_by_patch_id.items()}
     q_source = {nid: v * plan.dt for nid, v in plan.node_source_injection.items()}
@@ -732,6 +766,8 @@ def record_trajectory_step(
     trajectory.append(JointThermalTrajectoryStep(
         step_index=step_index,
         dt=plan.dt,
+        runtime_uid=runtime.runtime_uid,
+        plan_id=plan.plan_id,
         world_charges=world_charges,
         skin_charges=skin_charges,
         q_source=q_source,

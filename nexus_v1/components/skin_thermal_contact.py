@@ -124,6 +124,11 @@ from nexus_v1.components.thermal_source_coupling import (
     DynamicHeatSource,
     ThermalFieldLocator,
 )
+from nexus_v1.components.structural_address import (
+    AddressRegistry,
+    StructuralAddress,
+    DOMAIN_SKIN_PATCH,
+)
 
 # EXP: P0 first-pass placeholder, see module docstring Q3.
 DEFAULT_SKIN_CAPACITANCE: float = 1.0
@@ -136,16 +141,47 @@ class SkinThermalState:
     Structurally identical role to `ThermalCell` on the world side — wraps
     a `Capacitor` (SEMI) as its energy store, does not duplicate charge
     tracking logic. See module docstring Q1/Q2.
+
+    P2-A0（批判二十八）: `address` 是可选字段，默认`None`（向后兼容既有
+    P0/P1-0/P1-C测试，它们从不注册地址也能正常工作）。P2-A要求
+    `α(skin patch)↔α(ξ_i^occ)`稳定映射，前提是皮肤支撑本身有稳定地址可以
+    被`ξ^occ`的`GeneratedAddress.parent_addresses`引用——调用`register_
+    skin_patch()`（见下）即可注册并挂载，不强制所有场景都必须注册。
     """
     patch_id: int
     ambient_temperature: float = 0.0
     capacitor: Capacitor = field(
         default_factory=lambda: Capacitor(capacitance=DEFAULT_SKIN_CAPACITANCE))
     r_leak_ambient: Optional[float] = None  # None = no leak (P0 minimal default)
+    address: Optional[StructuralAddress] = None  # P2-A0: 物理支撑稳定地址，见register_skin_patch()
 
     @property
     def temperature(self) -> float:
         return self.ambient_temperature + self.capacitor.voltage
+
+
+def register_skin_patch(registry: AddressRegistry, skin: SkinThermalState) -> StructuralAddress:
+    """P2-A0（批判二十八）: 给皮肤支撑注册`StructuralAddress`（复用P1-A已有
+    `DOMAIN_SKIN_PATCH`常量+`AddressRegistry.register_physical()`，不新增
+    地址系统API），并把结果挂载到`skin.address`——一步完成注册+挂载。
+
+    幂等：`register_physical()`本身幂等（同一`patch_id`重复调用返回同一
+    地址），本函数额外保证`skin.address`与registry里的记录始终一致。
+
+    Q1/Q2/Q3（强制三问）：
+      Q1 无新BIO对象——皮肤支撑本身已在P0/P1-0/P1-C里有真实物理角色，本
+         函数只是给它一个跨重建保持的稳定身份，同`structural_address.py`
+         对世界节点的处理方式完全一致。
+      Q2 Sources=`SkinThermalState.patch_id` -> `AddressRegistry.
+         register_physical(DOMAIN_SKIN_PATCH, patch_id)`（只读查询/幂等
+         注册，不修改registry之外的任何状态）-> Targets=`skin.address`
+         （挂载，供未来`GeneratedAddress.parent_addresses`引用）。
+      Q3 无新参数——`DOMAIN_SKIN_PATCH`是P1-A已冻结的域常量，不是本轮
+         新增。
+    """
+    addr = registry.register_physical(DOMAIN_SKIN_PATCH, skin.patch_id)
+    skin.address = addr
+    return addr
 
 
 @dataclass
