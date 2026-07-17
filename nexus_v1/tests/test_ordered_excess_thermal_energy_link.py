@@ -16,7 +16,7 @@ import pytest
 from nexus_v1.components.dynamic_thermal_field import ThermalCell
 from nexus_v1.components.semiconductor import Capacitor
 from nexus_v1.components.structural_address import (
-    AddressRegistry, DOMAIN_WORLD_CELL, MECHANISM_MEDIUM_TRANSPORT,
+    AddressRegistry, DOMAIN_WORLD_CELL, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER,
 )
 from nexus_v1.components.ordered_excess_thermal_energy_link import (
     OrderedExcessThermalEnergyLink, step_ordered_transport, is_single_edge_stable,
@@ -28,7 +28,7 @@ def _build_link_and_cells(rate=DEFAULT_RATE_PER_TIME, u0=10.0, ambient_i=0.0, am
     reg = AddressRegistry()
     addr_i = reg.register_physical(DOMAIN_WORLD_CELL, 0)
     addr_j = reg.register_physical(DOMAIN_WORLD_CELL, 1)
-    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_MEDIUM_TRANSPORT)
+    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
     link = OrderedExcessThermalEnergyLink(identity=identity, rate_per_time=rate)
     cell_i = ThermalCell(node_id=0, position=(0, 0, 0), ambient_temperature=ambient_i,
                           capacitor=Capacitor(capacitance=1.0))
@@ -72,7 +72,7 @@ def test_oetl_3_negative_rate_rejected():
     reg = AddressRegistry()
     addr_i = reg.register_physical(DOMAIN_WORLD_CELL, 0)
     addr_j = reg.register_physical(DOMAIN_WORLD_CELL, 1)
-    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_MEDIUM_TRANSPORT)
+    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
     with pytest.raises(ValueError, match=">= 0"):
         OrderedExcessThermalEnergyLink(identity=identity, rate_per_time=-0.1)
 
@@ -82,7 +82,7 @@ def test_oetl_4_nan_and_inf_rate_rejected():
     reg = AddressRegistry()
     addr_i = reg.register_physical(DOMAIN_WORLD_CELL, 0)
     addr_j = reg.register_physical(DOMAIN_WORLD_CELL, 1)
-    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_MEDIUM_TRANSPORT)
+    identity = reg.register_ordered_edge(addr_i, addr_j, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
     for bad_rate in (float("nan"), float("inf")):
         with pytest.raises(ValueError, match="finite"):
             OrderedExcessThermalEnergyLink(identity=identity, rate_per_time=bad_rate)
@@ -178,7 +178,7 @@ def test_oetl_12_tail_and_head_identical_rejected_at_identity_construction():
     reg = AddressRegistry()
     addr_i = reg.register_physical(DOMAIN_WORLD_CELL, 0)
     with pytest.raises(ValueError, match="tail and head must differ"):
-        reg.register_ordered_edge(addr_i, addr_i, MECHANISM_MEDIUM_TRANSPORT)
+        reg.register_ordered_edge(addr_i, addr_i, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
 
 
 def test_oetl_13_drive_mode_flag_present_and_default():

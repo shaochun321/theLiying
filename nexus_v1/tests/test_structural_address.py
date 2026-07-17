@@ -20,7 +20,7 @@ from nexus_v1.components.structural_address import (
     AddressRegistry, StructuralAddress, GeneratedAddress,
     SymmetricEdgeIdentity, OrderedEdgeIdentity, TopologyValidationReport,
     DOMAIN_WORLD_CELL, DOMAIN_SKIN_PATCH, DOMAIN_HEAT_SOURCE,
-    MECHANISM_DIFFUSION, MECHANISM_CONTACT, MECHANISM_MEDIUM_TRANSPORT,
+    MECHANISM_DIFFUSION, MECHANISM_CONTACT, MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER,
 )
 
 
@@ -41,7 +41,7 @@ def test_sa_1_edge_endpoints_must_exist():
 
 def test_sa_2_endpoint_domain_must_be_mechanism_compatible():
     """T-SA-2: 端点域必须与机制兼容（diffusion只能world-world，contact只能
-    world-skin，medium-transport只能world-world）。
+    world-skin，ordered-excess-thermal-transfer只能world-world）。
     """
     reg, world_addrs, skin_addr = _build_registry_and_addresses()
     with pytest.raises(ValueError, match="not compatible"):
@@ -100,8 +100,8 @@ def test_sa_5_old_address_invalidated_after_rebuild():
 def test_sa_6_ordered_edges_ij_and_ji_are_distinct():
     """T-SA-6: e_ij 与 e_ji 是两个不同的有序传输实例。"""
     reg, world_addrs, _ = _build_registry_and_addresses()
-    e_01 = reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_MEDIUM_TRANSPORT)
-    e_10 = reg.register_ordered_edge(world_addrs[1], world_addrs[0], MECHANISM_MEDIUM_TRANSPORT)
+    e_01 = reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
+    e_10 = reg.register_ordered_edge(world_addrs[1], world_addrs[0], MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
     assert e_01 != e_10
     assert e_01.uid != e_10.uid
     assert e_01.tail == e_10.head
@@ -117,9 +117,9 @@ def test_sa_7_duplicate_edge_registration_forbidden():
     with pytest.raises(ValueError, match="already registered"):
         reg.register_symmetric_edge(world_addrs[1], world_addrs[0], MECHANISM_DIFFUSION)  # 端点交换
 
-    reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_MEDIUM_TRANSPORT)
+    reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
     with pytest.raises(ValueError, match="already registered"):
-        reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_MEDIUM_TRANSPORT)
+        reg.register_ordered_edge(world_addrs[0], world_addrs[1], MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
 
 
 def test_sa_8_state_changes_traceable_to_source_or_edge():
@@ -130,7 +130,7 @@ def test_sa_8_state_changes_traceable_to_source_or_edge():
     reg, world_addrs, skin_addr = _build_registry_and_addresses()
     e_diff = reg.register_symmetric_edge(world_addrs[0], world_addrs[1], MECHANISM_DIFFUSION)
     e_contact = reg.register_symmetric_edge(world_addrs[0], skin_addr, MECHANISM_CONTACT)
-    e_transport = reg.register_ordered_edge(world_addrs[0], world_addrs[2], MECHANISM_MEDIUM_TRANSPORT)
+    e_transport = reg.register_ordered_edge(world_addrs[0], world_addrs[2], MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER)
 
     sym_edges = reg.all_symmetric_edges()
     ord_edges = reg.all_ordered_edges()

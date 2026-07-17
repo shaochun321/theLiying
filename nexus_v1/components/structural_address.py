@@ -54,12 +54,15 @@ DOMAIN_RELATION_RHO = "relation.r_rho"      # 生成物域（P2 使用，本轮�
 _PHYSICAL_DOMAINS = frozenset({DOMAIN_WORLD_CELL, DOMAIN_SKIN_PATCH, DOMAIN_HEAT_SOURCE})
 _GENERATED_DOMAINS = frozenset({DOMAIN_OCC_THERMAL, DOMAIN_RELATION_PREC, DOMAIN_RELATION_RHO})
 
-# 机制类型（批判十七②）
+# 机制类型（批判十七②；批判二十②：介质传输改名为"有序过剩热能转移"，机制标识
+# 同步收紧，不再用"medium-transport"——地址/拓扑账本的机制标签不是普通注释，
+# 会进入域兼容性检查/边身份/账本追踪/未来 GeneratedAddress.parent_addresses，
+# 现在改成本低，等 P2 回接后再改会造成地址谱系迁移）
 MECHANISM_DIFFUSION = "diffusion"
 MECHANISM_CONTACT = "contact"
-MECHANISM_MEDIUM_TRANSPORT = "medium-transport"
+MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER = "ordered-excess-thermal-transfer"
 _SYMMETRIC_MECHANISMS = frozenset({MECHANISM_DIFFUSION, MECHANISM_CONTACT})
-_ORDERED_MECHANISMS = frozenset({MECHANISM_MEDIUM_TRANSPORT})
+_ORDERED_MECHANISMS = frozenset({MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER})
 
 # 端点域—机制兼容表（批判十七"端点域必须与机制兼容"结构测试用）
 _MECHANISM_DOMAIN_COMPAT = {
@@ -67,7 +70,7 @@ _MECHANISM_DOMAIN_COMPAT = {
     MECHANISM_CONTACT: frozenset({
         (DOMAIN_WORLD_CELL, DOMAIN_SKIN_PATCH), (DOMAIN_SKIN_PATCH, DOMAIN_WORLD_CELL),
     }),
-    MECHANISM_MEDIUM_TRANSPORT: frozenset({(DOMAIN_WORLD_CELL, DOMAIN_WORLD_CELL)}),
+    MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER: frozenset({(DOMAIN_WORLD_CELL, DOMAIN_WORLD_CELL)}),
 }
 
 
@@ -129,14 +132,14 @@ class SymmetricEdgeIdentity:
 @dataclass(frozen=True)
 class OrderedEdgeIdentity:
     """TYPE:INFRA — ε_e^ord = (uid, tail, head, mechanism, version)。只有 P1-B
-    的介质传输边（`mechanism="medium-transport"`）用这个类型——
+    的介质传输边（`mechanism="ordered-excess-thermal-transfer"`）用这个类型——
     `J_tail→head^tr = a·E_tail` 的公式本身依赖哪端是 `tail`，是真正有序的。
     `e_ij`（tail=i,head=j）与 `e_ji`（tail=j,head=i）是两个不同的对象。
     """
     uid: str
     tail: StructuralAddress
     head: StructuralAddress
-    mechanism: str = MECHANISM_MEDIUM_TRANSPORT
+    mechanism: str = MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER
     version: int = 0
 
     def __post_init__(self):
@@ -185,6 +188,17 @@ class AddressRegistry:
         self._sym_edge_keys: Dict[Tuple[FrozenSet[str], str], str] = {}   # (endpoint uids, mechanism) -> edge uid
         self._ord_edge_keys: Dict[Tuple[str, str, str], str] = {}         # (tail uid, head uid, mechanism) -> edge uid
         self._retired_local_keys: set = set()   # (domain, local_key) freed by rebuild_physical(); must not silently resurrect
+        self._revision: int = 0   # P1-B2: monotonic counter, bumped on every successful mutation
+                                   # (new address/edge registration, rebuild). Lets ThermalTransportPlan
+                                   # (P1-B2) snapshot "registry state at prepare-time" for later staleness
+                                   # checks (P1-B3's apply()) without needing per-object revision fields.
+
+    @property
+    def revision(self) -> int:
+        """当前注册表版本号——每次成功的注册/重建操作后递增一次。供
+        `ThermalTransportPlan`（P1-B2）快照，P1-B3 的 `apply()` 用它判断
+        提交时注册表是否已经变化（stale plan 检测）。"""
+        return self._revision
 
     # ── 节点地址 ──
 
@@ -212,6 +226,7 @@ class AddressRegistry:
         self._addresses[uid] = addr
         self._local_to_uid[key] = uid
         self._uid_to_local[uid] = local_key
+        self._revision += 1
         return addr
 
     def rebuild_physical(self, domain: str, old_local_key: Any, new_local_key: Any) -> StructuralAddress:
@@ -230,6 +245,7 @@ class AddressRegistry:
         self._addresses[uid] = new_addr
         self._local_to_uid[(domain, new_local_key)] = uid
         self._uid_to_local[uid] = new_local_key
+        self._revision += 1
         return new_addr
 
     def resolve(self, uid: str) -> Any:
@@ -267,10 +283,11 @@ class AddressRegistry:
             uid=uid, endpoints=frozenset({addr_i, addr_j}), mechanism=mechanism)
         self._sym_edges[uid] = edge
         self._sym_edge_keys[edge_key] = uid
+        self._revision += 1
         return edge
 
     def register_ordered_edge(
-        self, tail: StructuralAddress, head: StructuralAddress, mechanism: str = MECHANISM_MEDIUM_TRANSPORT,
+        self, tail: StructuralAddress, head: StructuralAddress, mechanism: str = MECHANISM_ORDERED_EXCESS_THERMAL_TRANSFER,
     ) -> OrderedEdgeIdentity:
         """介质传输边注册。`e_ij`（tail=i,head=j）与 `e_ji`（tail=j,head=i）
         是两个不同的有序传输实例——分别注册，互不冲突；但同一 (tail,head,
@@ -289,6 +306,7 @@ class AddressRegistry:
         edge = OrderedEdgeIdentity(uid=uid, tail=tail, head=head, mechanism=mechanism)
         self._ord_edges[uid] = edge
         self._ord_edge_keys[edge_key] = uid
+        self._revision += 1
         return edge
 
     def _require_registered(self, addr: StructuralAddress) -> None:
@@ -324,3 +342,14 @@ class AddressRegistry:
 
     def all_addresses(self) -> List[StructuralAddress]:
         return list(self._addresses.values())
+
+    def is_current_address(self, addr: StructuralAddress) -> bool:
+        """P1-B2: 只读判断——`addr` 是否仍是该 uid 当前有效的地址版本（不
+        raise，供 `ThermalTransportPlan.prepare()` 批量校验时使用，同
+        `_require_registered()` 的判定逻辑，只是不抛异常改为返回布尔值）。
+        """
+        return self._addresses.get(addr.uid) == addr
+
+    def is_current_ordered_edge(self, edge: OrderedEdgeIdentity) -> bool:
+        """P1-B2: 只读判断——`edge` 是否仍是该 uid 当前注册的有序边身份。"""
+        return self._ord_edges.get(edge.uid) == edge
