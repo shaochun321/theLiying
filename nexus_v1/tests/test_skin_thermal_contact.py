@@ -1,9 +1,12 @@
-"""T-STC-1~8：P0 世界-身体边界与联合守恒闭合验收。
+"""T-STC-1~14：P0 世界-身体边界与联合守恒闭合验收 + P1-0 前置收口。
 
-方案依据：第二十二节 22.5/22.6。第十四份交叉比对批判建议恢复已暂停的
-W2B 支线（重命名+范围收紧为 P0），验收范围严格限定：单接触点/3~5个
-`ThermalCell`/单动态热源/失败路径测试，不接 ξ^occ/Neuron/Bundle/L3/
-坐标组件。
+方案依据：第二十二节 22.5/22.6（P0）+ 第二十三节 23.3（P1-0）。第十四份
+交叉比对批判建议恢复已暂停的 W2B 支线（重命名+范围收紧为 P0），验收范围
+严格限定：单接触点/3~5个`ThermalCell`/单动态热源/失败路径测试，不接
+ξ^occ/Neuron/Bundle/L3/坐标组件。第十五份批判确认 P0 机制成立但指出真实
+接触边稳定性缺口（已用代码复现验证：小kappa+大h+小皮肤热容场景下
+`is_stable(world)=True`但实际发散到~1e25），T-STC-11~14 覆盖修复后的
+`is_contact_stable()` 四种失稳场景；T-STC-9/10 补逆向交换与长程收敛。
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from nexus_v1.components.semiconductor import Capacitor
 from nexus_v1.components.thermal_source_coupling import DynamicHeatSource, ThermalFieldLocator
 from nexus_v1.components.skin_thermal_contact import (
     SkinThermalState, ThermalContact, couple_world_skin_step,
+    contact_stability_numbers, is_contact_stable,
 )
 
 _RESIDUAL_TOL = 1e-9
@@ -131,6 +135,91 @@ def test_stc_8_no_skin_leak_by_default():
         assert ledger.e_loss_skin == 0.0
 
 
+# ── P1-0 前置收口新增测试（方案第二十三节 23.3）──
+
+def test_stc_9_reverse_exchange_skin_hotter_than_world():
+    """T-STC-9: 皮肤更热时（T_s>T_w），世界获得能量、皮肤失去能量，
+    联合账本仍闭合（批判十五§四：防止实现只适配"世界加热皮肤"这一方向）。
+    """
+    world, source, locator, skin, contact = _build_rig(power=0.0, energy=0.0)
+    skin.capacitor.charge = 5.0  # 皮肤初始远高于世界(T_world=0)
+    e_world_before = world.total_energy()
+    e_skin_before = skin.capacitor.charge
+
+    ledger = couple_world_skin_step(source, locator, world, contact, skin, dt=0.2)
+
+    assert ledger.delta_e_world > 0.0  # 世界获得能量
+    assert ledger.delta_e_skin < 0.0   # 皮肤失去能量
+    assert ledger.residual < _RESIDUAL_TOL
+    assert world.total_energy() > e_world_before
+    assert skin.capacitor.charge < e_skin_before
+
+
+def test_stc_10_long_run_convergence_no_overshoot():
+    """T-STC-10: 长程运行覆盖接触时间常数 τ_ws 的多个倍数，ΔT=T_w-T_s
+    应单调趋于0，不出现过冲或符号振荡（批判十五§四）。
+
+    隔离场景：世界无环境泄漏、无热源、无扩散干扰（单节点世界），只让
+    接触通道单独驱动，精确对照批判给出的解析递推
+    ΔT^{n+1}=[1-χ_contact]ΔT^n（否则世界自身的环境泄漏/扩散会叠加进
+    ΔT 的演化，破坏"只测接触通道单调性"这个验证目标）。
+    """
+    world = _build_world(n=1, kappa=0.0, r_leak_ambient=None)
+    source = DynamicHeatSource(position=(0.0, 0, 0), energy_remaining=0.0, power=0.0)
+    locator = ThermalFieldLocator(k=1)
+    skin = SkinThermalState(patch_id=0, capacitor=Capacitor(capacitance=1.0))
+    contact = ThermalContact(world_node_id=0, skin_patch_id=0, h=0.1, area=1.0)
+    world.cells[0].capacitor.charge = 5.0  # 初始温差
+    dt = 0.2
+    h_total = contact.h * contact.area
+    c_w = world.cells[0].capacitor.capacitance
+    c_s = skin.capacitor.capacitance
+    tau_ws = 1.0 / (h_total * (1.0 / c_w + 1.0 / c_s))
+
+    n_steps = int(10 * tau_ws / dt)  # 覆盖约10个时间常数，确保充分收敛
+    prev_dT = world.cells[0].temperature - skin.temperature
+    sign = 1 if prev_dT > 0 else -1
+    for _ in range(n_steps):
+        couple_world_skin_step(source, locator, world, contact, skin, dt=dt)
+        dT = world.cells[0].temperature - skin.temperature
+        # 单调性：|dT|不应增大，且不应变号（无振荡）
+        assert abs(dT) <= abs(prev_dT) + 1e-9
+        assert (dT >= 0) == (sign >= 0) or abs(dT) < 1e-6
+        prev_dT = dT
+    assert abs(prev_dT) < 0.01  # 10个τ后应基本收敛到0
+
+
+@pytest.mark.parametrize("h,area,skin_cap,dt", [
+    (1000.0, 1.0, 1.0, 0.2),   # 大h
+    (0.1, 5000.0, 1.0, 0.2),   # 大area
+    (0.1, 1.0, 1e-4, 0.2),     # 小C_s
+    (0.1, 1.0, 1.0, 5000.0),   # 大dt
+])
+def test_stc_11_14_contact_instability_rejected(h, area, skin_cap, dt):
+    """T-STC-11~14: 四种接触失稳场景（大h/大area/小C_s/大dt）均在
+    source.release()前被 is_contact_stable() 正确拒绝，三方状态未被触碰
+    （批判十五§二，同T-STC-5方法论扩展到接触边）。
+    """
+    world = _build_world(n=4, kappa=0.001, r_leak_ambient=None)  # 世界侧极稳
+    source = DynamicHeatSource(position=(0.0, 0, 0), energy_remaining=1000.0, power=5.0)
+    locator = ThermalFieldLocator(k=2)
+    skin = SkinThermalState(patch_id=0, capacitor=Capacitor(capacitance=skin_cap))
+    contact = ThermalContact(world_node_id=1, skin_patch_id=0, h=h, area=area)
+
+    assert not is_contact_stable(contact, world, skin, dt)
+
+    energy_before = source.energy_remaining
+    world_energy_before = world.total_energy()
+    skin_charge_before = skin.capacitor.charge
+
+    with pytest.raises(ValueError):
+        couple_world_skin_step(source, locator, world, contact, skin, dt=dt)
+
+    assert source.energy_remaining == energy_before
+    assert world.total_energy() == world_energy_before
+    assert skin.capacitor.charge == skin_charge_before
+
+
 if __name__ == "__main__":
     test_stc_1_joint_conservation_holds_over_time()
     test_stc_2_skin_temperature_rises_from_world_heat()
@@ -140,4 +229,13 @@ if __name__ == "__main__":
     test_stc_6_scope_no_xi_occ_neuron_bundle_dependency()
     test_stc_7_multi_cell_world_still_conserves()
     test_stc_8_no_skin_leak_by_default()
-    print("T-STC-1~8 ALL PASS")
+    test_stc_9_reverse_exchange_skin_hotter_than_world()
+    test_stc_10_long_run_convergence_no_overshoot()
+    for _h, _area, _skin_cap, _dt in [
+        (1000.0, 1.0, 1.0, 0.2),
+        (0.1, 5000.0, 1.0, 0.2),
+        (0.1, 1.0, 1e-4, 0.2),
+        (0.1, 1.0, 1.0, 5000.0),
+    ]:
+        test_stc_11_14_contact_instability_rejected(_h, _area, _skin_cap, _dt)
+    print("T-STC-1~14 ALL PASS")
