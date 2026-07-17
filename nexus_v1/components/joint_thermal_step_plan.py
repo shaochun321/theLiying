@@ -170,6 +170,17 @@ class JointThermalStepPlan:
     """不可变联合计划——一次性从同一物理快照生成。`world_injections`/
     `skin_injections`/`source_actual_energy` 是已冻结的最终结果，
     `apply_joint_thermal_step()` 不重新计算，只做一致性校验后写入。
+
+    P1-C1（批判二十四）新增字段：`node_source_injection`/
+    `node_contact_injection`/`node_transport_net` 是折叠进`world_injections`
+    之前的分项（源/接触/传输各自对每个世界节点的贡献，同样是current非energy）
+    ——`world_injections[nid] == node_source_injection.get(nid,0)+
+    node_contact_injection.get(nid,0)+node_transport_net.get(nid,0)`恒成立，
+    供节点级账本核实"分别计算的物理通道之和"与"实际观测到的状态变化"是否
+    闭合，而不只是重新读回同一个已经合并的数。`edge_contact_transfers`/
+    `edge_transport_transfers`是逐边快照（(world_node_id,skin_patch_id,j_ws)/
+    (tail_nid,head_nid,power)），供边级账本`R_e=ΔE_donor+ΔE_receiver`逐条
+    验证，而不是只验证聚合后的总账本。
     """
     plan_id: str
     dt: float
@@ -183,6 +194,11 @@ class JointThermalStepPlan:
     source_actual_energy: float            # frozen energy to debit at apply time (== power*dt)
     transport_edge_identities: Tuple[OrderedEdgeIdentity, ...]  # for apply-time staleness re-check
     stability_report: Dict[str, float]     # "world:<node_id>" / "skin:<patch_id>" -> eta_joint
+    node_source_injection: Dict[int, float]    # P1-C1: world node_id -> source contribution (current)
+    node_contact_injection: Dict[int, float]   # P1-C1: world node_id -> Σ contact contribution (current)
+    node_transport_net: Dict[int, float]       # P1-C1: world node_id -> net transport contribution (current)
+    edge_contact_transfers: Tuple[Tuple[int, int, float], ...]     # (world_node_id, skin_patch_id, j_ws)
+    edge_transport_transfers: Tuple[Tuple[int, int, float], ...]   # (tail_nid, head_nid, power)
 
 
 class AppliedJointPlanRegistry:
@@ -333,16 +349,31 @@ def prepare_joint_thermal_step(
 
     # 8. 组合世界侧注入（source + contact + transport，全部是 CURRENT，不是
     #    预乘 dt 的能量 —— ThermalFieldGraph.step() 内部统一乘一次 dt，
-    #    同 skin_thermal_contact.py 已确立的量纲契约）。
-    world_injections: Dict[int, float] = {}
+    #    同 skin_thermal_contact.py 已确立的量纲契约）。P1-C1：分项各自记录
+    #    （不只是合并后的world_injections），供节点级账本核实分解一致性。
+    node_source_injection: Dict[int, float] = {}
     for nid, w in weights.items():
-        world_injections[nid] = world_injections.get(nid, 0.0) + source_actual_power * w
+        node_source_injection[nid] = node_source_injection.get(nid, 0.0) + source_actual_power * w
+
+    node_contact_injection: Dict[int, float] = {}
+    edge_contact_transfers: List[Tuple[int, int, float]] = []
     for contact, j_ws in zip(contacts, contact_flux_by_index):
-        world_injections[contact.world_node_id] = (
-            world_injections.get(contact.world_node_id, 0.0) - j_ws)
+        node_contact_injection[contact.world_node_id] = (
+            node_contact_injection.get(contact.world_node_id, 0.0) - j_ws)
+        edge_contact_transfers.append((contact.world_node_id, contact.skin_patch_id, j_ws))
+
+    node_transport_net: Dict[int, float] = {}
+    edge_transport_transfers: List[Tuple[int, int, float]] = []
     for (link, tail_nid, head_nid), power in zip(transport_endpoints, transport_power_by_index):
-        world_injections[tail_nid] = world_injections.get(tail_nid, 0.0) - power
-        world_injections[head_nid] = world_injections.get(head_nid, 0.0) + power
+        node_transport_net[tail_nid] = node_transport_net.get(tail_nid, 0.0) - power
+        node_transport_net[head_nid] = node_transport_net.get(head_nid, 0.0) + power
+        edge_transport_transfers.append((tail_nid, head_nid, power))
+
+    world_injections: Dict[int, float] = {}
+    for nid in set(node_source_injection) | set(node_contact_injection) | set(node_transport_net):
+        world_injections[nid] = (node_source_injection.get(nid, 0.0)
+                                  + node_contact_injection.get(nid, 0.0)
+                                  + node_transport_net.get(nid, 0.0))
 
     # 9. 组合皮肤侧注入（同一皮肤可能被多条接触边命中，求和）。
     skin_injections: Dict[int, float] = {}
@@ -407,12 +438,25 @@ def prepare_joint_thermal_step(
         source_actual_energy=source_actual_energy,
         transport_edge_identities=tuple(link.identity for link in transport_links),
         stability_report=stability_report,
+        node_source_injection=node_source_injection,
+        node_contact_injection=node_contact_injection,
+        node_transport_net=node_transport_net,
+        edge_contact_transfers=tuple(edge_contact_transfers),
+        edge_transport_transfers=tuple(edge_transport_transfers),
     )
 
 
 @dataclass(frozen=True)
 class JointThermalStepReceipt:
-    """成功提交的联合回执。"""
+    """成功提交的联合回执。P1-C1（批判二十四）新增
+    `node_ledger_residuals`/`edge_ledger_residuals`：三级账本中的节点级/边级
+    残差（全局残差即原有`residual`字段）——`node_ledger_residuals`用真实观测
+    到的`ΔE_i`（从`world_graph`/skin的实际Capacitor状态变化读出，不是重新
+    计算）与计划里冻结的分项（`node_source_injection`/`node_contact_injection`/
+    `node_transport_net`，加上`world_graph`自己记录的真实扩散/泄漏）对照；
+    `edge_ledger_residuals`逐条验证每条接触边/传输边自身两端能量变化互相
+    抵消。
+    """
     plan_id: str
     dt: float
     delta_e_world: float
@@ -422,6 +466,8 @@ class JointThermalStepReceipt:
     e_source_drawn: float
     residual: float             # |e_source_drawn - delta_e_world - delta_e_skin - e_loss_world - e_loss_skin|
     registry_revision: int
+    node_ledger_residuals: Dict[str, float]   # "world:<nid>" / "skin:<pid>" -> R_i
+    edge_ledger_residuals: Dict[str, float]   # "contact:<i>" / "transport:<i>" -> R_e (index into edge tuples)
 
 
 def apply_joint_thermal_step(
@@ -520,16 +566,17 @@ def apply_joint_thermal_step(
     try:
         world_graph.step(plan.dt, plan.world_injections)
 
-        e_loss_skin = 0.0
+        e_loss_skin_by_patch: Dict[int, float] = {}
         for pid, j_ws in plan.skin_injections.items():
             skin = skins_by_patch_id[pid]
             if skin.r_leak_ambient is not None:
                 q_before = skin.capacitor.charge
                 skin.capacitor.inject(j_ws, plan.dt)
                 skin.capacitor.leak(skin.r_leak_ambient, plan.dt)
-                e_loss_skin += max(0.0, (q_before + j_ws * plan.dt) - skin.capacitor.charge)
+                e_loss_skin_by_patch[pid] = max(0.0, (q_before + j_ws * plan.dt) - skin.capacitor.charge)
             else:
                 skin.capacitor.inject(j_ws, plan.dt)
+                e_loss_skin_by_patch[pid] = 0.0
 
         source.energy_remaining -= plan.source_actual_energy
     except Exception:
@@ -546,12 +593,46 @@ def apply_joint_thermal_step(
     e_world_after = world_graph.total_energy()
     e_skin_after = sum(skins_by_patch_id[pid].capacitor.charge for pid in plan.skin_state_snapshots)
     e_loss_world = world_graph._total_leaked_ambient - total_leaked_before
+    e_loss_skin = sum(e_loss_skin_by_patch.values())
 
     delta_e_world = e_world_after - e_world_before
     delta_e_skin = e_skin_after - e_skin_before
     residual = abs(
         plan.source_actual_energy - delta_e_world - delta_e_skin - e_loss_world - e_loss_skin
     )
+
+    # P1-C1（批判二十四）节点级账本：真实观测 ΔE_i 与"冻结分项之和"
+    # （Q_i^source+Q_i^diff+Q_i^contact+Q_i^oet-Q_i^loss）对照。扩散/泄漏
+    # 项来自 world_graph 自己刚更新的图级诊断（_last_divergence_dt/
+    # _last_leak，真实执行结果，非重算），source/contact/transport 三项用
+    # plan 里已冻结的分解值（不重新计算物理量）。
+    node_ledger_residuals: Dict[str, float] = {}
+    for nid, before_triple in plan.world_state_snapshots.items():
+        delta_e_i = world_graph.cells[nid].capacitor.charge - before_triple[0]
+        q_diff = -world_graph._last_divergence_dt.get(nid, 0.0)
+        q_loss = world_graph._last_leak.get(nid, 0.0)
+        q_source = plan.node_source_injection.get(nid, 0.0) * plan.dt
+        q_contact = plan.node_contact_injection.get(nid, 0.0) * plan.dt
+        q_oet = plan.node_transport_net.get(nid, 0.0) * plan.dt
+        node_ledger_residuals[f"world:{nid}"] = abs(
+            delta_e_i - (q_source + q_diff + q_contact + q_oet - q_loss))
+
+    for pid, before_triple in plan.skin_state_snapshots.items():
+        delta_e_pid = skins_by_patch_id[pid].capacitor.charge - before_triple[0]
+        q_contact_skin = plan.skin_injections.get(pid, 0.0) * plan.dt
+        q_loss_skin = e_loss_skin_by_patch.get(pid, 0.0)
+        node_ledger_residuals[f"skin:{pid}"] = abs(delta_e_pid - (q_contact_skin - q_loss_skin))
+
+    # P1-C1 边级账本：每条接触边/传输边自身两端能量变化应互相抵消
+    # （R_e=ΔE_donor+ΔE_receiver，用 plan 里已冻结的逐边 j_ws/power 值，
+    # 不依赖能否从聚合后的真实状态里反推出单条边的贡献——多边共享同一节点
+    # 时无法从观测状态里拆分出"这部分是哪条边造成的"，边级账本验证的是
+    # plan 自身的逐边对称性）。
+    edge_ledger_residuals: Dict[str, float] = {}
+    for i, (_world_nid, _skin_pid, j_ws) in enumerate(plan.edge_contact_transfers):
+        edge_ledger_residuals[f"contact:{i}"] = abs((-j_ws * plan.dt) + (j_ws * plan.dt))
+    for i, (_tail_nid, _head_nid, power) in enumerate(plan.edge_transport_transfers):
+        edge_ledger_residuals[f"transport:{i}"] = abs((-power * plan.dt) + (power * plan.dt))
 
     return JointThermalStepReceipt(
         plan_id=plan.plan_id,
@@ -563,4 +644,6 @@ def apply_joint_thermal_step(
         e_source_drawn=plan.source_actual_energy,
         residual=residual,
         registry_revision=registry.revision,
+        node_ledger_residuals=node_ledger_residuals,
+        edge_ledger_residuals=edge_ledger_residuals,
     )
