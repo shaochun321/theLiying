@@ -183,6 +183,8 @@ class AddressRegistry:
         self._addresses: Dict[str, StructuralAddress] = {}          # uid -> address
         self._local_to_uid: Dict[Tuple[str, Any], str] = {}         # (domain, local_key) -> uid
         self._uid_to_local: Dict[str, Any] = {}                     # uid -> current local_key
+        self._generated: Dict[str, GeneratedAddress] = {}                  # uid -> generated address (P2)
+        self._generated_local_to_uid: Dict[Tuple[str, Any], str] = {}      # (domain, local_key) -> uid (P2)
         self._sym_edges: Dict[str, SymmetricEdgeIdentity] = {}
         self._ord_edges: Dict[str, OrderedEdgeIdentity] = {}
         self._sym_edge_keys: Dict[Tuple[FrozenSet[str], str], str] = {}   # (endpoint uids, mechanism) -> edge uid
@@ -226,6 +228,48 @@ class AddressRegistry:
         self._addresses[uid] = addr
         self._local_to_uid[key] = uid
         self._uid_to_local[uid] = local_key
+        self._revision += 1
+        return addr
+
+    def register_generated(
+        self,
+        domain: str,
+        local_key: Any,
+        parent_addresses: Tuple[Union[StructuralAddress, "GeneratedAddress"], ...],
+        generation_depth: int,
+    ) -> GeneratedAddress:
+        """P2 首次接线：为关系生成物（ξ^occ/r≺^τ/r_ρ^τ）分配 `GeneratedAddress`。
+        对称于 `register_physical`：幂等（同一 `(domain, local_key)` 重复调用
+        返回同一地址，忽略后续调用传入的 `parent_addresses`/`generation_depth`），
+        `uid = f"{domain}:{local_key}"`，version=0。
+
+        与 `register_physical` 的区别只在于域集合（`_GENERATED_DOMAINS` 而非
+        `_PHYSICAL_DOMAINS`）和多出的谱系字段（`parent_addresses`/
+        `generation_depth`，由 `GeneratedAddress.__post_init__` 校验非负）。
+        `parent_addresses` 必须非空——生成物地址不允许悬空谱系（禁止"猜回"
+        物理上已丢失的信息，等价于强制每个生成物可追溯至少一个真实支撑）。
+        """
+        if domain not in _GENERATED_DOMAINS:
+            raise ValueError(f"register_generated: unknown generated domain {domain!r}, "
+                              f"expected one of {sorted(_GENERATED_DOMAINS)}")
+        if not parent_addresses:
+            raise ValueError("register_generated: parent_addresses must be non-empty "
+                              "(a generated address must trace back to at least one "
+                              "physical or generated parent)")
+        for p in parent_addresses:
+            if not isinstance(p, (StructuralAddress, GeneratedAddress)):
+                raise TypeError(f"register_generated: parent_addresses entries must be "
+                                 f"StructuralAddress or GeneratedAddress, got {type(p)!r}")
+        key = (domain, local_key)
+        if key in self._generated_local_to_uid:
+            uid = self._generated_local_to_uid[key]
+            return self._generated[uid]
+        uid = f"{domain}:{local_key}"
+        addr = GeneratedAddress(
+            domain=domain, uid=uid, parent_addresses=tuple(parent_addresses),
+            generation_depth=generation_depth, version=0)
+        self._generated[uid] = addr
+        self._generated_local_to_uid[key] = uid
         self._revision += 1
         return addr
 
@@ -342,6 +386,9 @@ class AddressRegistry:
 
     def all_addresses(self) -> List[StructuralAddress]:
         return list(self._addresses.values())
+
+    def all_generated(self) -> List[GeneratedAddress]:
+        return list(self._generated.values())
 
     def is_current_address(self, addr: StructuralAddress) -> bool:
         """P1-B2: 只读判断——`addr` 是否仍是该 uid 当前有效的地址版本（不
