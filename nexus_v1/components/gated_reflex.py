@@ -43,15 +43,16 @@ class GatedReflexArc:
                  g_min: float = 0.3, g_max: float = 2.0):
         # ── gain_gate 神经元：慢积分上下文 → 增益指令 ──
         # Q3: C=200, r_leak=5.0 → τ=1000 步，匹配 hunger 上下文时间尺度(方案 v2 §9.4)。
-        #     无 bc 基线：full(hunger→0) 时 vm→0 → m_gate→0 → gain→g_min=0.3(抑制热趋, 期望态)；
-        #     hungry 时 hunger 电流抬 vm → gain↑。V_ss=I·r_leak=I·5(对 hunger 敏感)。
+        #     bc_current=0.082 → baseline vm=bc·r_leak=0.41 → m_gate=0.41 → gain≈1.0(基线中性)。
+        #     **基线=1.0 让先天反射正常工作(body 可觅食自举拿到奖励)**；hunger 在此之上上调增益,
+        #     STDP 学"饥饿→更强热趋"(饱腹回落基线; 完全抑制需 satiety 入负向门, 属扩展)。
         #     gate 信号用膜电位 vm(干净线性积分), 避开 activation 非线性压缩。
         #     maturation_stage=0: 使入射束走 STDP(spine 可塑)。
         self.gain_gate = Neuron(NeuronConfig(
             neuron_id="gain_gate",
             capacitance=200.0, r_leak=5.0, v_rest=0.0, region=0x04,
             channels=[ChannelConfig(name="default", v_threshold=0.01, gm=1.0)],
-            use_bias_current=False, bc_current=0.0,
+            use_bias_current=True, bc_current=0.082,
             energy=10.0, spiking=False, maturation_stage=0,
             trace_tau_pre=20.0, trace_tau_post=20.0,
         ))
