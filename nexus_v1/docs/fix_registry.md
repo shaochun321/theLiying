@@ -286,3 +286,30 @@
   - w(oto_x)/w(oto_y) = 1.49× → 方向学习成功
 - **副作用**: 跨轴权重不再受 BCM 竞争修剪（但有衰减限制增长）
 
+---
+
+### FIX-019: ThermalDeltaNeuron 输出上限钳位
+- **日期**: 2026-07-21
+- **关联降级**: DEG-015
+- **修改文件**: `somatosensory/transducer_neurons.py` — `ThermalDeltaNeuron`
+  新增类常量 `_ACTIVATION_MAX=10.0`，`step()` 里
+  `self.activation = min(max(0.0, dT_raw*_WARM_ONSET_GAIN), self._ACTIVATION_MAX)`
+- **根因分析**: 见 DEG-015。`ThermalDeltaNeuron.step()` 完全覆写基类，
+  从未经过基类 ±10.0 activation 钳位，输出理论线性无界，导致下游
+  ensemble PowerRail 在足够大的 dT 下被完全拖垮。
+- **推导依据**:
+  数值一致性：`10.0` 复用基类 `Neuron.step()` 已建立的 ±10.0 activation
+  钳位惯例（`neuron.py:438/466`），不新造标准。
+  实证依据：`exp_P2A_highinput_root_cause.py` 精细网格扫描（L1=1→40）
+  实测在该 cap 值下 ensemble PowerRail `v_actual` 稳定在 ~0.42-0.48
+  （有意义存活，非崩溃），不是凭空选择的数字。
+- **验证**:
+  - 修复前：u≥0.2 时 ensemble `v_actual` 精确坍缩为 0，n_occ/peak_pre_trace
+    归零（完全静默）。
+  - 修复后：u=0.05~5.0 全部保持 n_occ=2，`peak_pre_trace≈1.0`，
+    `ensemble.v_actual` 恒为 ~0.42（不再随 u 继续崩溃）。
+  - T-P2AG-1~12（12/12）+ T-STP-1~5（5/5）+ 既有 basegen/P2A0 契约
+    （14/14）+ 全量回归 21/21 全部 PASS。
+- **副作用**: 无（L1 输出高端从"理论无界"变为"cap 在 10.0"，只影响
+  u 极大时的行为，不影响既有 u≤0.05 范围内任何已验证测试）。
+

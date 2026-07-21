@@ -167,3 +167,30 @@
 - **状态**: FIXED
 - **修复**: FIX-016
 
+---
+
+### DEG-015: P2-A 生成元核心高输入完全静默（带通响应高端截止）
+- **发现时间**: 2026-07-21
+- **现象**: P2-A1a 输入包络扫描（`exp_P2A1a_input_envelope_scan.py`）发现
+  基础生成元(`BaseGenerator`)在输入 u≥0.2 时 n_occ 归零、`peak_pre_trace`
+  归零——不是持续高位不退出式饱和，而是完全静默，形成非单调带通响应
+  （u∈[0.0005,0.1]活跃，u≥0.2静默）。
+- **影响层**: `nexus_v1/generators/`（P2-A 基础生成元）→
+  `somatosensory/transducer_neurons.py`（L1 ThermalDeltaNeuron）
+- **根因**: 用户指定方法（比对u=0.1/0.2/0.5逐级检查L1/HC/ensemble/collector,
+  见`exp_P2A_highinput_root_cause.py`）实测定位：
+  1. `ThermalDeltaNeuron.step()` 完全覆写基类 `Neuron.step()`（PHYS注释
+     "bypasses RC"），从未经过基类的 ±10.0 activation 钳位，输出
+     `max(0,dT×200)` 理论线性无界增长。
+  2. 精细网格实测（L1=1→40）显示 ensemble PowerRail 的
+     `v_actual=max(0,vdd-I·r_internal)` 随 L1 输出连续平滑衰减
+     （0.925→0.808→0.458→0.025→0），在 L1≈20（u=0.1）时已几乎完全崩溃
+     （0.03-0.04），L1≥30（u≥0.15）时精确坍缩为 0——collector 随之完全
+     收不到输入。
+  - 与 DEG-014/`project_memristor_saturation_edge_bug` 记录的同一机制
+    （注入电流超过 PowerRail 供电能力 → v_avail 钳死为 0）同源，
+    2026-07-11 的规避（L1→HC bundle weight 降到 0.3）只假设"dT≤0.1安全"，
+    未在 L1 输出本身设上限，该假设在 ensemble 这一级实测已不成立。
+- **状态**: FIXED
+- **修复**: FIX-019
+

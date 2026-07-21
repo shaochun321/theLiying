@@ -259,9 +259,35 @@ class ThermalDeltaNeuron(Neuron):
     REF: LaMotte & Campbell 1978 J Neurophysiol 41:924 — Type II AMH warm-onset.
     SEMI: MOSFET half-wave: activation = max(0, dT × WARM_ONSET_GAIN).
     PHYS: step() bypasses RC (SkinPatch already applies τ=5s integration).
+
+    FIX-019 (2026-07-21, DEG-015): `activation` now clamped to
+    `_ACTIVATION_MAX=10.0` (matching the base `Neuron.step()` ±10.0
+    activation clamp convention already used everywhere else — see
+    `neuron.py:438/466`). Root cause: this class fully overrides
+    `Neuron.step()` (PHYS note above) and therefore never went through
+    that base-class clamp, so its output was genuinely unbounded
+    (`dT_raw × 200`, linear, no ceiling). P2-A generator-core root-cause
+    diagnosis (`exp_P2A_highinput_root_cause.py`, u=0.1/0.2/0.5 fine
+    sweep) empirically confirmed: downstream ensemble neurons' `PowerRail`
+    IR-drop (`semiconductor.py:290-294`, `v_actual=max(0,vdd-I·r_internal)`)
+    saturates smoothly-but-fully to 0 once L1's unbounded output drives
+    injected current past `vdd/r_internal`; at `activation=20` (u=0.1)
+    ensemble `PowerRail.v_actual` was already down to ~0.03-0.04 (nearly
+    fully collapsed), and by `activation=30` (u=0.15) it was exactly 0 for
+    every ensemble neuron — silencing the entire downstream pathway. This
+    is the same collapse family already logged as
+    `project_memristor_saturation_edge_bug`/DEG-014 (PowerRail draws current
+    beyond its rail capacity → v_avail clamps to 0), recurring here because
+    the 2026-07-11 fix for that bug only capped the L1→HC bundle weight
+    (assuming "dT≤0.1 stays safe"), not L1's own output — an assumption
+    silently violated once P2-A1a scanned dT beyond 0.1.
+    `_ACTIVATION_MAX=10.0` keeps ensemble `PowerRail.v_actual` at ≈0.46-0.48
+    (meaningfully alive, not collapsed) at the cap, verified empirically
+    by the same diagnostic script.
     """
 
     _TRACE_DECAY: float = 0.99
+    _ACTIVATION_MAX: float = 10.0
 
     def __init__(self, patch_id: str,
                  position: tuple = (0.0, 0.0, 0.0)) -> None:
@@ -284,10 +310,12 @@ class ThermalDeltaNeuron(Neuron):
             dt:     timestep (seconds; used for trace decay).
 
         Returns:
-            activation = max(0, dT_raw × WARM_ONSET_GAIN)
-                         (MOSFET half-wave: zero output on cooling)
+            activation = clip(max(0, dT_raw × WARM_ONSET_GAIN), 0, _ACTIVATION_MAX)
+                         (MOSFET half-wave: zero output on cooling; upper
+                         clamp added by FIX-019, see class docstring)
         """
-        self.activation = max(0.0, dT_raw * _WARM_ONSET_GAIN)
+        self.activation = min(
+            max(0.0, dT_raw * _WARM_ONSET_GAIN), self._ACTIVATION_MAX)
         self.pre_trace = (self.pre_trace * self._TRACE_DECAY
                           + abs(self.activation))
         self.pre_trace = min(self.pre_trace, 10.0)
