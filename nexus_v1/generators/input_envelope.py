@@ -67,6 +67,13 @@ class InputEnvelopePoint:
                         T-P2AG-5 已验证过的边界情形，是判断"是否已进入
                         u_sat 区"的关键证据之一。
       steps_observed:   本档实际驱动的步数。
+      l1_activation_final:
+                        扫描窗口结束时 `handle.l1.activation` 的值（P2-A1a-R
+                        新增，`评判_P2A1a响应重分类评判_2026-07-21.md`
+                        非阻塞一）——区分`𝒟_disc`（输入变化仍能造成可区分
+                        L1 输出）与`𝒮_cap`（被 L1 上限钳位 `_ACTIVATION_
+                        MAX=10.0` 而趋于等价）的直接证据。默认 None（向后
+                        兼容——旧调用点不受影响）。
     """
     u: float
     n_occ: int
@@ -76,6 +83,7 @@ class InputEnvelopePoint:
     peak_pre_trace: float
     ends_active: bool
     steps_observed: int
+    l1_activation_final: Optional[float] = None
 
 
 def scan_input_envelope(
@@ -116,5 +124,6 @@ def scan_input_envelope(
             u=u, n_occ=n_occ, l_first=l_first, mean_t_active=mean_t_active,
             f_occ=f_occ, peak_pre_trace=peak, ends_active=handle.closure.is_active,
             steps_observed=steps_per_level,
+            l1_activation_final=handle.l1.activation,
         ))
     return results
