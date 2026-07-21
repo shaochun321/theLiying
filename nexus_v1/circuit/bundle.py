@@ -171,6 +171,10 @@ class SynapticBundle:
         # zlib.crc32 对稳定字符串摘要——crc32 跨进程/跨解释器完全确定，
         # 不依赖任何环境变量。数学不变：仍是基于(bundle_id,i_s,i_t)三元组
         # 的[-0.25,+0.25]均匀分布扰动，只换随机性来源。
+        # 非阻塞说明（评判document-2026-07-21T161711.318.md）：
+        # `crc32(...) % 10000` 仍可能让不同三元组偶然得到相同种子（有限
+        # 种子空间的固有属性，任何取模哈希都有此性质），这不是本次修复
+        # 引入的新缺陷，当前不需要为此深挖或引入 model_seed。
         self._memristors: List[List[Memristor]] = []
         for i_s, _s in enumerate(sources):
             row = []

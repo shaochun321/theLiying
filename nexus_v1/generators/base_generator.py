@@ -46,7 +46,7 @@ RULES.md 强制三问：
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from ..circuit.bundle import SynapticBundle
@@ -56,7 +56,20 @@ from ..components.structural_address import (
 )
 from ..somatosensory.transducer_neurons import ThermalDeltaNeuron
 from .occurrence import Occurrence, OccurrenceClosure
+from .skin_transduction import TransductionConfig, transduce
 from .trajectory import GeneratorTrajectory
+
+# P2-A1b-3：驱动权归属守卫（评判document-2026-07-21T161711.318.md「①驱动
+# 权归属守卫」）。风格对齐既有`ordered_excess_thermal_energy_link.py`的
+# `transport_drive_mode`纯字符串模块常量先例（不用Enum）。
+# MANUAL_CALIBRATION = feed()/tick()手动喂合成dT_raw的标定路径（既有）；
+# WORLD_COUPLED = feed_from_skin()/tick_from_skin()经转导映射喂真实
+# q_i^skin(t)的世界耦合路径（本轮新增）。同一BaseGenerator实例运行中只能
+# 被其中一种模式驱动，冲突立即报错，不静默累加（对齐本项目"拒绝在前、不
+# 静默钳位"的既有纪律，如`ordered_excess_thermal_energy_link.py`/
+# `thermal_source_coupling.py`的fail-fast前置校验）。
+DRIVE_MODE_MANUAL_CALIBRATION = "manual_calibration"
+DRIVE_MODE_WORLD_COUPLED = "world_coupled"
 
 
 def register_occ_thermal(
@@ -99,6 +112,11 @@ class BaseGenerator:
                             非 None 时每次 `tick()` 自动追加一条 `TrajectoryRecord`。
                             与 `Occurrence` 并列（Λ^org ∥ Λ^phys），不融合进
                             `Occurrence` 本身（反馈文档 §5.3 纪律）。
+      _drive_mode         — P2-A1b-3驱动权归属守卫内部状态（见模块级
+                            `DRIVE_MODE_*`常量）。None=未认领；首次调用
+                            `feed()`/`feed_from_skin()`之一即自动认领对应
+                            模式；此后同一实例只允许同模式调用，切换模式
+                            会`RuntimeError`（不静默累加）。
     """
     site_index: int
     polarity: str
@@ -112,27 +130,29 @@ class BaseGenerator:
     bundle_col: SynapticBundle
     closure: OccurrenceClosure
     trajectory: Optional[GeneratorTrajectory] = None
+    _drive_mode: Optional[str] = field(default=None, repr=False)
 
-    def feed(self, dT_raw: float, dt: float = 0.001) -> None:
-        """D_i^sim → 𝒢_i 正式输入端口：喂入原始温度差 dT_raw，驱动三级
-        传播一步（L1 → L2 → ensemble → collector）。
+    def _claim_drive_mode(self, mode: str) -> None:
+        """驱动权归属守卫：首次调用认领模式，此后模式不一致则拒绝
+        （fail-fast，对齐`ordered_excess_thermal_energy_link.py`/
+        `thermal_source_coupling.py`的"拒绝在前、不静默累加"纪律）。"""
+        if self._drive_mode is None:
+            self._drive_mode = mode
+        elif self._drive_mode != mode:
+            raise RuntimeError(
+                f"BaseGenerator(site_index={self.site_index}, polarity="
+                f"{self.polarity!r}) 已被 {self._drive_mode!r} 模式驱动，"
+                f"不能切换到 {mode!r}——同一实例运行中不能双重驱动。")
 
-        与 `tests/test_basegen_thermal_t0.py` 的 `_propagate_xi_point`
+    def _propagate(self, u_i: float, dt: float) -> None:
+        """三级传播一步（L1 → L2 → ensemble → collector），与驱动模式/
+        输入来源无关的纯物理传播逻辑。与
+        `tests/test_basegen_thermal_t0.py` 的 `_propagate_xi_point`
         是同一套传播序列——本方法把它从测试局部函数提升为生产代码，
         使测试与生成元核心本身共用一份实现，不再各自维护一份可能漂移
         的复制品。
-
-        **与 `circuit.step()` 互斥**：`VariantCircuit._step_quantum_thermal_
-        pathways`（`circuit/variant_adapter.py:1910`）在每次 `circuit.step()`
-        时已经用 world/body 真实采样自动驱动同一批 l1/hc/ensemble/collector
-        对象（本句柄只是引用，不是独立副本）。若调用方的 circuit 会持续
-        跑 `circuit.step()`，不要再调用本方法注入合成 dT——否则同一 pathway
-        每步会被驱动两次（真实 world dT + 合成 dT_raw 叠加），产生不属于
-        任何物理过程的伪造信号。`feed()`/`tick()` 只适用于"绕开 world/body
-        自主物理、手动喂合成 dT"的标定/测试场景（同 T0~T1 现有方法论），
-        与母本主循环二选一使用。
         """
-        self.l1.step(dT_raw, dt)
+        self.l1.step(u_i, dt)
 
         currents_hc = self.bundle_l1_hc.propagate()
         self.hc.step(currents_hc[0] if currents_hc else 0.0, dt)
@@ -143,6 +163,40 @@ class BaseGenerator:
 
         currents_col = self.bundle_col.propagate()
         self.collector.step(currents_col[0] if currents_col else 0.0, dt)
+
+    def feed(self, dT_raw: float, dt: float = 0.001) -> None:
+        """D_i^sim → 𝒢_i 正式输入端口（MANUAL_CALIBRATION 模式）：喂入
+        原始温度差 dT_raw，驱动三级传播一步。
+
+        **与 `circuit.step()` 互斥**：`VariantCircuit._step_quantum_thermal_
+        pathways`（`circuit/variant_adapter.py:1910`）在每次 `circuit.step()`
+        时已经用 world/body 真实采样自动驱动同一批 l1/hc/ensemble/collector
+        对象（本句柄只是引用，不是独立副本）。若调用方的 circuit 会持续
+        跑 `circuit.step()`，不要再调用本方法注入合成 dT——否则同一 pathway
+        每步会被驱动两次（真实 world dT + 合成 dT_raw 叠加），产生不属于
+        任何物理过程的伪造信号（此互斥仍只是文档警告，未被下面的驱动权
+        归属守卫覆盖——那个守卫管的是本模块内`feed()`与`feed_from_skin()`
+        的互斥，`circuit.step()`是另一套独立主循环，不在本句柄的守卫范围
+        内）。`feed()`/`tick()` 只适用于"绕开 world/body 自主物理、手动喂
+        合成 dT"的标定/测试场景（同 T0~T1 现有方法论），与母本主循环
+        二选一使用。
+        """
+        self._claim_drive_mode(DRIVE_MODE_MANUAL_CALIBRATION)
+        self._propagate(dT_raw, dt)
+
+    def feed_from_skin(
+        self, q_skin: float, config: TransductionConfig, dt: float = 0.001,
+    ) -> float:
+        """P2-A1b-3 正式接入转导映射（WORLD_COUPLED 模式）：`q_i^skin(t)`
+        经 `skin_transduction.transduce()` 映射为 `u_i(t)` 后驱动三级
+        传播一步。返回实际驱动值 `u_i`（供调用方连同原始 `q_skin` 一起
+        记入轨迹，见 `tick_from_skin()`——不能只记录转导后的浮点数，原始
+        `q_i^skin(t)` 必须完整保留）。
+        """
+        self._claim_drive_mode(DRIVE_MODE_WORLD_COUPLED)
+        u_i = transduce(q_skin, config)
+        self._propagate(u_i, dt)
+        return u_i
 
     def sense(self) -> float:
         """当前发生检测信号——collector 的 `pre_trace`（既有量，非本模块
@@ -162,6 +216,25 @@ class BaseGenerator:
                 u_i=dT_raw,
                 ensemble_values=tuple(n.pre_trace for n in self.ensemble),
                 collector_value=self.collector.pre_trace,
+            )
+        return self.closure.update(self.sense(), t_step)
+
+    def tick_from_skin(
+        self, q_skin: float, config: TransductionConfig, dt: float, t_step: int,
+    ) -> Optional[Occurrence]:
+        """feed_from_skin() + 闭合状态机推进一步 + (若挂载) 轨迹记录一步
+        （镜像 `tick()` 结构，WORLD_COUPLED 模式版本）。轨迹记录同时保留
+        原始 `q_skin` 与转导后的 `u_i`（`q_skin_raw`/`u_i` 两个字段），
+        不能只记录被 clip 后的 `u_i`。
+        """
+        u_i = self.feed_from_skin(q_skin, config, dt)
+        if self.trajectory is not None:
+            self.trajectory.record(
+                step_index=t_step,
+                u_i=u_i,
+                ensemble_values=tuple(n.pre_trace for n in self.ensemble),
+                collector_value=self.collector.pre_trace,
+                q_skin_raw=q_skin,
             )
         return self.closure.update(self.sense(), t_step)
 

@@ -35,7 +35,7 @@ RULES.md 强制三问：
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -46,23 +46,32 @@ class TrajectoryRecord:
       step_index:          本记录对应的 step（与 `Occurrence`/`OccurrenceClosure`
                             使用同一计数源，供 `GeneratorTrajectory.window()`
                             按 `[t_up, t_rearm)` 半开区间对齐切片）。
-      u_i:                 本步基础生成元输入端口量。当前 `BaseGenerator.feed()`
-                            把 `dT_raw` 一比一直接注入（κ_i 隐式为 1），本字段
-                            如实记录这个"当前最小映射"——不是温度/焦耳/安培天然
-                            等同后的统一量。未来 P2-A1 若标定出真实增益 κ_i，
-                            调用方应在生成 `u_i` 时先做 `κ_i·q_i^skin` 换算，
-                            本记录字段语义不变（仍是"喂给 feed() 的那个值"）。
+      u_i:                 本步基础生成元输入端口量——即实际驱动
+                            `_propagate()` 的值。`tick()`(MANUAL_CALIBRATION)
+                            路径下等于调用方传入的合成 `dT_raw`（κ_i 隐式为1）；
+                            `tick_from_skin()`(WORLD_COUPLED) 路径下等于
+                            `skin_transduction.transduce(q_skin, config)` 的
+                            输出（已经过κ_i/b_i/clip变换）。
       ensemble_pre_trace:   10 个 ensemble 神经元本步的 `pre_trace`（阶梯阈值
                             温度计编码，只读快照，不代表任何已确定的自然化
                             候选测度——是否可用作内部占比 ρ 的输入留给 P2-B）。
       collector_pre_trace:  collector（AND 门）本步的 `pre_trace`，即
                             `OccurrenceClosure` 用来判定 ARMED/ACTIVE/REFRACTORY
                             的同一信号。
+      q_skin_raw:           P2-A1b-3新增，可选（默认None）。WORLD_COUPLED
+                            路径下的原始未转导皮肤输出 `q_i^skin(t)`——转导
+                            映射会把大部分数值clip压缩，若只记录`u_i`会丢失
+                            原始物理轨迹，故与`u_i`一起保留（评判
+                            document-2026-07-21T161711.318.md「②正式接入
+                            转导映射」明确要求"不能只记录被clip后的u_i"）。
+                            MANUAL_CALIBRATION 路径下保持 None（没有皮肤，
+                            不适用）。
     """
     step_index: int
     u_i: float
     ensemble_pre_trace: Tuple[float, ...]
     collector_pre_trace: float
+    q_skin_raw: Optional[float] = None
 
 
 @dataclass
@@ -78,11 +87,13 @@ class GeneratorTrajectory:
     def record(
         self, step_index: int, u_i: float,
         ensemble_values: Tuple[float, ...], collector_value: float,
+        q_skin_raw: Optional[float] = None,
     ) -> None:
         self.records.append(TrajectoryRecord(
             step_index=step_index, u_i=u_i,
             ensemble_pre_trace=tuple(ensemble_values),
             collector_pre_trace=collector_value,
+            q_skin_raw=q_skin_raw,
         ))
 
     def window(self, t_start: int, t_end: int) -> List[TrajectoryRecord]:

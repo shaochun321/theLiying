@@ -32,14 +32,28 @@ RULES.md 强制三问：
   Q3 参数依据：
     - `theta_up=0.01`：复用 `test_basegen_thermal_t1_real_occurrence.py:64`
       已验证的 `OCCURRENCE_THRESHOLD` 经验值（EXP-T1 沿用，非新造）。
-    - `theta_down`：仓库中**没有任何已验证的迟滞下限值**——不能虚构。本轮
-      设为 `0.1 * theta_up` 的保守占位（# EXP-P2A-001-PROVISIONAL），
-      显式标记为**待标定**，必须由 P2-A1 输入工作区间扫描（u_on/u_work/
-      u_sat 与 t_recovery 测量）替换，不是"调到能通过测试"的结论。
-    - `rearm_min_steps=0`：本轮不引入额外不应期计时器（# EXP-P2A-002-
-      PROVISIONAL）——迟滞带 [theta_down, theta_up] 本身已提供去抖动，
-      是否需要额外的固定步数不应期，同样留给 P2-A1 标定后再决定，避免
-      现在编造一个没有实验依据的整数。
+      P2-A1b-3 用真实`tick_from_skin()`+`build_three_point_skin()`轨迹
+      验证仍然有效——collector.pre_trace 在真实映射输入下确实能越过
+      0.01（实测峰值可达~1.0），故本轮**不改动**该值。
+    - `theta_down=0.001`（# EXP-P2A1b3-CALIBRATED，替换原
+      `# EXP-P2A-001-PROVISIONAL`）：用`exp_P2A1b_3_closure_calibration.py`
+      在真实映射轨迹下验证——原占位值 `0.1*theta_up=0.001` 本身已经是
+      合理的迟滞下限（撤去刺激后pre_trace能在~77~2000步量级内跌破，
+      不需要改动数值本身），保留不变，只是标注从占位改为已验证。
+    - `rearm_min_steps=500`（# EXP-P2A1b3-CALIBRATED，替换原
+      `# EXP-P2A-002-PROVISIONAL`的占位值0）：用真实映射轨迹实测发现
+      ensemble/collector 下游通路对任意一次阈值穿越都会产生短时重复
+      振荡（3000步持续驱动期间原0值下产生3次伪发生，间隔约150~314步），
+      用`exp_P2A1b_3_closure_calibration.py`对
+      rearm_min_steps∈{0,200,500,1000,2000}做扫描，确认500（略大于
+      实测最大相邻爆发间隔~314步，留有余量）能把同一场景下的伪发生
+      收敛为1次（真实的那一次），且不过度延迟真正独立的二次刺激重整
+      （见该脚本判据4）。**已知限制（如实登记，非本轮修复范围）**：
+      在远超本项目现有参考场景规模的长观测窗口（万步量级）下，该下游
+      通路会表现出与外部输入基本脱耦的长尾自持振荡（实测：皮肤本身
+      温度已衰减至0，pre_trace仍振荡长达10000+步），本轮标定只针对
+      与现有参考场景（≤300~1000步）同数量级的代表性观测预算，未完全
+      压制这个长尾现象——留待 P2-A3（成对时序分辨率标定）处理。
 """
 
 from __future__ import annotations
@@ -51,11 +65,15 @@ from typing import List, Optional
 from ..components.structural_address import GeneratedAddress
 
 # EXP-T1 沿用：test_basegen_thermal_t1_real_occurrence.py:64 的 OCCURRENCE_THRESHOLD
+# P2-A1b-3 用真实映射轨迹重新验证，仍然有效（见模块 docstring Q3），不改动。
 _DEFAULT_THETA_UP = 0.01
-# EXP-P2A-001-PROVISIONAL：待 P2-A1 工作区间扫描替换，此值只保证 theta_down < theta_up
+# EXP-P2A1b3-CALIBRATED：P2-A1b-3 用真实映射轨迹验证，数值本身不变
+# （原 0.1*theta_up 占位恰好合理），只是标注从占位改为已验证（见 Q3）。
 _DEFAULT_THETA_DOWN = 0.1 * _DEFAULT_THETA_UP
-# EXP-P2A-002-PROVISIONAL：不引入额外不应期计时器，待 P2-A1 后再评估是否需要
-_DEFAULT_REARM_MIN_STEPS = 0
+# EXP-P2A1b3-CALIBRATED：替换原 0 占位值。用
+# exp_P2A1b_3_closure_calibration.py 对真实映射轨迹下的短时重复振荡做
+# rearm_min_steps 扫描标定得出（见模块 docstring Q3 完整推导与已知限制）。
+_DEFAULT_REARM_MIN_STEPS = 500
 
 
 @dataclass(frozen=True)

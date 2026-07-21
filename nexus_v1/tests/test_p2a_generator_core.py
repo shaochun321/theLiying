@@ -41,6 +41,10 @@ from nexus_v1.components.structural_address import (
 from nexus_v1.generators import (
     BaseGenerator, OccurrenceClosure, wrap_base_generator, register_occ_thermal,
     GeneratorTrajectory, scan_input_envelope,
+    TransductionConfig, transduce, REFERENCE_TRANSDUCTION_CONFIG,
+)
+from nexus_v1.generators.base_generator import (
+    DRIVE_MODE_MANUAL_CALIBRATION, DRIVE_MODE_WORLD_COUPLED,
 )
 from nexus_v1.relations import FROZEN_THERMAL_SITES, snapshot_weights, check_frozen_weights_against
 
@@ -189,7 +193,10 @@ def test_end_to_end_single_occurrence_via_real_drive():
 # T-P2AG-5：长饱和不重复计数（OccurrenceClosure 单元测试）
 # ─────────────────────────────────────────────────────────────
 def test_sustained_saturation_does_not_double_count():
-    closure = OccurrenceClosure(address=_dummy_address("t5"))
+    # rearm_min_steps=0 显式指定：本测试验证的是crossing逻辑本身（长期
+    # 饱和不重复计数），与P2-A1b-3标定的真实世界rearm延迟（默认500，
+    # 见occurrence.py）是两回事，不应耦合到默认值上。
+    closure = OccurrenceClosure(address=_dummy_address("t5"), rearm_min_steps=0)
 
     # 持续高位（远超 theta_up）1000 步，从不跌破 theta_down——
     # ACTIVE 窗口应保持打开，不产生任何"多次发生"的伪造计数。
@@ -212,7 +219,11 @@ def test_sustained_saturation_does_not_double_count():
 # ─────────────────────────────────────────────────────────────
 def test_hysteresis_absorbs_jitter_without_spurious_occurrences():
     theta_up, theta_down = 0.01, 0.001
-    closure = OccurrenceClosure(address=_dummy_address("t6"), theta_up=theta_up, theta_down=theta_down)
+    # rearm_min_steps=0 显式指定：本测试验证的是迟滞带crossing逻辑本身
+    # （抖动去抖），与默认值500（P2-A1b-3标定的真实世界rearm延迟）无关。
+    closure = OccurrenceClosure(
+        address=_dummy_address("t6"), theta_up=theta_up, theta_down=theta_down,
+        rearm_min_steps=0)
 
     t = 0
     ev = closure.update(theta_up, t); t += 1  # 触发进入 ACTIVE
@@ -404,3 +415,130 @@ def test_input_envelope_scan_active_level():
         assert p.l_first is not None
         assert p.mean_t_active is not None and p.mean_t_active >= 0
     assert p.steps_observed == 1000
+
+
+# ─────────────────────────────────────────────────────────────
+# T-P2AG-13~17：P2-A1b-3 驱动权归属守卫 + 转导映射接线
+# （评判 document-2026-07-21T161711.318.md 「P2-A1b-3只做四件事」①②）
+# ─────────────────────────────────────────────────────────────
+def test_feed_then_feed_from_skin_raises():
+    """先 feed()（认领 MANUAL_CALIBRATION）后调用 feed_from_skin() 应
+    RuntimeError——不能静默双重驱动。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+
+    handle.feed(0.0, DT)
+    try:
+        handle.feed_from_skin(50.0, REFERENCE_TRANSDUCTION_CONFIG, DT)
+        raise AssertionError("应抛出 RuntimeError，但没有")
+    except RuntimeError as e:
+        assert "manual_calibration" in str(e)
+        assert "world_coupled" in str(e)
+
+
+def test_feed_from_skin_then_feed_raises():
+    """先 feed_from_skin()（认领 WORLD_COUPLED）后调用 feed() 应
+    RuntimeError——反向切换同样必须拒绝。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+
+    handle.feed_from_skin(50.0, REFERENCE_TRANSDUCTION_CONFIG, DT)
+    try:
+        handle.feed(0.0, DT)
+        raise AssertionError("应抛出 RuntimeError，但没有")
+    except RuntimeError as e:
+        assert "world_coupled" in str(e)
+        assert "manual_calibration" in str(e)
+
+
+def test_repeated_feed_same_mode_does_not_raise():
+    """同模式重复调用 feed() 不应报错——守卫只拒绝模式切换，不拒绝
+    重复调用同一模式。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+    for _ in range(5):
+        handle.feed(0.0, DT)  # 不应抛异常
+
+
+def test_repeated_feed_from_skin_same_mode_does_not_raise():
+    """同模式重复调用 feed_from_skin() 不应报错。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+    for _ in range(5):
+        handle.feed_from_skin(50.0, REFERENCE_TRANSDUCTION_CONFIG, DT)  # 不应抛异常
+
+
+def test_unclaimed_generator_each_mode_succeeds_on_first_call():
+    """未认领状态下，两种驱动方式各自首次调用都应成功（不强制预先
+    声明模式）——用两个独立全新句柄分别验证。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+
+    h1 = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+    h1.feed(0.0, DT)
+    assert h1._drive_mode == DRIVE_MODE_MANUAL_CALIBRATION
+
+    circuit2 = VariantCircuit()
+    registry2 = AddressRegistry()
+    h2 = wrap_base_generator(circuit2, site_index, registry2, polarity="warm")
+    h2.feed_from_skin(50.0, REFERENCE_TRANSDUCTION_CONFIG, DT)
+    assert h2._drive_mode == DRIVE_MODE_WORLD_COUPLED
+
+
+def test_feed_from_skin_returns_transduced_value():
+    """feed_from_skin() 的返回值应精确等于 transduce(q_skin, config)——
+    不是某个近似值或恒定值。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(circuit, site_index, registry, polarity="warm")
+
+    q_skin = 50.0
+    expected_u = transduce(q_skin, REFERENCE_TRANSDUCTION_CONFIG)
+    actual_u = handle.feed_from_skin(q_skin, REFERENCE_TRANSDUCTION_CONFIG, DT)
+    assert actual_u == expected_u
+
+
+def test_tick_from_skin_records_both_raw_and_transduced_values():
+    """tick_from_skin() 驱动 N 步后，trajectory.records 每条的
+    q_skin_raw 应与传入的原始值逐步一致、u_i 应与 transduce() 结果一致
+    ——原始物理量与转导后驱动量必须同时保留，不能只留其一。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(
+        circuit, site_index, registry, polarity="warm", record_trajectory=True)
+
+    q_values = [0.0, 10.0, 43.6483, 61.8260, 100.0]
+    for t, q in enumerate(q_values):
+        handle.tick_from_skin(q, REFERENCE_TRANSDUCTION_CONFIG, DT, t)
+
+    assert len(handle.trajectory.records) == len(q_values)
+    for rec, q in zip(handle.trajectory.records, q_values):
+        assert rec.q_skin_raw == q
+        assert rec.u_i == transduce(q, REFERENCE_TRANSDUCTION_CONFIG)
+
+
+def test_tick_manual_calibration_leaves_q_skin_raw_none():
+    """MANUAL_CALIBRATION 路径下（既有 tick()），trajectory 记录的
+    q_skin_raw 应保持 None——向后兼容，不影响 T-P2AG-9/10 既有断言。"""
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(
+        circuit, site_index, registry, polarity="warm", record_trajectory=True)
+
+    for t in range(5):
+        handle.tick(0.05, DT, t)
+
+    for rec in handle.trajectory.records:
+        assert rec.q_skin_raw is None
