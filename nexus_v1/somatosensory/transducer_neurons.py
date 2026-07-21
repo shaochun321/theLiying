@@ -38,7 +38,7 @@ Design constraints (from 2026-07-03 design lock):
 
 from __future__ import annotations
 
-from ..components.neuron import Neuron, NeuronConfig
+from ..components.neuron import Neuron, NeuronConfig, ChannelConfig
 from ..circuit.bundle import SynapticBundle, BundleConfig
 
 
@@ -324,4 +324,130 @@ def make_thermo_delta_to_da_bundle(patch_id: str,
         ),
         sources=[delta_neuron],
         targets=da_neurons,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Thermal hair-cell analog (Level 2 of quantum-thermal reconstruction)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _thermo_haircell_config(patch_id: str, position: tuple = (0.0, 0.0, 0.0),
+                             region: int = 0x00) -> NeuronConfig:
+    """TYPE:BIO — Thermal hair-cell analog: multi-channel graded transducer.
+
+    BIO: Free nerve ending thermoreceptor with genuine membrane dynamics,
+         replacing the single-formula ThermalDeltaNeuron shortcut with a
+         multi-channel HH-equivalent — same structural pattern as the
+         vestibular hair cell (_haircell_config, vestibular/chain.py:152).
+    REF: Vriens et al. 2014 Neuron 82:730 — TRP channel thermosensation.
+    REF: Cesare & McNaughton 1996 J Physiol 495:517 — thermoreceptor
+         adaptation/desensitization to sustained stimuli (the behavior
+         ThermalDeltaNeuron's memoryless max(0, dT*gain) formula lacks).
+    REF: Roberts et al. 1990 J Neurosci — Ca²⁺ release subsystem (same
+         structural form as the vestibular hair cell, retuned below for
+         thermal (second-scale) rather than mechanical (ms-scale) kinetics).
+
+    Q1. BIO: TRP channel (fast excitatory) + K+ adaptation channel (slow
+        inhibitory, provides desensitization) + Ca2+ channel (graded release).
+    Q2. Level1(ThermalDeltaNeuron, ±dT) → [frozen bundle] → this hair-cell
+        analog → [frozen bundle] → quantum ensemble(10).
+    Q3. Structure copied verbatim from _haircell_config's 3-channel +
+        Ca2+-subsystem form (vestibular/chain.py:161-198). Numeric values
+        are placeholders pending calibration against synthetic thermal
+        scenarios (thermal adaptation time constants are ~1-10s, vs
+        vestibular's ms-scale — NOT the same numbers, only the same
+        equation structure is reused). Flagged TODO-CALIBRATE below.
+    """
+    return NeuronConfig(
+        neuron_id=f"thermo_hc_{patch_id}",
+        position=position,
+        region=region,
+        capacitance=1.0,
+        r_leak=5.0,
+        inertia=1.0,
+        vdd=1.0,
+        r_supply=0.05,
+        v_rest=0.115,
+        channels=[
+            # TRP current channel (excitatory, fast) — analog of MET channel.
+            ChannelConfig(
+                name="trp",
+                v_threshold=0.05,
+                gm=1.0,
+                tau_gate=0.0,
+                reversal=0.615,
+                sign=1.0,
+            ),
+            # K+ adaptation channel (inhibitory, slow) — TODO-CALIBRATE:
+            # tau_gate here sets desensitization speed; placeholder value
+            # copied from vestibular (ms-scale) pending thermal-scale
+            # (second-scale, Cesare & McNaughton 1996) recalibration.
+            ChannelConfig(
+                name="k",
+                v_threshold=0.385,
+                gm=0.67,
+                tau_gate=0.005,
+                reversal=0.0,
+                sign=-1.0,
+            ),
+            # Ca channel (excitatory, medium) — feeds Ca2+ release subsystem.
+            ChannelConfig(
+                name="ca",
+                v_threshold=0.308,
+                gm=0.17,
+                tau_gate=0.001,
+                reversal=1.0,
+                sign=1.0,
+            ),
+        ],
+        leak_conductance=0.017,
+        leak_reversal=0.154,
+        # Ca2+ subsystem — TODO-CALIBRATE: structure copied from
+        # _haircell_config verbatim; thermal receptor clearance/release
+        # kinetics need their own measurement (not the same numbers as
+        # vestibular's Ca2+ clearance, which is tuned to ms-scale synaptic
+        # release, not second-scale thermal adaptation).
+        ca_capacitance=0.2,
+        ca_r_leak=20.0,
+        ca_release_threshold=0.01,
+        ca_release_gm=0.30,
+        use_voltage_regulator=True,
+        vr_base_rate=0.001,
+        vr_activity_coeff=0.3,
+        vr_max_rate=3.0,
+    )
+
+
+def make_thermo_l1_to_hc_bundle(patch_id: str, delta_neuron: 'ThermalDeltaNeuron',
+                                 hc_neuron: 'Neuron') -> SynapticBundle:
+    """Create frozen bundle: ThermalDeltaNeuron (Level1) → thermal hair-cell (Level2).
+
+    Frozen (innate): TRP channel transduction coefficients are evolution-fixed
+    physical constants, not individually learned (same justification as the
+    other transducer bundles in this module — see module docstring).
+
+    Q3: initial_weight=0.3（非 1.0）—— 实测发现的边缘案例：Memristor 电导
+        G=1/(r_min+ΔR(1-w))，w=1.0 时 G=10.0（=1/r_min，物理上限）。
+        SynapticBundle 构造时对每条 bundle 施加 ±25%"对称性打破"随机扰动
+        （bundle.py:170-173，基于 bundle_id 哈希），若 initial_weight 卡在
+        weight_max=1.0 附近，扰动可能把某些实例推到 w≈1.0（G=10），使注入
+        电流 4.0(dT=0.02时L1峰值)×10=40 远超 PowerRail 饱和点
+        vdd/r_supply=1.0/0.05=20，导致电流被 IR-drop 完全钳死为 0——而另一
+        些实例扰动推低了 w，电导降到安全区间，正常工作。这曾在 warm/cool
+        对称构造中制造出一侧沉默一侧正常的假性"整流失败"（2026-07-11 调试
+        记录）。initial_weight=0.3 → G(0.3)≈0.14，即使在扰动+dT=0.1 上限下
+        注入电流仍 <4，远离饱和点，两个极性对称工作。
+    """
+    return SynapticBundle(
+        config=BundleConfig(
+            bundle_id=f"thermo_l1_to_hc_{patch_id}",
+            learning_rule="frozen",
+            initial_weight=0.3,
+            weight_max=0.3,
+            synapse_gain=1.0,
+            bundle_role="feedforward",
+            remodel_cost_kappa=0.0,
+        ),
+        sources=[delta_neuron],
+        targets=[hc_neuron],
     )
