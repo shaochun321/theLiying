@@ -13,6 +13,8 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
                           （wrap，不重建）+ D_i^sim 输入端口 + 地址挂载
   - trajectory.py:      Λ^phys 轨迹记录器（可选挂载，逐步记录 u_i/ensemble/
                           collector 原始值，供 P2-B 自然化候选测度检验）
+  - input_envelope.py:  P2-A1a 输入包络扫描工具（纯测量，不做边界分类，
+                          详见 `评判_P2A1顺序倒置修正_2026-07-21.md`）
 
 严格遵守「不改母本代码」——不修改 `circuit/variant_adapter.py` 的
 `_init_quantum_thermal_pathways`，只读取其已构造的属性。
@@ -21,9 +23,11 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
 from .occurrence import Occurrence, OccurrenceClosure
 from .base_generator import BaseGenerator, wrap_base_generator, register_occ_thermal
 from .trajectory import TrajectoryRecord, GeneratorTrajectory
+from .input_envelope import InputEnvelopePoint, scan_input_envelope
 
 __all__ = [
     'Occurrence', 'OccurrenceClosure',
     'BaseGenerator', 'wrap_base_generator', 'register_occ_thermal',
     'TrajectoryRecord', 'GeneratorTrajectory',
+    'InputEnvelopePoint', 'scan_input_envelope',
 ]

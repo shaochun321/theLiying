@@ -1,5 +1,5 @@
-"""T-P2AG-1~10：P2-A 生成元核心验收（抽取 + 地址 + D_i^sim 输入合同 + 闭合状态机
-+ Λ^phys 轨迹记录）。
+"""T-P2AG-1~12：P2-A 生成元核心验收（抽取 + 地址 + D_i^sim 输入合同 + 闭合状态机
++ Λ^phys 轨迹记录 + 输入包络扫描工具）。
 
 方案依据：`cell-cell/交叉比对/评判_反馈自然单位概念修正_2026-07-20.md` §九
 执行顺序步骤 1-3。四轮交叉比对（203329→203750→我方评判#1→211325→我方评判
@@ -23,6 +23,12 @@
 T-P2AG-9/10 验证 `generators/trajectory.py` 的 `GeneratorTrajectory`——补齐
 工作报告"未完成项"里的 Λ^phys 窗口聚合 + 10 ensemble 逐步激活轨缺口（见
 `cell-cell/交叉比对/评判_P2A核心确认与生长机制来源存疑_2026-07-21.md` §一）。
+
+T-P2AG-11/12 验证 `generators/input_envelope.py` 的 `scan_input_envelope`
+工具本身工作正确（P2-A1a 生成元核心输入包络扫描，见
+`cell-cell/交叉比对/评判_P2A1顺序倒置修正_2026-07-21.md` §一）——只测扫描
+机制的正确性，不预判具体的 u_silent/u_on/u_work/u_sat 边界（那是实验脚本
+`exp_P2A1a_input_envelope_scan.py` 的经验发现，不是回归断言）。
 """
 
 from __future__ import annotations
@@ -34,7 +40,7 @@ from nexus_v1.components.structural_address import (
 )
 from nexus_v1.generators import (
     BaseGenerator, OccurrenceClosure, wrap_base_generator, register_occ_thermal,
-    GeneratorTrajectory,
+    GeneratorTrajectory, scan_input_envelope,
 )
 from nexus_v1.relations import FROZEN_THERMAL_SITES, snapshot_weights, check_frozen_weights_against
 
@@ -345,3 +351,56 @@ def test_trajectory_window_aligns_with_occurrence_boundaries():
     all_indices = {r.step_index for r in window}
     assert (occurrence.t_up - 1) not in all_indices
     assert occurrence.t_rearm not in all_indices
+
+
+def _fresh_generator_factory(site_index):
+    """供 T-P2AG-11/12 使用：每次调用返回全新 VariantCircuit+句柄，
+    避免跨扫描档位的历史依赖污染（同 scan_input_envelope 的设计要求）。"""
+    def build():
+        circuit = VariantCircuit()
+        registry = AddressRegistry()
+        return wrap_base_generator(circuit, site_index, registry, polarity="warm")
+    return build
+
+
+# ─────────────────────────────────────────────────────────────
+# T-P2AG-11：扫描工具——静息档位应得零发生、不留在ACTIVE、峰值≈0
+# ─────────────────────────────────────────────────────────────
+def test_input_envelope_scan_silent_level():
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    build = _fresh_generator_factory(site_index)
+
+    points = scan_input_envelope(build, u_levels=[0.0], dt=DT, steps_per_level=200)
+    assert len(points) == 1
+    p = points[0]
+    assert p.u == 0.0
+    assert p.n_occ == 0
+    assert p.l_first is None
+    assert p.mean_t_active is None
+    assert p.f_occ == 0.0
+    assert p.peak_pre_trace <= 1e-6, "零输入下峰值应维持精确静息"
+    assert p.ends_active is False
+    assert p.steps_observed == 200
+
+
+# ─────────────────────────────────────────────────────────────
+# T-P2AG-12：扫描工具——已知活动档位应产生真实峰值与发生/持续激活之一
+# ─────────────────────────────────────────────────────────────
+def test_input_envelope_scan_active_level():
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    build = _fresh_generator_factory(site_index)
+
+    # dT=0.05 是 T-P2AG-4/test_basegen_thermal_t0.py 的 T-T0-3 已验证会
+    # 产生非零峰值的档位；这里只验证扫描工具机制正确，不预判具体落在
+    # u_work 还是 u_sat 区间（那是实验脚本的经验发现）。
+    points = scan_input_envelope(build, u_levels=[0.05], dt=DT, steps_per_level=1000)
+    assert len(points) == 1
+    p = points[0]
+    assert p.u == 0.05
+    assert p.peak_pre_trace > 0.0, "已知活动档位应产生非零峰值"
+    assert p.n_occ >= 1 or p.ends_active, \
+        "应产生至少一次完整发生，或扫描结束时仍处于激活状态（二者之一）"
+    if p.n_occ >= 1:
+        assert p.l_first is not None
+        assert p.mean_t_active is not None and p.mean_t_active >= 0
+    assert p.steps_observed == 1000
