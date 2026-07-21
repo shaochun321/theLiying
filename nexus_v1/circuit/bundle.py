@@ -7,6 +7,7 @@ STDP learning rule operates on pre/post traces from the Neurons.
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass, field
 from typing import List
 
@@ -158,16 +159,25 @@ class SynapticBundle:
 
         # Create memristor matrix: sources × targets
         # Symmetry breaking: each weight gets deterministic variation
-        # based on (bundle_id, source_idx, target_idx) hash.
+        # based on (bundle_id, source_idx, target_idx) digest.
         # This breaks the self-locking cycle where uniform weights
         # → uniform activity → uniform STDP → unchanged weights.
         # BIO: synaptic strengths are never perfectly uniform in vivo.
+        # FIX(2026-07-21，评判document-2026-07-21T145017.166.md唯一阻塞)：
+        # 原用 Python 内置 hash() 生成 seed——hash() 对字符串默认逐进程
+        # 随机化（PYTHONHASHSEED 未固定时），导致相同(bundle_id,i_s,i_t)
+        # 在不同进程里产生不同扰动，破坏跨进程可复现性（P2-A1b-0 边界复核
+        # 实测坐实：u=0.0005 三次独立进程给出0/1/0次不同触发）。改用
+        # zlib.crc32 对稳定字符串摘要——crc32 跨进程/跨解释器完全确定，
+        # 不依赖任何环境变量。数学不变：仍是基于(bundle_id,i_s,i_t)三元组
+        # 的[-0.25,+0.25]均匀分布扰动，只换随机性来源。
         self._memristors: List[List[Memristor]] = []
         for i_s, _s in enumerate(sources):
             row = []
             for i_t, _t in enumerate(targets):
                 # Deterministic variation: ±25% of initial_weight
-                seed = hash((config.bundle_id, i_s, i_t)) % 10000
+                digest_key = f"{config.bundle_id}:{i_s}:{i_t}".encode("utf-8")
+                seed = zlib.crc32(digest_key) % 10000
                 variation = (seed / 10000.0 - 0.5) * 0.5  # [-0.25, +0.25]
                 w0 = config.initial_weight * (1.0 + variation)
                 w0 = max(config.weight_min, min(config.weight_max, w0))

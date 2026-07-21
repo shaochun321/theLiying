@@ -15,6 +15,9 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
                           collector 原始值，供 P2-B 自然化候选测度检验）
   - input_envelope.py:  P2-A1a 输入包络扫描工具（纯测量，不做边界分类，
                           详见 `评判_P2A1顺序倒置修正_2026-07-21.md`）
+  - skin_transduction.py: P2-A1b-2 皮肤输出→生成元输入转导映射（纯函数，
+                          不接入BaseGenerator实际驱动循环，详见
+                          `document - 2026-07-21T145017.166.md`）
 
 严格遵守「不改母本代码」——不修改 `circuit/variant_adapter.py` 的
 `_init_quantum_thermal_pathways`，只读取其已构造的属性。
@@ -24,10 +27,14 @@ from .occurrence import Occurrence, OccurrenceClosure
 from .base_generator import BaseGenerator, wrap_base_generator, register_occ_thermal
 from .trajectory import TrajectoryRecord, GeneratorTrajectory
 from .input_envelope import InputEnvelopePoint, scan_input_envelope
+from .skin_transduction import (
+    TransductionConfig, transduce, REFERENCE_TRANSDUCTION_CONFIG,
+)
 
 __all__ = [
     'Occurrence', 'OccurrenceClosure',
     'BaseGenerator', 'wrap_base_generator', 'register_occ_thermal',
     'TrajectoryRecord', 'GeneratorTrajectory',
     'InputEnvelopePoint', 'scan_input_envelope',
+    'TransductionConfig', 'transduce', 'REFERENCE_TRANSDUCTION_CONFIG',
 ]
