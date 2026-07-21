@@ -11,6 +11,8 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
                           （不含任何无量纲测度，χ ≠ 自然单位）
   - base_generator.py:  从既有 VariantCircuit 抽取生成元核心的句柄
                           （wrap，不重建）+ D_i^sim 输入端口 + 地址挂载
+  - trajectory.py:      Λ^phys 轨迹记录器（可选挂载，逐步记录 u_i/ensemble/
+                          collector 原始值，供 P2-B 自然化候选测度检验）
 
 严格遵守「不改母本代码」——不修改 `circuit/variant_adapter.py` 的
 `_init_quantum_thermal_pathways`，只读取其已构造的属性。
@@ -18,8 +20,10 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
 
 from .occurrence import Occurrence, OccurrenceClosure
 from .base_generator import BaseGenerator, wrap_base_generator, register_occ_thermal
+from .trajectory import TrajectoryRecord, GeneratorTrajectory
 
 __all__ = [
     'Occurrence', 'OccurrenceClosure',
     'BaseGenerator', 'wrap_base_generator', 'register_occ_thermal',
+    'TrajectoryRecord', 'GeneratorTrajectory',
 ]

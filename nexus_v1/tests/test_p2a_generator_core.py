@@ -1,4 +1,5 @@
-"""T-P2AG-1~8：P2-A 生成元核心验收（抽取 + 地址 + D_i^sim 输入合同 + 闭合状态机）。
+"""T-P2AG-1~10：P2-A 生成元核心验收（抽取 + 地址 + D_i^sim 输入合同 + 闭合状态机
++ Λ^phys 轨迹记录）。
 
 方案依据：`cell-cell/交叉比对/评判_反馈自然单位概念修正_2026-07-20.md` §九
 执行顺序步骤 1-3。四轮交叉比对（203329→203750→我方评判#1→211325→我方评判
@@ -13,11 +14,15 @@
     发生记录，不冻结任何无量纲测度字段。
 
 测试分两层：
-  - T-P2AG-1/2/3/4/7/8：对真实 `VariantCircuit` 抽取的 `BaseGenerator`
+  - T-P2AG-1/2/3/4/7/8/9/10：对真实 `VariantCircuit` 抽取的 `BaseGenerator`
     做集成验证（延续 `test_basegen_thermal_t0.py` 的 `_propagate_xi_point`
     传播方法论，现改为调用生产代码 `BaseGenerator.feed()`）；
   - T-P2AG-5/6：对 `OccurrenceClosure` 状态机本身做精确受控的单元测试
     （直接喂合成信号序列，不依赖神经元动力学的具体数值时间尺度）。
+
+T-P2AG-9/10 验证 `generators/trajectory.py` 的 `GeneratorTrajectory`——补齐
+工作报告"未完成项"里的 Λ^phys 窗口聚合 + 10 ensemble 逐步激活轨缺口（见
+`cell-cell/交叉比对/评判_P2A核心确认与生长机制来源存疑_2026-07-21.md` §一）。
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from nexus_v1.components.structural_address import (
 )
 from nexus_v1.generators import (
     BaseGenerator, OccurrenceClosure, wrap_base_generator, register_occ_thermal,
+    GeneratorTrajectory,
 )
 from nexus_v1.relations import FROZEN_THERMAL_SITES, snapshot_weights, check_frozen_weights_against
 
@@ -259,3 +265,83 @@ def test_driving_generator_does_not_mutate_frozen_weights():
     err_col = check_frozen_weights_against(handle.bundle_col, snap_col)
     assert err_in is None, err_in
     assert err_col is None, err_col
+
+
+# ─────────────────────────────────────────────────────────────
+# T-P2AG-9：轨迹记录完整性——record_trajectory=True 时逐步记录与真实值一致
+# ─────────────────────────────────────────────────────────────
+def test_trajectory_records_match_real_drive_values():
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(
+        circuit, site_index, registry, polarity="warm", record_trajectory=True)
+
+    assert isinstance(handle.trajectory, GeneratorTrajectory)
+    assert handle.trajectory.records == []
+
+    n_steps = 50
+    dT = 0.05
+    for t in range(n_steps):
+        handle.tick(dT, DT, t)
+
+    assert len(handle.trajectory.records) == n_steps, \
+        "轨迹记录条数应恰好等于驱动步数（一步一记，不多不少）"
+
+    for i, rec in enumerate(handle.trajectory.records):
+        assert rec.step_index == i
+        assert rec.u_i == dT, "当前最小映射下 u_i 应与喂入的 dT_raw 完全一致"
+        assert len(rec.ensemble_pre_trace) == 10, "应记录恰好 10 个 ensemble 的 pre_trace"
+        assert all(v >= 0.0 for v in rec.ensemble_pre_trace), \
+            "pre_trace 是 |activation| 的 EMA，理论上非负"
+        assert isinstance(rec.collector_pre_trace, float)
+
+    # 末尾记录的 collector_pre_trace 应与驱动结束后 handle.sense() 的实时值一致
+    # （驱动循环里最后一次 tick 之后没有再产生新状态变化）。
+    assert handle.trajectory.records[-1].collector_pre_trace == handle.sense()
+
+
+# ─────────────────────────────────────────────────────────────
+# T-P2AG-10：窗口切片对齐 Occurrence 边界——window(t_up,t_rearm) 不多不少
+# ─────────────────────────────────────────────────────────────
+def test_trajectory_window_aligns_with_occurrence_boundaries():
+    circuit = VariantCircuit()
+    registry = AddressRegistry()
+    site_index = FROZEN_THERMAL_SITES["t1_pair"]["a"]
+    handle = wrap_base_generator(
+        circuit, site_index, registry, polarity="warm", record_trajectory=True)
+
+    t = 0
+    occurrence = None
+
+    # 复刻 T-P2AG-4 的脉冲驱动场景：先驱动到 ACTIVE，再切零输入等待完整闭合。
+    drive_budget = 1000
+    for _ in range(drive_budget):
+        ev = handle.tick(0.05, DT, t)
+        t += 1
+        if ev is not None:
+            occurrence = ev
+        if handle.closure.is_active:
+            break
+    assert handle.closure.is_active
+
+    decay_budget = 5000
+    for _ in range(decay_budget):
+        ev = handle.tick(0.0, DT, t)
+        t += 1
+        if ev is not None:
+            occurrence = ev
+            break
+    assert occurrence is not None, "应产生恰好一次完整发生供窗口切片测试"
+
+    window = handle.trajectory.window(occurrence.t_up, occurrence.t_rearm)
+
+    assert len(window) == occurrence.t_rearm - occurrence.t_up, \
+        "窗口切片记录数应恰好等于 [t_up, t_rearm) 半开区间的步数"
+    assert window[0].step_index == occurrence.t_up, "窗口首条记录应正好落在 t_up"
+    assert window[-1].step_index == occurrence.t_rearm - 1, \
+        "窗口末条记录应正好落在 t_rearm-1（半开区间不含 t_rearm 本身）"
+    # 窗口外紧邻的两条记录不应被包含进来（边界不多不少的双向核实）。
+    all_indices = {r.step_index for r in window}
+    assert (occurrence.t_up - 1) not in all_indices
+    assert occurrence.t_rearm not in all_indices

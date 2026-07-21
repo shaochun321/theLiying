@@ -56,6 +56,7 @@ from ..components.structural_address import (
 )
 from ..somatosensory.transducer_neurons import ThermalDeltaNeuron
 from .occurrence import Occurrence, OccurrenceClosure
+from .trajectory import GeneratorTrajectory
 
 
 def register_occ_thermal(
@@ -93,6 +94,11 @@ class BaseGenerator:
                             完整复刻既有三级传播序列
       address             — α_gen(ξ_i^occ)，父地址回指皮肤支撑
       closure             — 触发/退出/重整状态机，读 collector.pre_trace
+      trajectory          — 可选的 Λ^phys 轨迹记录器（`generators/trajectory.py`）；
+                            为 None 时 `tick()` 不做任何记录（默认，向后兼容）；
+                            非 None 时每次 `tick()` 自动追加一条 `TrajectoryRecord`。
+                            与 `Occurrence` 并列（Λ^org ∥ Λ^phys），不融合进
+                            `Occurrence` 本身（反馈文档 §5.3 纪律）。
     """
     site_index: int
     polarity: str
@@ -105,6 +111,7 @@ class BaseGenerator:
     bundle_in: SynapticBundle
     bundle_col: SynapticBundle
     closure: OccurrenceClosure
+    trajectory: Optional[GeneratorTrajectory] = None
 
     def feed(self, dT_raw: float, dt: float = 0.001) -> None:
         """D_i^sim → 𝒢_i 正式输入端口：喂入原始温度差 dT_raw，驱动三级
@@ -143,11 +150,19 @@ class BaseGenerator:
         return self.collector.pre_trace
 
     def tick(self, dT_raw: float, dt: float, t_step: int) -> Optional[Occurrence]:
-        """feed() + 闭合状态机推进一步。返回本步若完成的 `Occurrence`
-        （否则 None）。`t_step` 由调用方传入（生成元本身不维护全局时钟，
-        避免与调用方的仿真主循环步数产生第二套计数源）。
+        """feed() + 闭合状态机推进一步 + (若挂载) 轨迹记录一步。返回本步
+        若完成的 `Occurrence`（否则 None）。`t_step` 由调用方传入（生成元
+        本身不维护全局时钟，避免与调用方的仿真主循环步数产生第二套计数源，
+        同时也是 `trajectory` 记录与 `Occurrence` 边界共用的同一计数源）。
         """
         self.feed(dT_raw, dt)
+        if self.trajectory is not None:
+            self.trajectory.record(
+                step_index=t_step,
+                u_i=dT_raw,
+                ensemble_values=tuple(n.pre_trace for n in self.ensemble),
+                collector_value=self.collector.pre_trace,
+            )
         return self.closure.update(self.sense(), t_step)
 
 
@@ -156,6 +171,7 @@ def wrap_base_generator(
     polarity: str = "warm",
     theta_up: Optional[float] = None,
     theta_down: Optional[float] = None,
+    record_trajectory: bool = False,
 ) -> BaseGenerator:
     """从已构造的 `VariantCircuit` 实例抽取生成元核心句柄（wrap，不重建）。
 
@@ -177,6 +193,11 @@ def wrap_base_generator(
 
     `theta_up`/`theta_down` 为 None 时使用 `OccurrenceClosure` 的默认占位
     值（见 `occurrence.py` 模块 docstring Q3）。
+
+    `record_trajectory=True` 时自动构造并挂载一个空的 `GeneratorTrajectory`
+    （见 `generators/trajectory.py`），此后每次 `tick()` 自动记录一步。默认
+    `False`，不挂载任何轨迹记录器——保持与本参数引入前的行为完全一致
+    （已有调用点/测试不受影响）。
     """
     if polarity not in ("warm", "cool"):
         raise ValueError(f"wrap_base_generator: polarity must be 'warm' or 'cool', got {polarity!r}")
@@ -216,10 +237,11 @@ def wrap_base_generator(
     if theta_down is not None:
         closure_kwargs["theta_down"] = theta_down
     closure = OccurrenceClosure(**closure_kwargs)
+    trajectory = GeneratorTrajectory() if record_trajectory else None
 
     return BaseGenerator(
         site_index=site_index, polarity=polarity, address=address,
         l1=l1, hc=hc, ensemble=ensemble, collector=collector,
         bundle_l1_hc=bundle_l1_hc, bundle_in=bundle_in, bundle_col=bundle_col,
-        closure=closure,
+        closure=closure, trajectory=trajectory,
     )
