@@ -50,9 +50,14 @@ DOMAIN_HEAT_SOURCE = "heat_source"
 DOMAIN_OCC_THERMAL = "occ.thermal"          # 生成物域（P2 使用，本轮仅占位）
 DOMAIN_RELATION_PREC = "relation.r_prec"    # 生成物域（P2 使用，本轮仅占位）
 DOMAIN_RELATION_RHO = "relation.r_rho"      # 生成物域（P2 使用，本轮仅占位）
+DOMAIN_EVENT_KERNEL = "event.kernel"        # 生成物域（P2-B1K0）
+DOMAIN_EVENT_CANDIDATE = "event.candidate"  # 生成物域（P2-B1K0）
 
 _PHYSICAL_DOMAINS = frozenset({DOMAIN_WORLD_CELL, DOMAIN_SKIN_PATCH, DOMAIN_HEAT_SOURCE})
-_GENERATED_DOMAINS = frozenset({DOMAIN_OCC_THERMAL, DOMAIN_RELATION_PREC, DOMAIN_RELATION_RHO})
+_GENERATED_DOMAINS = frozenset({
+    DOMAIN_OCC_THERMAL, DOMAIN_RELATION_PREC, DOMAIN_RELATION_RHO,
+    DOMAIN_EVENT_KERNEL, DOMAIN_EVENT_CANDIDATE
+})
 
 # 机制类型（批判十七②；批判二十②：介质传输改名为"有序过剩热能转移"，机制标识
 # 同步收紧，不再用"medium-transport"——地址/拓扑账本的机制标签不是普通注释，
