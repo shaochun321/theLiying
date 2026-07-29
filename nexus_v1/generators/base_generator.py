@@ -208,6 +208,15 @@ class BaseGenerator:
         若完成的 `Occurrence`（否则 None）。`t_step` 由调用方传入（生成元
         本身不维护全局时钟，避免与调用方的仿真主循环步数产生第二套计数源，
         同时也是 `trajectory` 记录与 `Occurrence` 边界共用的同一计数源）。
+
+        P2-A1b-3R：传入门控（afferent gating，见 `occurrence.py` Q1/Q2/Q3）——
+        `closure.update` 的 `phys_support` 直接读 `self.l1.activation > 0`
+        （L1 既有的 `max(0, dT-T_THRESHOLD)` 阈值判定，零新增参数）。L1
+        是最贴近外周物理支撑的层，其 `activation` 已实测精确跟随
+        `dT_raw`——`dT_raw` 撤去后同一步内 `activation` 归零，不像
+        HC/ensemble/collector 会残留自持慢态（根因见 `base_generator.py`
+        模块级评判引用；HC 毛细胞 K+/Ca 通道慢态未耗散，登记为独立
+        debt，不在本轮改母本 BIO 参数）。
         """
         self.feed(dT_raw, dt)
         if self.trajectory is not None:
@@ -217,7 +226,7 @@ class BaseGenerator:
                 ensemble_values=tuple(n.pre_trace for n in self.ensemble),
                 collector_value=self.collector.pre_trace,
             )
-        return self.closure.update(self.sense(), t_step)
+        return self.closure.update(self.sense(), t_step, phys_support=(self.l1.activation > 0))
 
     def tick_from_skin(
         self, q_skin: float, config: TransductionConfig, dt: float, t_step: int,
@@ -236,7 +245,8 @@ class BaseGenerator:
                 collector_value=self.collector.pre_trace,
                 q_skin_raw=q_skin,
             )
-        return self.closure.update(self.sense(), t_step)
+        # P2-A1b-3R 传入门控，见 tick() 同名注释。
+        return self.closure.update(self.sense(), t_step, phys_support=(self.l1.activation > 0))
 
 
 def wrap_base_generator(

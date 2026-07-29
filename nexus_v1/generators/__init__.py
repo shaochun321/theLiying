@@ -18,23 +18,29 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
   - skin_transduction.py: P2-A1b-2 皮肤输出→生成元输入转导映射（纯函数，
                           不接入BaseGenerator实际驱动循环，详见
                           `document - 2026-07-21T145017.166.md`）
+  - natural_unit.py:    P2-B0 单 occurrence 自然化接口（𝒩_i^(0): χ↦𝔲^(1)，
+                          两个明确标注的候选测度 count/duration，不冻结最终
+                          NaturalUnit，详见
+                          `document - 2026-07-28T183325.248.md`）
 
 严格遵守「不改母本代码」——不修改 `circuit/variant_adapter.py` 的
 `_init_quantum_thermal_pathways`，只读取其已构造的属性。
 """
 
-from .occurrence import Occurrence, OccurrenceClosure
+from .occurrence import Occurrence, OccurrenceClosure, TransitionEvent
 from .base_generator import BaseGenerator, wrap_base_generator, register_occ_thermal
 from .trajectory import TrajectoryRecord, GeneratorTrajectory
 from .input_envelope import InputEnvelopePoint, scan_input_envelope
 from .skin_transduction import (
     TransductionConfig, transduce, REFERENCE_TRANSDUCTION_CONFIG,
 )
+from .natural_unit import SiteCalibration, NaturalUnit, naturalize
 
 __all__ = [
-    'Occurrence', 'OccurrenceClosure',
+    'Occurrence', 'OccurrenceClosure', 'TransitionEvent',
     'BaseGenerator', 'wrap_base_generator', 'register_occ_thermal',
     'TrajectoryRecord', 'GeneratorTrajectory',
     'InputEnvelopePoint', 'scan_input_envelope',
     'TransductionConfig', 'transduce', 'REFERENCE_TRANSDUCTION_CONFIG',
+    'SiteCalibration', 'NaturalUnit', 'naturalize',
 ]
