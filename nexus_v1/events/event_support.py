@@ -1,12 +1,36 @@
-"""nexus_v1.events.event_support — P2-B1K0: 事件元支撑绑定器
+"""nexus_v1.events.event_support — P2-B1X: 关系实例谱系绑定（谱系基础设施）
 
 TYPE:INFRA（数据结构与资格判定逻辑，不涉及神经动力学）
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-29T140411.192.md`
+修正依据：`cell-cell/交叉比对/document - 2026-07-29T171142.179.md`
 
-背景：P2-B1R已证明学习后的关系连接具有局部物理作用（L1资格），可作为
-事件元支撑。P2-B1K0解决的问题是：**这段局部作用属于哪两次真实发生？
-哪些物理结构共同支撑了这一次关系过程？**
+**理论定位修正（2026-07-29）**：
+本模块原命名为"P2-B1K0事件元支撑绑定器"，但评判指出实际完成的是
+**P2-B1X：关系实例谱系绑定**——把D2关系绑定到正确的两次D1 occurrence，
+补齐D2→D1→D0完整谱系，验证跨epoch错配。
+
+当前**未完成**的：
+  - 支撑在真实运行中何时同时出现
+  - 支撑如何连续维持
+  - 事件何时进入/退出/重新可用
+  - 这些支撑共同形成独立于单条关系的组织
+  - 候选结构具有新的未来作用
+  - 一个事件与另一个事件的客观边界
+
+因此当前`CANDIDATE`实际含义只是：**关系谱系材料完整且一致**，
+而不是：**事件候选已由过程生成**。
+
+类名暂时保留（避免不必要返工），但语义降级为：
+  - `EventKernelSpec`：未来事件核所需的**关系谱系候选规格**（非事件核本身）
+  - `EventSupportBinding`：**关系支撑谱系完整的候选绑定**（非事件元支撑）
+  - `EventInstanceCandidate`：**关系谱系材料完整的候选**（非D3事件实例）
+
+本模块可被视为：**未来事件核可能复用的谱系基础设施**，但不表示事件核
+已经开始生长。真正的事件核需要先完成P2-C（关系—关系生成）。
+
+背景：P2-B1R已证明学习后的关系连接具有局部物理作用（L1资格）。
+P2-B1X解决的问题是：**这段局部作用属于哪两次真实发生？补齐D2→D1→D0谱系。**
 
 核心约束：
   1. 必须记录实例身份（occurrence_28_epoch_17），不是站点身份（site28）
@@ -19,7 +43,7 @@ TYPE:INFRA（数据结构与资格判定逻辑，不涉及神经动力学）
 RULES.md 强制三问：
   Q1 生物/物理对应物：
     本模块是INFRA类型，类似AddressRegistry——是审计/身份管理基础设施，
-    不对应具体物理机制。它管理的是"哪些结构共同支撑一个事件实例"的
+    不对应具体物理机制。它管理的是"哪些结构共同支撑一个关系实例"的
     谱系绑定关系，不执行神经动力学。
 
   Q2 物理结构：
@@ -37,22 +61,26 @@ from typing import Optional, Tuple
 
 from ..components.structural_address import GeneratedAddress, StructuralAddress
 
-# ── 事件核类型常量 ──
-EVENT_KERNEL_A_PRECEDES_B_FAST = "event.a_prec_b_fast"
+# ── 关系谱系候选类型常量（降级语义：非事件核本身）──
+RELATION_LINEAGE_A_PRECEDES_B_FAST = "relation.lineage.a_prec_b_fast"
 
-# ── 候选资格状态 ──
-STATUS_CANDIDATE = "CANDIDATE"
+# ── 谱系候选资格状态 ──
+STATUS_CANDIDATE = "CANDIDATE"  # 关系谱系材料完整且一致
 STATUS_REJECTED_INCOMPLETE_SUPPORT = "REJECTED_INCOMPLETE_SUPPORT"
 STATUS_REJECTED_LINEAGE_MISMATCH = "REJECTED_LINEAGE_MISMATCH"
 
 
 @dataclass(frozen=True)
 class EventKernelSpec:
-    """TYPE:INFRA — 事件核规格：描述一种候选事件需要哪些支撑。
+    """TYPE:INFRA — 关系谱系候选规格（非事件核本身）。
 
-    不执行神经动力学，只定义"哪些元支撑必须存在"的结构契约。
+    **语义降级（2026-07-29）**：当前只定义"哪些关系元支撑材料必须存在"的
+    结构契约，是未来事件核可能复用的谱系基础设施，不表示事件核已开始生长。
 
-    当前只定义一种核：A_PRECEDES_B_FAST（A先于B，快时间尺度）。
+    真正的事件核需要先完成P2-C（关系—关系生成），由多关系组织后验形成，
+    而非开发者预设单条关系为一个事件类型。
+
+    当前只定义一种谱系规格：A_PRECEDES_B_FAST（A先于B，快时间尺度）。
     """
     address: GeneratedAddress
     generation_depth: int  # 事件是D3，关系是D2，occurrence是D1
@@ -69,12 +97,14 @@ class EventKernelSpec:
 
 @dataclass(frozen=True)
 class EventSupportBinding:
-    """TYPE:INFRA — 事件元支撑绑定：把某一次实际发生绑定到事件核上。
+    """TYPE:INFRA — 关系支撑谱系完整的候选绑定（非事件元支撑本身）。
 
-    关键设计：记录**实例身份**（occurrence_28_epoch_17），不是站点身份（site28）。
-    这样相同站点后来再次发生时，不会被错误地拼进旧事件。
+    **语义降级（2026-07-29）**：记录**关系实例身份**（occurrence_28_epoch_17），
+    不是站点身份（site28）。这样相同站点后来再次发生时，不会被错误地拼进旧关系。
 
     补齐谱系：D2关系 → D1两次occurrence → D0/D_{-1}物理支撑。
+
+    当前CANDIDATE含义：**关系谱系材料完整且一致**，不是：**事件候选已由过程生成**。
     """
     kernel_address: GeneratedAddress  # 指向EventKernelSpec
 
@@ -99,14 +129,20 @@ class EventSupportBinding:
 
 @dataclass(frozen=True)
 class EventInstanceCandidate:
-    """TYPE:INFRA — 事件实例候选：绑定成功后产生的候选实例。
+    """TYPE:INFRA — 关系谱系材料完整的候选（非D3事件实例本身）。
 
-    第一版只允许三种状态：
-      - CANDIDATE：所有必需支撑完整且谱系正确
+    **语义降级（2026-07-29）**：第一版只允许三种状态：
+      - CANDIDATE：所有必需支撑完整且谱系正确（关系谱系材料完整）
       - REJECTED_INCOMPLETE_SUPPORT：缺失必要支撑
       - REJECTED_LINEAGE_MISMATCH：谱系错配（如A、B不在同一关系窗口）
 
-    不包含完整状态机（READY/ACTIVE/EXIT/REARM），那是P2-B1K1的任务。
+    当前**未验证**的（需P2-C后才能实现）：
+      - 支撑在真实运行中何时同时出现
+      - 支撑如何连续维持
+      - 事件何时进入/退出/重新可用
+      - 这些支撑共同形成独立于单条关系的组织
+
+    不包含完整状态机（READY/ACTIVE/EXIT/REARM），那需要先完成P2-C关系—关系生成。
     """
     address: GeneratedAddress  # 候选实例地址
     kernel_address: GeneratedAddress  # 指向EventKernelSpec

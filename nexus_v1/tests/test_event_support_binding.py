@@ -1,13 +1,18 @@
-"""T-EKB-1~3：P2-B1K0 事件元支撑绑定器资格测试（2026-07-29）
+"""T-EKB-1~3：P2-B1X 关系实例谱系绑定资格测试（2026-07-29）
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-29T140411.192.md`
+修正依据：`cell-cell/交叉比对/document - 2026-07-29T171142.179.md`
+
+**理论定位修正**：原命名为"P2-B1K0事件元支撑绑定器"，评判指出实际完成的是
+**P2-B1X：关系实例谱系绑定**——把D2关系绑定到正确的两次D1 occurrence，
+补齐D2→D1→D0完整谱系，验证跨epoch错配。
 
 核心验证：能够把一条已取得局部作用资格的D2关系，绑定到正确的两次D1发生。
 
 三个测试：
-  T-EKB-1：完整支撑 → CANDIDATE
+  T-EKB-1：完整支撑 → CANDIDATE（关系谱系材料完整）
   T-EKB-2：缺失必要支撑 → REJECTED_INCOMPLETE_SUPPORT
-  T-EKB-3：谱系错配 → REJECTED_LINEAGE_MISMATCH
+  T-EKB-3：谱系错配 → REJECTED_LINEAGE_MISMATCH（证明绑定实例而非站点）
 """
 import sys
 sys.path.insert(0, '.')
@@ -17,7 +22,7 @@ from nexus_v1.events import (
     EventSupportBinding,
     EventInstanceCandidate,
     create_event_candidate,
-    EVENT_KERNEL_A_PRECEDES_B_FAST,
+    RELATION_LINEAGE_A_PRECEDES_B_FAST,
     STATUS_CANDIDATE,
     STATUS_REJECTED_INCOMPLETE_SUPPORT,
     STATUS_REJECTED_LINEAGE_MISMATCH,
@@ -72,7 +77,7 @@ def _create_mock_addresses(registry: AddressRegistry):
     # 事件核地址（回指两个物理站点作为其覆盖范围）
     kernel = registry.register_generated(
         domain="event.kernel",
-        local_key=EVENT_KERNEL_A_PRECEDES_B_FAST,
+        local_key=RELATION_LINEAGE_A_PRECEDES_B_FAST,
         parent_addresses=(skin_28, skin_31),  # 核覆盖的物理范围
         generation_depth=2,  # 核本身是D2级别的规格
     )
