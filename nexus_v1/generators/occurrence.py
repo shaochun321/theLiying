@@ -105,6 +105,25 @@ _DEFAULT_REARM_MIN_STEPS = 500
 
 
 @dataclass(frozen=True)
+class OccurrenceInstanceId:
+    """D1实例身份键：(生成元地址, epoch序号)。
+
+    评判修正（`document - 2026-07-30T113327.179.md`）：`Occurrence.address`
+    单独存在时只是"生成元地址"（同一生成元反复产生的所有 occurrence 共享
+    同一个 address），不能被当作"这一次发生"的实例地址。**D1实例身份是
+    "生成元地址＋epoch"，不是生成元地址本身**——两者组合才能唯一区分
+    `u_{A,17}^(1)` 与 `u_{A,18}^(1)`。
+
+    本类不新造字段来源——`generator_address`/`epoch_id` 都已存在于
+    `Occurrence`（见 `Occurrence.instance_id` 属性），只是把它们包装成
+    一个有类型、可哈希、可作 dict key 的复合身份对象，而不是让调用方各自
+    拼字符串（如 `f"{addr.uid}_epoch_{epoch}"`）模拟这个概念。
+    """
+    generator_address: GeneratedAddress
+    epoch_id: int
+
+
+@dataclass(frozen=True)
 class Occurrence:
     """χ_i^k = (t_up, t_down, t_rearm)：一次完整发生的三边界记录。
 
@@ -117,13 +136,24 @@ class Occurrence:
       t_down:  活动退出时刻（跌破 theta_down 的 step_index）
       t_rearm: 重新具备下一次触发资格的 step_index（本轮 == t_down，
                因 rearm_min_steps=0，见模块 Q3）
+      address: 生成地址（挂在 GeneratedAddress 上的谱系，父地址回指皮肤支撑）。
+               **注意**：同一生成元反复产生的所有 Occurrence 共享同一个
+               `address`（它是生成元自身的地址，不是逐次发生的实例地址）。
+               要区分"这一次"和"上一次"发生，须用 `(address, epoch_id)` 组合，
+               不能只用 `address`（见 P2-B1X1 评判
+               `document - 2026-07-29T200523.988.md` 对跨 epoch 错配的要求）。
+      epoch_id: 本次发生所属的父物理支撑 epoch 序号（= `TransitionEvent.
+               epoch_id`，从 `OccurrenceClosure._epoch_id` 直接继承，见
+               `update()`）。P2-B1X1 新增字段——此前只存在于 `TransitionEvent`，
+               未进入 `Occurrence` 本身，导致下游（如关系实例绑定）无法区分
+               同一生成元的不同发生实例，只能靠测试手写字符串模拟。
       count:   恒为 1，表示"一次有效发生"，不表示焦耳/脉冲/秒等物理量
-      address: 生成地址（挂在 GeneratedAddress 上的谱系，父地址回指皮肤支撑）
     """
     t_up: int
     t_down: int
     t_rearm: int
     address: GeneratedAddress
+    epoch_id: int
     count: int = 1
 
     def __post_init__(self):
@@ -131,6 +161,13 @@ class Occurrence:
             raise ValueError(
                 f"Occurrence: boundaries must satisfy t_up<=t_down<=t_rearm, "
                 f"got ({self.t_up}, {self.t_down}, {self.t_rearm})")
+
+    @property
+    def instance_id(self) -> "OccurrenceInstanceId":
+        """D1实例身份（评判要求，见 `OccurrenceInstanceId` 文档）。用
+        `@property` 组合既有字段，不重构现有构造签名/不新增独立传参——
+        `generator_address`/`epoch_id` 已经是本对象的既定字段。"""
+        return OccurrenceInstanceId(generator_address=self.address, epoch_id=self.epoch_id)
 
 
 @dataclass(frozen=True)
@@ -293,7 +330,7 @@ class OccurrenceClosure:
             if t_step - self._t_down >= self.rearm_min_steps:
                 ev = Occurrence(
                     t_up=self._t_up, t_down=self._t_down, t_rearm=t_step,
-                    address=self.address,
+                    address=self.address, epoch_id=self._epoch_id,
                 )
                 self.events.append(ev)
                 self._t_up = None

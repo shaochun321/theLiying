@@ -27,7 +27,7 @@ collector）已存在于 `circuit/variant_adapter.py`（`_init_quantum_thermal_p
 `_init_quantum_thermal_pathways`，只读取其已构造的属性。
 """
 
-from .occurrence import Occurrence, OccurrenceClosure, TransitionEvent
+from .occurrence import Occurrence, OccurrenceClosure, OccurrenceInstanceId, TransitionEvent
 from .base_generator import BaseGenerator, wrap_base_generator, register_occ_thermal
 from .trajectory import TrajectoryRecord, GeneratorTrajectory
 from .input_envelope import InputEnvelopePoint, scan_input_envelope
@@ -35,12 +35,14 @@ from .skin_transduction import (
     TransductionConfig, transduce, REFERENCE_TRANSDUCTION_CONFIG,
 )
 from .natural_unit import SiteCalibration, NaturalUnit, naturalize
+from .occurrence_identity import OccurrenceIdentityRegistry
 
 __all__ = [
-    'Occurrence', 'OccurrenceClosure', 'TransitionEvent',
+    'Occurrence', 'OccurrenceClosure', 'OccurrenceInstanceId', 'TransitionEvent',
     'BaseGenerator', 'wrap_base_generator', 'register_occ_thermal',
     'TrajectoryRecord', 'GeneratorTrajectory',
     'InputEnvelopePoint', 'scan_input_envelope',
     'TransductionConfig', 'transduce', 'REFERENCE_TRANSDUCTION_CONFIG',
     'SiteCalibration', 'NaturalUnit', 'naturalize',
+    'OccurrenceIdentityRegistry',
 ]
