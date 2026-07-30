@@ -36,6 +36,7 @@ from .skin_transduction import (
 )
 from .natural_unit import SiteCalibration, NaturalUnit, naturalize
 from .occurrence_identity import OccurrenceIdentityRegistry
+from .occurrence_tap import CollectorOccurrenceTap, wrap_collector_occurrence_tap
 
 __all__ = [
     'Occurrence', 'OccurrenceClosure', 'OccurrenceInstanceId', 'TransitionEvent',
@@ -45,4 +46,5 @@ __all__ = [
     'TransductionConfig', 'transduce', 'REFERENCE_TRANSDUCTION_CONFIG',
     'SiteCalibration', 'NaturalUnit', 'naturalize',
     'OccurrenceIdentityRegistry',
+    'CollectorOccurrenceTap', 'wrap_collector_occurrence_tap',
 ]
