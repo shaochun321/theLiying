@@ -355,6 +355,15 @@ class OccurrenceClosure:
         return len(self.events)
 
     @property
+    def epoch_id(self) -> int:
+        """当前（或最近）物理支撑 epoch 序号（与 TransitionEvent.epoch_id 同一
+        来源）。只读访问，供 `RelationDraft`/`CollectorOccurrenceTap` 在关系
+        collector 激活时捕获父实例的在线身份标识，不需要等待父 occurrence 完成
+        rearm——epoch_id 在 ARMED→ACTIVE 触发时刻即已确定，即使 Occurrence
+        本身尚未 emit。"""
+        return self._epoch_id
+
+    @property
     def last_transitions(self) -> Tuple[TransitionEvent, ...]:
         """本次 `update()` 调用触发的转换事件列表，元素为类型化的
         `TransitionEvent`（`kind` ∈ {"up", "down", "rearm"}，对应
