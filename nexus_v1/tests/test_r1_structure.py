@@ -1,18 +1,18 @@
-"""T-R1S-1~3：P2-B1X2a R1最小结构块定义验证（2026-08-01）。
+"""T-R1S-1~4：P2-B1X2a' R1最小结构块定义验证（2026-08-01，评判030645修正）。
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-31T205641.086.md` +
-          `cell-cell/交叉比对/document - 2026-07-31T221144.140.md`
+          `cell-cell/交叉比对/document - 2026-07-31T221144.140.md` +
+          `cell-cell/交叉比对/document - 2026-08-01T030645.402.md`
 
-三个测试：
-  T-R1S-1：KappaTen工程映射——从RPrecCircuitT1构造两个κ^10，
-            验证字段完整（l1/hc/ensemble×10/collector/address），
-            输入端口=L1，输出端口=collector
-  T-R1S-2：RelationGenLink工程映射——ℓ_gen包含trace神经元/relation
-            collector/3条相关bundle，且ℓ_gen.relation_collector ≠
-            κ_A.collector（不把基元内部collector混入生成链路）
-  T-R1S-3：R1StructureBlock整体构造——验证两段链路分开存储，
-            link_gen≠link_out，R1块的relation_collector快捷属性指向
-            ℓ_gen输出端（而非κ的输出端）
+评判030645修正：T-R1S-3改为验证R1StructureBlock（本体，无ℓ_out字段），
+新增T-R1S-4验证R1OutputBinding（R1本体+ℓ_out），并验证RPrecCircuitT1
+（基类）构造的R1本体在无ℓ_out时仍然合法（不是"R1不完整"）。
+
+四个测试：
+  T-R1S-1：KappaTen工程映射（ensemble=10，B_in/C^10/S_dyn/B_out四层，两站点独立）
+  T-R1S-2：RelationGenLink分离（ℓ_gen ≠ κ^10输出端，3条bundle正确）
+  T-R1S-3：R1StructureBlock本体（不含ℓ_out，RPrecCircuitT1基类可构造，成立合法）
+  T-R1S-4：R1OutputBinding（R1本体+ℓ_out，桥梁衔接，measure_output_current()可读）
 """
 import sys
 
@@ -23,7 +23,7 @@ from nexus_v1.relations.temporal_r_prec import RPrecCircuitT1
 from nexus_v1.relations.temporal_r_prec_plastic import RPrecCircuitT1Plastic
 from nexus_v1.relations.r1_structure import (
     KappaTen, RelationGenLink, R1OutputLink, R1PhysicalInterval,
-    R1StructureBlock, LINK_TYPE_RPREC_FAST,
+    R1StructureBlock, R1OutputBinding, LINK_TYPE_RPREC_FAST,
 )
 
 
@@ -155,11 +155,48 @@ def test_r1s_2_link_gen_separation():
     print("✓ T-R1S-2 PASS: ℓ_gen与κ^10的输出端口分开定义，两段链路不混淆")
 
 
-def test_r1s_3_r1block_complete():
-    """T-R1S-3：R1StructureBlock完整构造——验证两段链路分开存储，
-    R1块的relation_collector快捷属性指向ℓ_gen输出端。
-    若使用RPrecCircuitT1Plastic还验证ℓ_out存在且source_collector与
-    ℓ_gen.relation_collector是同一对象（衔接两段链路的桥梁）。
+def test_r1s_3_r1block_body_no_output():
+    """T-R1S-3：R1StructureBlock本体——评判030645阻塞修正验证。
+
+    用RPrecCircuitT1**基类**（没有bundle_rprec_to_da，没有ℓ_out）构造R1本体，
+    验证：
+    - R1本体成立完全不需要ℓ_out（R1StructureBlock不再有link_out字段）
+    - relation_collector快捷属性正确指向ℓ_gen输出端
+    - "没有输出链路"不是"R1不完整"——这是合法状态
+    """
+    circuit = RPrecCircuitT1()  # 注意：基类，没有bundle_rprec_to_da
+    site_a = circuit.rprec_site_a
+    site_b = circuit.rprec_site_b
+
+    kappa_a = _build_kappa_ten(circuit, site_a, "warm")
+    kappa_b = _build_kappa_ten(circuit, site_b, "warm")
+    link_gen = _build_link_gen(circuit)
+
+    r1 = R1StructureBlock(kappa_a=kappa_a, kappa_b=kappa_b, link_gen=link_gen)
+
+    # relation_collector快捷属性应指向ℓ_gen.relation_collector
+    assert r1.relation_collector is link_gen.relation_collector
+    assert r1.relation_collector is circuit.rprec_collector_a_prec_b_fast
+
+    # R1StructureBlock不应再有link_out字段（评判030645核心修正）
+    assert not hasattr(r1, "link_out"), (
+        "R1StructureBlock不应含link_out字段——ℓ_out已移至独立的R1OutputBinding类")
+    assert not hasattr(r1, "has_output_link")
+    assert not hasattr(r1, "measure_output_current")
+
+    print(f"T-R1S-3: R1本体（RPrecCircuitT1基类，无bundle_rprec_to_da）构造成功")
+    print(f"  relation_collector = {r1.relation_collector.config.neuron_id}")
+    print("✓ T-R1S-3 PASS: R1本体不含ℓ_out仍合法成立，'关系存在'与'关系能否施力'已解耦")
+
+
+def test_r1s_4_output_binding():
+    """T-R1S-4：R1OutputBinding——R1本体+ℓ_out的组合绑定。
+
+    用RPrecCircuitT1Plastic构造R1本体，再绑定ℓ_out为R1OutputBinding，
+    验证：
+    - output_link.source_collector 与 r1.relation_collector 是同一对象（桥梁）
+    - 若二者不是同一对象，__post_init__应拒绝构造（ValueError）
+    - measure_output_current()能正确读取局部电流
     """
     circuit = RPrecCircuitT1Plastic()
     site_a = circuit.rprec_site_a
@@ -168,12 +205,10 @@ def test_r1s_3_r1block_complete():
     kappa_a = _build_kappa_ten(circuit, site_a, "warm")
     kappa_b = _build_kappa_ten(circuit, site_b, "warm")
     link_gen = _build_link_gen(circuit)
+    r1 = R1StructureBlock(kappa_a=kappa_a, kappa_b=kappa_b, link_gen=link_gen)
 
-    # 构造ℓ_out（RPrecCircuitT1Plastic中的bundle_rprec_to_da）
     out_addr = StructuralAddress(
-        domain="relation.out_link",
-        uid="r_prec.a_prec_b_fast.out_link",
-    )
+        domain="relation.out_link", uid="r_prec.a_prec_b_fast.out_link")
     link_out = R1OutputLink(
         source_collector=circuit.rprec_collector_a_prec_b_fast,
         output_bundle=circuit.bundle_rprec_to_da,
@@ -181,50 +216,42 @@ def test_r1s_3_r1block_complete():
         link_address=out_addr,
     )
 
-    r1 = R1StructureBlock(
-        kappa_a=kappa_a,
-        kappa_b=kappa_b,
-        link_gen=link_gen,
-        link_out=link_out,
-    )
+    binding = R1OutputBinding(r1=r1, output_link=link_out)
 
-    # relation_collector快捷属性应指向ℓ_gen.relation_collector
-    assert r1.relation_collector is link_gen.relation_collector
-    assert r1.relation_collector is circuit.rprec_collector_a_prec_b_fast
+    assert binding.output_link.source_collector is binding.r1.relation_collector, (
+        "ℓ_out.source_collector应与R1本体.relation_collector是同一对象（桥梁）")
 
-    # 两段链路分开：link_gen ≠ link_out（不同类型对象）
-    assert r1.link_gen is link_gen
-    assert r1.link_out is link_out
-    assert r1.has_output_link
-
-    # ℓ_out.source_collector == ℓ_gen.relation_collector（桥梁）
-    assert link_out.source_collector is link_gen.relation_collector, (
-        "ℓ_out.source_collector应与ℓ_gen.relation_collector是同一对象"
-        "（衔接两段链路的桥梁神经元）")
-
-    # ℓ_out.target_neurons 是DA池
-    assert len(link_out.target_neurons) > 0, "ℓ_out应有下游目标神经元（DA池）"
-
-    # measure_output_current()应能调用（不崩溃，返回长度匹配target_neurons）
-    currents = r1.measure_output_current()
+    currents = binding.measure_output_current()
     assert currents is not None
     assert len(currents) == len(link_out.target_neurons)
 
-    print(f"T-R1S-3: R1块构造完成")
-    print(f"  ℓ_gen.relation_collector = {link_gen.relation_collector.config.neuron_id}")
-    print(f"  ℓ_out.source_collector   = {link_out.source_collector.config.neuron_id} (同一对象)")
-    print(f"  ℓ_out.target_neurons数量 = {len(link_out.target_neurons)} (DA池)")
-    print(f"  measure_output_current() 返回 {len(currents)} 个电流值（初始全0，collector尚未激活）")
-    print("✓ T-R1S-3 PASS: R1StructureBlock两段链路分开，桥梁衔接正确，ℓ_out可读取局部电流")
+    # 桥梁校验：用不匹配的collector构造应拒绝
+    mismatched_link = R1OutputLink(
+        source_collector=circuit.rprec_collector_b_prec_a_fast,  # 错误：不是同一collector
+        output_bundle=circuit.bundle_rprec_to_da,
+        target_neurons=tuple(circuit.bundle_rprec_to_da.targets),
+        link_address=out_addr,
+    )
+    try:
+        R1OutputBinding(r1=r1, output_link=mismatched_link)
+        raise AssertionError("应拒绝source_collector与r1.relation_collector不一致的绑定")
+    except ValueError:
+        pass
+
+    print(f"T-R1S-4: R1OutputBinding构造完成")
+    print(f"  output_link.source_collector = {link_out.source_collector.config.neuron_id} (同一对象)")
+    print(f"  measure_output_current() 返回 {len(currents)} 个电流值")
+    print("✓ T-R1S-4 PASS: R1OutputBinding正确绑定R1本体+ℓ_out，桥梁校验生效")
 
 
 def run():
     test_r1s_1_kappa_ten_mapping()
     test_r1s_2_link_gen_separation()
-    test_r1s_3_r1block_complete()
+    test_r1s_3_r1block_body_no_output()
+    test_r1s_4_output_binding()
     print()
     print("=" * 60)
-    print("T-R1S-1~3 ALL PASS")
+    print("T-R1S-1~4 ALL PASS")
     print("=" * 60)
 
 

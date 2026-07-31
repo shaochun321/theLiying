@@ -5,8 +5,19 @@ TYPE:INFRA — 纯类型定义，不新建Neuron/SynapticBundle，不执行神�
 方案依据：
   `cell-cell/交叉比对/document - 2026-07-31T205641.086.md`（P2-B1X2路线重写）
   `cell-cell/交叉比对/document - 2026-07-31T221144.140.md`（核心修正：ℓ_gen≠ℓ_out）
+  `cell-cell/交叉比对/document - 2026-08-01T030645.402.md`（X2a'：ℓ_out移出R1本体）
 
-评判核心修正（221144）：
+评判030645核心修正（阻塞，本轮已执行）：
+  X2a首版把ℓ_out设为R1StructureBlock的可选字段（Optional[R1OutputLink]），
+  但这仍把"关系是否存在"和"关系是否已能向下游施力"放在同一个类里共享
+  身份边界——没有bundle_rprec_to_da的普通RPrecCircuitT1，不应该因此"没有
+  R1"。评判要求彻底拆成两个类：
+    R1StructureBlock：本体，只含κ_A/κ_B/ℓ_gen/区间/耦合轨迹，不含ℓ_out
+    R1OutputBinding：R1StructureBlock + ℓ_out + 下游目标 + measure_output_current()
+  R1本体回答"A、B是否通过真实生成链路形成了关系"；R1OutputBinding回答
+  "这个已经形成的关系能否向下游施力"——两个问题分属两个对象，不共享类。
+
+评判221144核心修正（ℓ_gen≠ℓ_out的最初区分）：
   P2-B1X1e工作报告曾将"关系生成链路"和"关系输出链路"混写成一条。
   本文件按评判要求严格区分：
 
@@ -26,6 +37,13 @@ TYPE:INFRA — 纯类型定义，不新建Neuron/SynapticBundle，不执行神�
   两个切割测试分开定义（P2-B1X2c）：
     K_gen：切断ℓ_gen后relation collector是否失去活动，RelationOccurrence不再产生
     K_out：切断ℓ_out后下游Y是否消失（在R1已形成的前提下）
+
+评判030645阻塞修正：ℓ_out不属于R1本体的必需字段。
+  R1StructureBlock（本体）只含κ_A^10/κ_B^10/ℓ_gen/区间——"A、B是否形成了
+  关系"不应依赖"关系是否已能向下游施力"。没有bundle_rprec_to_da的普通
+  RPrecCircuitT1，只要ℓ_gen真实检测到A≺B，R1本体依然成立。
+  ℓ_out相关内容独立成R1OutputBinding类（R1本体 + ℓ_out + 下游节点q +
+  Y_q读出），只在RPrecCircuitT1Plastic场景下才能构造。
 
 κ^10基元（十神经元基元）的工程映射（评判221144提醒必须明确到代码对象）：
   以site_a（thermptXX_warm）为例：
@@ -77,7 +95,20 @@ _DEFAULT_INTERVAL_EXIT_THRESHOLD = 1e-4
 
 @dataclass(frozen=True)
 class KappaTen:
-    """κ^10：十神经元不可约基础结构块（一个站点的温感量子元通路）。
+    """κ^10：以十神经元ensemble为最低功能核心的基础生成元（一个站点的温感量子元通路）。
+
+    评判030645非阻塞澄清（"十"指什么）：
+      κ^10 = (B_in, C^10, S_dyn, B_out)，即：
+        C^10（不可约核心）  = ensemble中的10个神经元——最低功能规模
+        B_in（输入边界）    = l1
+        S_dyn（支持动力学） = hc
+        B_out（输出边界）   = collector
+      "十"描述核心的最小功能规模，不是整个物理装置的总元件数（l1/hc/
+      collector都是维持该核心作为完整生成元工作所需的支撑结构，"不可约"
+      指核心实现的最低项目功能不可再拆，不是说l1/hc/collector可以从
+      实际运行结构中删除）。collector属于生成元整体，但不属于十神经元
+      核心本身——这与ℓ_gen读取collector.pre_trace（输出端口，不是核心
+      内部信号）的约定一致。
 
     对应代码：
       variant_adapter.py 中 `_init_quantum_thermal_pathways` 对每个站点
@@ -234,24 +265,22 @@ class R1PhysicalInterval:
 
 @dataclass
 class R1StructureBlock:
-    """R1最小结构块：两个不可约基础结构通过真实链路在物理驱动区间内形成的耦合块。
+    """R1本体：两个不可约基础结构通过真实生成链路在物理驱动区间内形成的耦合块。
 
-    评判205641定义（修正后）：
+    评判030645阻塞修正：本体**不含**ℓ_out——"关系是否存在"不应依赖"关系
+    是否已能向下游施力"。没有bundle_rprec_to_da的普通RPrecCircuitT1，
+    只要ℓ_gen真实检测到A≺B，R1本体依然成立。ℓ_out相关字段/方法已移至
+    独立的 `R1OutputBinding` 类（见下）。
+
+    评判205641定义：
 
         R1_AB[I] = (κ_A^10, κ_B^10, ℓ_gen, I, Γ_AB^I)
 
     其中：
       κ_A^10, κ_B^10：两个不可约基础结构（十神经元基元）
-      ℓ_gen：使两者发生耦合的关系生成结构（不是输出链路）
+      ℓ_gen：使两者发生耦合的关系生成结构
       I：该耦合保持同一谱系的物理区间
       Γ_AB^I：区间内完整耦合轨迹（P2-B1X2c测量）
-
-    关系向下游产生作用另由ℓ_out（R1OutputLink）表示：
-        O_ρq = (R1_AB, ℓ_out, q, Y_q)
-
-    层次清楚：
-      R1块  ← 回答"A和B是否真正形成了关系"
-      ℓ_out ← 回答"这个关系是否能向下游施力"（P2-B1X2c测量Y的位置）
 
     身份：
       R1实例身份 = (parent_a_instance_id, parent_b_instance_id,
@@ -272,9 +301,6 @@ class R1StructureBlock:
     # ── 物理区间（P2-B1X2d补全） ──
     interval: R1PhysicalInterval = field(default_factory=R1PhysicalInterval)
 
-    # ── 关系输出链路（可选，仅RPrecCircuitT1Plastic存在） ──
-    link_out: Optional[R1OutputLink] = None
-
     # ── 谱系回指 ──
     # 两个父D1实例身份（与RelationOccurrence.parent_{a,b}_instance_id对应）
     parent_a_instance_id: Optional[OccurrenceInstanceId] = None
@@ -284,21 +310,43 @@ class R1StructureBlock:
     r1_id: Optional[str] = None   # 暂用字符串占位，X2d替换为专用类型
 
     @property
-    def has_output_link(self) -> bool:
-        """是否已有关系输出链路（需RPrecCircuitT1Plastic）。"""
-        return self.link_out is not None
-
-    @property
     def relation_collector(self) -> Neuron:
-        """快捷访问关系collector（ℓ_gen的输出端，ℓ_out的输入端）。"""
+        """快捷访问关系collector（ℓ_gen的输出端，也是R1OutputBinding.ℓ_out的输入端）。"""
         return self.link_gen.relation_collector
 
-    def measure_output_current(self) -> Optional[List[float]]:
-        """读取ℓ_out对下游节点的局部电流（P2-B1X2c测量Y_c(s)用）。
 
-        返回None若ℓ_out不存在（RPrecCircuitT1基类无输出链路）。
+@dataclass
+class R1OutputBinding:
+    """R1输出资格：已形成的R1本体，绑定一条输出链路后能否向下游节点施力。
+
+    评判030645定义（修正后）：
+
+        Q_out = (R1_AB, ℓ_out, q, Y_q)
+
+    它回答"这个已经形成的R1，能否沿某条出口链路对下游产生真实作用"——
+    与R1本体是否成立（"A、B是否形成了关系"）是完全不同的问题，故不共享
+    同一个类/身份边界。仅当R1本体所在的circuit是RPrecCircuitT1Plastic
+    （或其他挂了ℓ_out的子类）时才能构造本类；RPrecCircuitT1基类的R1本体
+    没有对应的R1OutputBinding，这是合法状态，不是"R1不完整"。
+
+    评判221144约定：
+      Y_c(s) = I_{ρ→q,c}^local(s) 读取的是ℓ_out对下游节点的局部电流，
+      即 output_link.measure_local_current() 的返回值——不是relation
+      collector本身的活动（那是循环证明），也不是DA池全局平均电位。
+    """
+    r1: R1StructureBlock       # 已形成的R1本体（不含ℓ_out）
+    output_link: R1OutputLink  # 关系输出链路ℓ_out
+
+    def __post_init__(self):
+        if self.output_link.source_collector is not self.r1.relation_collector:
+            raise ValueError(
+                "R1OutputBinding: output_link.source_collector必须是"
+                "r1.relation_collector同一对象（ℓ_gen与ℓ_out的衔接点），"
+                "不能是不同的collector")
+
+    def measure_output_current(self) -> List[float]:
+        """读取ℓ_out对下游目标节点的局部突触电流（P2-B1X2c测量Y_c(s)用）。
+
         调用方应在circuit.step_rprec()之后调用，不能在circuit.step()前。
         """
-        if self.link_out is None:
-            return None
-        return self.link_out.measure_local_current()
+        return self.output_link.measure_local_current()
