@@ -1,8 +1,17 @@
-"""nexus_v1.relations.relation_occurrence — P2-B1X1c：在线D2关系实例闭合。
+"""nexus_v1.relations.relation_occurrence — P2-B1X1c：在线D2关系实例闭合
+（P2-B1X1e：补充去重防线）。
 
 TYPE:INFRA（数据结构与状态机，不执行神经动力学）
 
-方案依据：`cell-cell/交叉比对/document - 2026-07-30T130442.029.md`（P2-B1X1c）。
+方案依据：`cell-cell/交叉比对/document - 2026-07-30T130442.029.md`（P2-B1X1c）+
+`cell-cell/交叉比对/document - 2026-07-31T203403.976.md`（P2-B1X1e：去重防线）。
+
+P2-B1X1e 背景：P2-B1X1d端到端场景调试时发现，连续（非脉冲）驱动下collector
+可能因神经元残余振荡在同一对父occurrence的rearm间隔内产生第二次上升沿，
+若不加防线会重复登记两份"同一件事"的RelationOccurrence。本轮在
+`RelationFinalizer`加(relation_type, parent_a_instance_id,
+parent_b_instance_id, trace_scale)去重键——不是修改`OccurrenceClosure`
+本身的迟滞参数（那会影响D1层语义），只在D2登记处拦截重复。
 
 核心语义边界（评判明确要求）：
   关系实例的成立**不能依赖DA**——DA=0时仍必须生成 ρ_obs（观察到的关系）。
@@ -121,6 +130,14 @@ class RelationFinalizer:
       draft只在collector从inactive→active的跳变时创建，而不是在每个
       pre_trace>threshold的步骤都创建——避免一次持续的collector活动制造
       大量重复实例。
+
+    P2-B1X1e 去重防线（`document - 2026-07-31T203403.976.md`评判）：
+      同一 (relation_type, parent_a_instance_id, parent_b_instance_id,
+      trace_scale) 组合，无论已闭合为RelationOccurrence还是仍是OPEN
+      draft，都只允许存在一份——collector在同一对父occurrence的rearm
+      间隔内因残余振荡产生的第二次上升沿不会再创建新draft。只有当至少
+      一个父生成元进入新的epoch（真正产生了新的D1 occurrence），
+      dedup_key才会变化，才允许新关系登记。
     """
     tap_a: CollectorOccurrenceTap
     tap_b: CollectorOccurrenceTap
@@ -134,6 +151,13 @@ class RelationFinalizer:
     _was_collector_active: bool = field(default=False, repr=False)
     _open_drafts: List[RelationDraft] = field(default_factory=list, repr=False)
     completed_relations: List[RelationOccurrence] = field(default_factory=list)
+
+    # P2-B1X1e：已登记的 (relation_type, parent_a, parent_b, trace_scale)
+    # 组合键集合，防止同一对父实例被重复登记为多个 RelationOccurrence/
+    # RelationDraft（见 document - 2026-07-31T203403.976.md 评判：残余
+    # 振荡可能让 collector 在同一对父 occurrence 的 rearm 间隔内产生
+    # 第二次上升沿，若不去重会生成两份"同一件事"的关系记录）。
+    _registered_keys: set = field(default_factory=set, repr=False)
 
     # 关系窗口过期判据：collector pre_trace跌落到此值以下则关系窗口关闭
     _RELATION_CLOSE_THRESHOLD: float = 1e-4
@@ -171,16 +195,32 @@ class RelationFinalizer:
                 epoch_id=self.tap_b.closure.epoch_id,
             )
             if instance_id_a.epoch_id > 0 and instance_id_b.epoch_id > 0:
-                draft = RelationDraft(
-                    relation_type=self.relation_type,
-                    parent_a_instance_id=instance_id_a,
-                    parent_b_instance_id=instance_id_b,
-                    collector_address=self.collector_address,
-                    trace_scale=self.trace_scale,
-                    t_detect=t_step,
-                    relation_window_start=t_step,
-                )
-                self._open_drafts.append(draft)
+                # P2-B1X1e 去重键：同一(关系类型, 父A实例, 父B实例, 尺度)
+                # 组合只允许存在一份记录——不管是已完成的 RelationOccurrence
+                # 还是仍在等待父实例就绪的 OPEN draft。残余振荡若在同一对
+                # 父occurrence的rearm间隔内让collector再次产生上升沿，此处
+                # 直接跳过，不追加新draft（不是修改 OccurrenceClosure 本身
+                # 的迟滞参数，只在 D2 登记处拦截——同评判要求的修复位置）。
+                dedup_key = (self.relation_type, instance_id_a, instance_id_b,
+                             self.trace_scale)
+                already_open = any(
+                    d.relation_type == self.relation_type
+                    and d.parent_a_instance_id == instance_id_a
+                    and d.parent_b_instance_id == instance_id_b
+                    and d.trace_scale == self.trace_scale
+                    and d.status == DRAFT_STATUS_OPEN
+                    for d in self._open_drafts)
+                if dedup_key not in self._registered_keys and not already_open:
+                    draft = RelationDraft(
+                        relation_type=self.relation_type,
+                        parent_a_instance_id=instance_id_a,
+                        parent_b_instance_id=instance_id_b,
+                        collector_address=self.collector_address,
+                        trace_scale=self.trace_scale,
+                        t_detect=t_step,
+                        relation_window_start=t_step,
+                    )
+                    self._open_drafts.append(draft)
         self._was_collector_active = collector_active
 
         # 3. 尝试闭合OPEN的draft
@@ -208,6 +248,12 @@ class RelationFinalizer:
                 self.completed_relations.append(ro)
                 draft.status = DRAFT_STATUS_CLOSED
                 newly_closed = ro
+                # 登记去重键：这一对父实例的这种关系类型/尺度已经产生过
+                # 正式记录，后续任何残余振荡触发的上升沿都不会再为它建
+                # 新draft（见上方"上升沿检测"处的dedup_key检查）。
+                self._registered_keys.add((
+                    draft.relation_type, draft.parent_a_instance_id,
+                    draft.parent_b_instance_id, draft.trace_scale))
             elif not collector_active and t_step - draft.t_detect > 5000:
                 # 关系窗口已过期（超过5000步仍未解析），标记EXPIRED
                 draft.status = DRAFT_STATUS_EXPIRED
