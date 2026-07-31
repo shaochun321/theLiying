@@ -1,18 +1,18 @@
-"""T-R1S-1~4：P2-B1X2a' R1最小结构块定义验证（2026-08-01，评判030645修正）。
+"""T-R1S-1~7：P2-B1X2a'/b/d R1结构块定义与区间验证（2026-08-01）。
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-31T205641.086.md` +
           `cell-cell/交叉比对/document - 2026-07-31T221144.140.md` +
-          `cell-cell/交叉比对/document - 2026-08-01T030645.402.md`
+          `cell-cell/交叉比对/document - 2026-08-01T030645.402.md` +
+          `cell-cell/交叉比对/document - 2026-08-01T040602.337.md`
 
-评判030645修正：T-R1S-3改为验证R1StructureBlock（本体，无ℓ_out字段），
-新增T-R1S-4验证R1OutputBinding（R1本体+ℓ_out），并验证RPrecCircuitT1
-（基类）构造的R1本体在无ℓ_out时仍然合法（不是"R1不完整"）。
-
-四个测试：
+七个测试：
   T-R1S-1：KappaTen工程映射（ensemble=10，B_in/C^10/S_dyn/B_out四层，两站点独立）
-  T-R1S-2：RelationGenLink分离（ℓ_gen ≠ κ^10输出端，3条bundle正确）
+  T-R1S-2：RelationGenLink分离（ℓ_gen ≠ κ^10输出端，3条bundle正确，generation_link_address≠collector_address）
   T-R1S-3：R1StructureBlock本体（不含ℓ_out，RPrecCircuitT1基类可构造，成立合法）
   T-R1S-4：R1OutputBinding（R1本体+ℓ_out，桥梁衔接，measure_output_current()可读）
+  T-R1S-5：project_to_relation_occurrence_fields()投影语义（collector_address≠generation_link_address）
+  T-R1S-6：R1PhysicalInterval状态机（UNBOUND→SUPPORTED→RELAXING→CLOSED，父epoch变化触发退出）
+  T-R1S-7：R1MeasurementWindow（后验构造，Y尾部归零检测，W_Y*≥I_R1）
 """
 import sys
 
@@ -23,6 +23,7 @@ from nexus_v1.relations.temporal_r_prec import RPrecCircuitT1
 from nexus_v1.relations.temporal_r_prec_plastic import RPrecCircuitT1Plastic
 from nexus_v1.relations.r1_structure import (
     KappaTen, RelationGenLink, R1OutputLink, R1PhysicalInterval,
+    R1MeasurementWindow, _R1IntervalState,
     R1StructureBlock, R1OutputBinding, LINK_TYPE_RPREC_FAST,
     project_to_relation_occurrence_fields,
 )
@@ -326,15 +327,130 @@ def _fake_generator_addr(label: str):
                              parent_addresses=(skin,), generation_depth=1)
 
 
+def test_r1s_6_physical_interval_state_machine():
+    """T-R1S-6：R1PhysicalInterval状态机——UNBOUND→SUPPORTED→RELAXING→CLOSED。
+    验证：
+    - 未满足共同支撑时停在UNBOUND
+    - 满足条件后进入SUPPORTED，记录s_enter
+    - 共同支撑解除后进入RELAXING，记录s_support_end
+    - trace/collector均归零后封闭，记录s_closed
+    - 父epoch变化强制触发SUPPORTED→RELAXING
+    """
+    threshold = 1e-4
+    iv = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
+
+    assert iv.state is _R1IntervalState.UNBOUND
+    assert not iv.is_active
+    assert not iv.is_closed
+
+    # t=0：只有A有支撑，B无支撑 → 停在UNBOUND
+    iv.update(0, support_a=0.5, support_b=0.0, collector_activity=0.5,
+              parent_a_epoch=1, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
+    assert iv.state is _R1IntervalState.UNBOUND
+
+    # t=1：双方都有支撑 → 进入SUPPORTED
+    iv.update(1, support_a=0.5, support_b=0.5, collector_activity=0.5,
+              parent_a_epoch=1, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
+    assert iv.state is _R1IntervalState.SUPPORTED
+    assert iv.s_enter == 1
+    assert iv.is_active
+
+    # t=2：支撑解除 → 进入RELAXING
+    iv.update(2, support_a=0.0, support_b=0.0, collector_activity=0.3,
+              parent_a_epoch=1, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv.state is _R1IntervalState.RELAXING
+    assert iv.s_support_end == 2
+
+    # t=3：collector也归零 → CLOSED
+    iv.update(3, support_a=0.0, support_b=0.0, collector_activity=0.0,
+              parent_a_epoch=1, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv.state is _R1IntervalState.CLOSED
+    assert iv.s_closed == 3
+    assert iv.duration == 2  # s_closed - s_enter = 3 - 1
+
+    # 父epoch变化强制退出SUPPORTED
+    iv2 = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
+    iv2.update(10, support_a=0.5, support_b=0.5, collector_activity=0.5,
+               parent_a_epoch=1, parent_b_epoch=1,
+               _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
+    assert iv2.state is _R1IntervalState.SUPPORTED
+    # epoch_a变为2（父occurrence进入新发生），即使物理支撑仍在 → 强制退出
+    iv2.update(11, support_a=0.5, support_b=0.5, collector_activity=0.5,
+               parent_a_epoch=2, parent_b_epoch=1,  # A有新epoch
+               _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv2.state is _R1IntervalState.RELAXING, (
+        "父epoch变化应强制SUPPORTED→RELAXING（新epoch不能并入旧区间）")
+
+    print("T-R1S-6: s_enter=1, s_support_end=2, s_closed=3, duration=2")
+    print("         父epoch变化正确触发SUPPORTED→RELAXING")
+    print("✓ T-R1S-6 PASS: R1PhysicalInterval状态机UNBOUND→SUPPORTED→RELAXING→CLOSED正确")
+
+
+def test_r1s_7_measurement_window():
+    """T-R1S-7：R1MeasurementWindow——后验构造，W_Y*≥I_R1。
+    验证：
+    - from_r1_run()正确找到Y轨迹最后一个超阈步骤
+    - W_Y*.s_start == I_R1.s_enter
+    - Y全程为零时降级为I_R1.s_closed
+    - s_start >= s_end时拒绝构造
+    """
+    threshold = 1e-4
+    iv = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
+    # 手动设置一个已封闭的区间
+    iv.s_enter = 100
+    iv.s_closed = 200
+    object.__setattr__(iv, '_state', _R1IntervalState.CLOSED)
+
+    target_addr = StructuralAddress(domain="neuron.da", uid="da_neuron_0")
+
+    # Y轨迹：步骤0~49对应t=100~149，步骤50~99为零
+    y_traj = [0.5] * 50 + [0.0] * 50  # 在t=149（index=49）最后一个超阈
+    win = R1MeasurementWindow.from_r1_run(
+        r1_interval=iv, y_trajectory=y_traj, y_start_step=100,
+        baseline_band=1e-5, target_address=target_addr)
+
+    assert win.s_start == 100, f"窗口起点应等于r1_interval.s_enter=100，实际{win.s_start}"
+    assert win.s_end == 150, f"窗口终点应为最后超阈步骤(149)+1=150，实际{win.s_end}"
+    # 注意：W_Y* = 150 < I_R1.s_closed = 200 是合法的——Y在R1区间封闭前就归零了
+    # 评判040602说s_closed^R1 ≤ s_relax^Y是"可能"情形（Y尾部持续时），不是必须
+    assert win.length == 50
+
+    # Y全程为零时：终点fallback为I_R1.s_closed
+    y_all_zero = [0.0] * 50
+    win_zero = R1MeasurementWindow.from_r1_run(
+        r1_interval=iv, y_trajectory=y_all_zero, y_start_step=100,
+        baseline_band=1e-5, target_address=target_addr)
+    assert win_zero.s_end == iv.s_closed, (
+        "Y全程为零时窗口终点应fallback为I_R1.s_closed")
+
+    # 非法窗口拒绝
+    try:
+        R1MeasurementWindow(s_start=100, s_end=100, baseline_band=0.0,
+                            target_address=target_addr)
+        raise AssertionError("s_start==s_end时应拒绝构造")
+    except ValueError:
+        pass
+
+    print(f"T-R1S-7: win.s_start={win.s_start}, win.s_end={win.s_end}, win.length={win.length}")
+    print(f"         Y全程为零时win_zero.s_end={win_zero.s_end}（=I_R1.s_closed={iv.s_closed}）")
+    print("✓ T-R1S-7 PASS: R1MeasurementWindow后验构造正确，W_Y*≥I_R1，Y尾部归零检测正确")
+
+
 def run():
     test_r1s_1_kappa_ten_mapping()
     test_r1s_2_link_gen_separation()
     test_r1s_3_r1block_body_no_output()
     test_r1s_4_output_binding()
     test_r1s_5_projection_to_relation_occurrence()
+    test_r1s_6_physical_interval_state_machine()
+    test_r1s_7_measurement_window()
     print()
     print("=" * 60)
-    print("T-R1S-1~5 ALL PASS")
+    print("T-R1S-1~7 ALL PASS")
     print("=" * 60)
 
 

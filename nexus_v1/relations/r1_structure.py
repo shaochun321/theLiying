@@ -258,35 +258,223 @@ class R1OutputLink:
 
 @dataclass
 class R1PhysicalInterval:
-    """R1结构块的物理区间 I = [s_enter, s_exit]。
+    """R1本体区间 I_R1 = [s_enter, s_support_end, s_closed]。
 
-    P2-B1X2d负责实现完整的区间进入/维持/退出判断逻辑。
-    本文件只定义字段类型，为P2-B1X2a冻结类型做占位——字段可在X2d补全。
+    评判040602修正：区分两个独立对象：
+      R1PhysicalInterval（本类）：回答"这条关系活了多久"
+      R1MeasurementWindow（见下）：回答"这条关系造成的作用要观察多久"
+    两者不能等同，因为R1本体不含ℓ_out，ℓ_out的电流尾部可能在R1区间
+    关闭后仍未归零（s_closed^R1 ≤ s_relax^Y）。
 
-    当前最小定义：
-      s_enter：外部物理支撑第一次开始作用的步骤
-      s_exit：四种条件中耦合链路低于退出阈值的最晚步骤
-              （取 max_c(s_relax,c)，确保耗散尾部被完整包含）
-      is_active：当前是否在有效区间内
+    状态机（评判040602）：
+      UNBOUND：等待两个父实例同时获得物理支撑且relation collector进入响应带
+      SUPPORTED：共同支撑中，collector在响应带内
+      RELAXING：共同支撑解除/collector退出响应带，但残响仍归属本区间
+      CLOSED：trace和collector均回到基线带，区间正式封闭；
+              后续残余振荡不能再触发同一R1区间的新实例
 
-    评判221144指出：
-      Y_c(s)的区间范数||Y||_{2,I}必须在明确的物理区间I上计算，
-      不能用任意固定长度测试窗口替代——这是P2-B1X2d的任务。
+    进入条件（UNBOUND→SUPPORTED）：
+      S_A(s)>0 AND S_B(s)>0 AND C_rel(s)∈B_response
+      即两父实例都有物理支撑（pre_trace>threshold），且relation collector
+      的pre_trace首次进入响应带（> response_threshold）。
+
+    退出至RELAXING（SUPPORTED→RELAXING）：
+      满足任一：共同支撑解除；collector退出响应带；父谱系中任一改变。
+      新epoch不能并入旧区间——新epoch只能开启新的候选R1区间。
+
+    封闭条件（RELAXING→CLOSED）：
+      trace归零（< baseline_threshold）AND collector归零（< baseline_threshold）
+      AND 在迟滞期内没有重新取得同一父实例共同支撑。
+
+    此区间用于：
+      - R1实例身份（同一父实例对+同一链路+同一区间=同一R1实例）
+      - 替代/补充P2-B1X1e的简单去重键（X2d完成后可升级）
+      - 判断残余振荡属于旧关系还是新关系（RELAXING阶段的残响归旧）
+
+    注意：本类只含字段和状态机，update()方法由step(t_step, ...)调用，
+    不直接访问神经元——所有输入值都由调用方从神经元读出后传入。
     """
-    s_enter: Optional[int] = None  # 耦合进入时刻
-    s_exit: Optional[int] = None   # 耦合退出时刻（待X2d填入）
-    exit_threshold: float = _DEFAULT_INTERVAL_EXIT_THRESHOLD
+    # ── 阈值参数 ──
+    response_threshold: float = _DEFAULT_INTERVAL_EXIT_THRESHOLD  # collector响应带下界
+    baseline_threshold: float = _DEFAULT_INTERVAL_EXIT_THRESHOLD   # 归零判定上界（同值）
+
+    # ── 时刻记录 ──
+    s_enter: Optional[int] = None         # 首次进入SUPPORTED的时刻
+    s_support_end: Optional[int] = None   # 共同支撑最后一步时刻（SUPPORTED→RELAXING）
+    s_closed: Optional[int] = None        # 区间正式封闭时刻（RELAXING→CLOSED）
+
+    # ── 状态 ──
+    _state: "_R1IntervalState" = field(default=None, repr=False)
+
+    def __post_init__(self):
+        if self._state is None:
+            object.__setattr__(self, '_state', _R1IntervalState.UNBOUND)
+
+    @property
+    def state(self) -> "_R1IntervalState":
+        return self._state
+
+    @property
+    def is_active(self) -> bool:
+        """区间已进入但尚未封闭（SUPPORTED或RELAXING）。"""
+        return self._state in (_R1IntervalState.SUPPORTED, _R1IntervalState.RELAXING)
+
+    @property
+    def is_closed(self) -> bool:
+        return self._state is _R1IntervalState.CLOSED
 
     @property
     def is_defined(self) -> bool:
-        """区间是否已有明确的enter/exit定义（P2-B1X2d完成前为False）。"""
-        return self.s_enter is not None and self.s_exit is not None
+        """区间已有明确的enter时刻。"""
+        return self.s_enter is not None
 
     @property
     def duration(self) -> Optional[int]:
-        if self.is_defined:
-            return self.s_exit - self.s_enter
+        if self.s_enter is not None and self.s_closed is not None:
+            return self.s_closed - self.s_enter
         return None
+
+    def update(
+        self,
+        t_step: int,
+        support_a: float,       # κ_A的collector.pre_trace（B_in方向的物理支撑代理）
+        support_b: float,       # κ_B的collector.pre_trace
+        collector_activity: float,  # ℓ_gen.relation_collector.pre_trace
+        parent_a_epoch: int,    # 当前tap_a.closure.epoch_id
+        parent_b_epoch: int,    # 当前tap_b.closure.epoch_id
+        _parent_a_epoch_at_enter: Optional[int],  # 进入时记录的epoch（由外部管理）
+        _parent_b_epoch_at_enter: Optional[int],
+    ) -> "_R1IntervalState":
+        """推进区间状态机一步，返回当前状态。
+
+        不直接访问Neuron对象，由调用方从神经元读出值后传入。
+        调用方（RelationFinalizer或P2-B1X2c测量代码）负责在circuit.step_rprec()
+        之后调用。
+        """
+        both_supported = support_a > self.response_threshold and \
+                         support_b > self.response_threshold
+        collector_in_band = collector_activity > self.response_threshold
+
+        parent_changed = (
+            _parent_a_epoch_at_enter is not None and
+            (_parent_a_epoch_at_enter != parent_a_epoch or
+             _parent_b_epoch_at_enter != parent_b_epoch)
+        )
+
+        if self._state is _R1IntervalState.UNBOUND:
+            if both_supported and collector_in_band:
+                self.s_enter = t_step
+                object.__setattr__(self, '_state', _R1IntervalState.SUPPORTED)
+
+        elif self._state is _R1IntervalState.SUPPORTED:
+            if parent_changed or not both_supported or not collector_in_band:
+                self.s_support_end = t_step
+                object.__setattr__(self, '_state', _R1IntervalState.RELAXING)
+
+        elif self._state is _R1IntervalState.RELAXING:
+            trace_back = (support_a <= self.baseline_threshold and
+                          support_b <= self.baseline_threshold)
+            collector_back = collector_activity <= self.baseline_threshold
+            if trace_back and collector_back:
+                self.s_closed = t_step
+                object.__setattr__(self, '_state', _R1IntervalState.CLOSED)
+
+        return self._state
+
+
+class _R1IntervalState(Enum):
+    """R1区间内部状态，不直接暴露——调用方通过R1PhysicalInterval.state读取。"""
+    UNBOUND = auto()    # 尚未获得两父实例共同支撑
+    SUPPORTED = auto()  # 双父支撑中，collector在响应带内
+    RELAXING = auto()   # 支撑已解除，残响仍归属本区间
+    CLOSED = auto()     # 区间正式封闭，后续残响另开新区间
+
+
+@dataclass
+class R1MeasurementWindow:
+    """Y测量统一窗口 W_Y* = [s_start, s_end]。
+
+    评判040602修正：X2c的反事实实验不能让每个条件（∅/A/B/AℓB/cut）
+    各自使用不同长度/不同起点的区间——那样比较的是不同物理过程的量纲
+    不可比的数字。
+
+    正确做法：
+      1. 先运行完整条件AℓB；
+      2. 从这次真实物理过程得到 I_R1^{AℓB}；
+      3. 再观察ℓ_out的电流何时回到基线带，得到s_relax^Y；
+      4. W_Y* = [I_R1^{AℓB}.s_enter, s_relax^Y]；
+      5. 对所有反事实条件（∅/A/B/gen-cut/out-cut）使用完全相同的W_Y*。
+
+    W_Y*由完整物理过程后验产生，不是硬编码固定窗口。
+
+    W_Y* ≥ I_R1 的原因：R1本体不含ℓ_out，ℓ_out的电流尾部可能在
+    s_closed^R1之后仍未归零（s_closed^R1 ≤ s_relax^Y），
+    所以需要专门跟踪ℓ_out电流的归零时刻。
+
+    字段：
+      reference_r1_interval_id：产生本窗口的R1区间标识符（供追溯）
+      s_start：窗口起点（= I_R1^{AℓB}.s_enter）
+      s_end：窗口终点（= s_relax^Y，ℓ_out电流归零后首步）
+      baseline_band：Y基线带上界（|Y|< baseline_band时视为归零）
+      target_address：Y的下游目标节点地址（对应R1OutputLink.target_neurons之一）
+    """
+    s_start: int
+    s_end: int
+    baseline_band: float
+    target_address: StructuralAddress
+    reference_r1_interval_id: Optional[str] = None   # 回指产生本窗口的R1实例
+
+    def __post_init__(self):
+        if self.s_start >= self.s_end:
+            raise ValueError(
+                f"R1MeasurementWindow: s_start({self.s_start}) >= s_end({self.s_end})，"
+                f"窗口必须有正长度")
+
+    @property
+    def length(self) -> int:
+        return self.s_end - self.s_start
+
+    def contains(self, t_step: int) -> bool:
+        return self.s_start <= t_step <= self.s_end
+
+    @staticmethod
+    def from_r1_run(
+        r1_interval: "R1PhysicalInterval",
+        y_trajectory: List[float],
+        y_start_step: int,
+        baseline_band: float,
+        target_address: StructuralAddress,
+        reference_r1_interval_id: Optional[str] = None,
+    ) -> "R1MeasurementWindow":
+        """从AℓB完整运行的结果后验构造统一测量窗口。
+
+        y_trajectory：从y_start_step开始的Y(s)轨迹（即ℓ_out局部电流轨迹）。
+        返回的窗口起点 = r1_interval.s_enter，
+        终点 = Y轨迹中最后一个|Y| > baseline_band的步骤后一步（确保尾部被包含）。
+
+        Y全程为零时（ℓ_out从未激活），以r1_interval.s_closed为终点。
+        """
+        if not r1_interval.is_defined:
+            raise ValueError("R1MeasurementWindow.from_r1_run: r1_interval.s_enter未设定")
+
+        # 找Y轨迹中最后一个超过基线带的步骤
+        s_relax_y = r1_interval.s_closed  # 默认fallback：R1本身已封闭
+        for i in range(len(y_trajectory) - 1, -1, -1):
+            if abs(y_trajectory[i]) > baseline_band:
+                # s_relax_y = 最后超阈步骤 + 1（首个回到基线的步骤）
+                s_relax_y = y_start_step + i + 1
+                break
+
+        s_end = s_relax_y if s_relax_y is not None else (r1_interval.s_enter + len(y_trajectory))
+        s_end = max(s_end, r1_interval.s_enter + 1)  # 窗口至少长度1
+
+        return R1MeasurementWindow(
+            s_start=r1_interval.s_enter,
+            s_end=s_end,
+            baseline_band=baseline_band,
+            target_address=target_address,
+            reference_r1_interval_id=reference_r1_interval_id,
+        )
 
 
 @dataclass
