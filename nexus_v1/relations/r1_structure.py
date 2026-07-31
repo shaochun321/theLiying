@@ -77,6 +77,7 @@ RULES.md 强制三问：
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from typing import List, Optional, Tuple
 
 from ..components.neuron import Neuron
@@ -200,8 +201,15 @@ class RelationGenLink:
     # ℓ_gen内部的bundles（只读引用，不拥有传播权）
     bundles: Tuple[SynapticBundle, ...]
 
-    # 链路地址（供R1实例身份回指）
-    link_address: StructuralAddress
+    # 评判040602核心修正：collector地址与生成链路地址是两个不同概念，
+    # 不能像relation_type/link_type那样再次混用：
+    #   generation_link_address：标识整条ℓ_gen（trace+bundle+collector的组合）
+    #   collector_address      ：标识relation_collector这一个检测节点本身
+    # Neuron对象本身不带StructuralAddress（只有.id/.config），因此
+    # collector_address必须由构造方显式提供，不能从
+    # relation_collector.address这类不存在的属性读取。
+    generation_link_address: StructuralAddress
+    collector_address: StructuralAddress
 
 
 @dataclass(frozen=True)
@@ -302,12 +310,12 @@ class R1StructureBlock:
 
     身份：
       R1实例身份 = (parent_a_instance_id, parent_b_instance_id,
-                    link_address, interval_identity)
+                    generation_link_address, interval_identity)
       其中interval_identity在X2d实现前暂用s_enter标识。
 
     去重规则（P2-B1X1e当前实现在RelationFinalizer._registered_keys）：
       同一父实例对、同一生成链路地址、同一区间，只产生一个R1实例。
-      X2d完成后去重键可扩展为(parent_A, parent_B, ℓ_gen.link_address, I)。
+      X2d完成后去重键可扩展为(parent_A, parent_B, ℓ_gen.generation_link_address, I)。
     """
     # ── 基元 ──
     kappa_a: KappaTen   # 基础结构A（十神经元基元）
@@ -384,7 +392,11 @@ def project_to_relation_occurrence_fields(
       relation_type    ← r1.link_gen.relation_type（ℓ_gen检测到的语义关系，
                          不是link_type——两者区分见RelationGenLink docstring）
       parent_a/b       ← r1.parent_a/b_instance_id（同一个身份对象，非复制新值）
-      collector_address← r1.link_gen.link_address（ℓ_gen的地址，检测发生在这里）
+      collector_address← r1.link_gen.collector_address（评判040602修正：
+                         relation collector这一个检测节点本身的地址，不是
+                         generation_link_address——后者标识整条ℓ_gen，
+                         RelationOccurrence.collector_address字段语义上
+                         指"哪个collector产生了这次检测"，应对应前者）
       trace_scale      ← r1.link_gen.trace_scale
 
     调用方（如`RelationFinalizer`，P2-B1X2d/c完成后）可用本函数的返回值
@@ -405,7 +417,7 @@ def project_to_relation_occurrence_fields(
         "relation_type": r1.link_gen.relation_type,
         "parent_a_instance_id": r1.parent_a_instance_id,
         "parent_b_instance_id": r1.parent_b_instance_id,
-        "collector_address": r1.link_gen.link_address,
+        "collector_address": r1.link_gen.collector_address,
         "trace_scale": r1.link_gen.trace_scale,
         "t_detect": t_detect,
         "t_closed": t_closed,

@@ -65,9 +65,13 @@ def _build_link_gen(circuit) -> RelationGenLink:
                    "rprec_raw_xi_b_to_col_fast"):
             relevant_bundles.append(b)
 
-    link_addr = StructuralAddress(
+    gen_link_addr = StructuralAddress(
         domain="relation.gen_link",
         uid="r_prec.a_prec_b_fast.gen_link",
+    )
+    collector_addr = StructuralAddress(
+        domain="relation.collector",
+        uid="rprec_collector_a_prec_b_fast",
     )
 
     return RelationGenLink(
@@ -78,7 +82,8 @@ def _build_link_gen(circuit) -> RelationGenLink:
         trace_b=circuit.rprec_trace_b_fast,
         relation_collector=circuit.rprec_collector_a_prec_b_fast,
         bundles=tuple(relevant_bundles),
-        link_address=link_addr,
+        generation_link_address=gen_link_addr,
+        collector_address=collector_addr,
     )
 
 
@@ -292,7 +297,10 @@ def test_r1s_5_projection_to_relation_occurrence():
 
     # relation_type取自link_gen.relation_type（语义），不是link_type（机制）
     assert fields["relation_type"] == RELATION_TYPE_A_PREC_B_FAST
-    assert fields["collector_address"] is link_gen.link_address
+    # collector_address取自link_gen.collector_address（评判040602修正：
+    # 检测节点本身的地址，非generation_link_address整条链路地址）
+    assert fields["collector_address"] is link_gen.collector_address
+    assert fields["collector_address"] is not link_gen.generation_link_address
     assert fields["trace_scale"] == "fast"
     assert fields["parent_a_instance_id"] is parent_a_id
     assert fields["parent_b_instance_id"] is parent_b_id
