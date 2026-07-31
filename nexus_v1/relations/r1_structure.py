@@ -168,9 +168,27 @@ class RelationGenLink:
       ℓ_gen负责"A和B怎样形成关系"，不负责"关系向下游产生作用"。
       relation collector的pre_trace上升代表关系检测到，但关系向下游的
       作用由ℓ_out（R1OutputLink）负责，两者不能混为同一链路。
+
+    `link_type` vs `relation_type`（P2-B1X2b新增字段时发现的真实区分，
+    不是拍脑袋加字段）：
+      link_type     = 链路**机制**类型（"用fast trace+AND门检测"，
+                      LINK_TYPE_RPREC_FAST/SLOW，描述ℓ_gen本身怎么实现）
+      relation_type = 链路**检测到的语义关系**类型（"A先于B"，
+                      relation_occurrence.RELATION_TYPE_A_PREC_B_FAST，
+                      描述ℓ_gen的输出代表什么关系事实）
+      两者不能混用：同一个relation_type理论上可以用不同link_type检测
+      （fast/slow trace是同一关系的两种时间尺度探测器），反之同一
+      link_type机制（AND门重合）也可能检测不同方向的relation_type
+      （a_prec_b vs b_prec_a，即当前代码里对称的两组collector）。
+      P2B1X2b写project_to_relation_occurrence_fields()时如果直接拿
+      link_type去填RelationOccurrence.relation_type，会把"用什么方法
+      检测"和"检测到什么"两个不同概念混进同一个字段——这正是评判
+      221144本想避免的"两条链路混成一条"问题在字段级的重演，因此
+      单独补充本字段，不复用link_type。
     """
-    link_type: str   # LINK_TYPE_RPREC_FAST / LINK_TYPE_RPREC_SLOW
-    trace_scale: str # "fast" | "slow"
+    link_type: str      # LINK_TYPE_RPREC_FAST / LINK_TYPE_RPREC_SLOW（机制）
+    relation_type: str  # RELATION_TYPE_A_PREC_B_FAST等（语义关系，见relation_occurrence.py）
+    trace_scale: str    # "fast" | "slow"
 
     # trace神经元（衰减积分器）
     trace_a: Neuron
@@ -350,3 +368,47 @@ class R1OutputBinding:
         调用方应在circuit.step_rprec()之后调用，不能在circuit.step()前。
         """
         return self.output_link.measure_local_current()
+
+
+def project_to_relation_occurrence_fields(
+    r1: R1StructureBlock, t_detect: int, t_closed: int,
+    occurrence_a_address: GeneratedAddress, occurrence_b_address: GeneratedAddress,
+) -> dict:
+    """P2-B1X2b：R1本体 → RelationOccurrence字段的显式投影映射 Π_τ(R1_AB[I])。
+
+    评判205641/030645要求把`RelationOccurrence`重新定型为"R1本体在时间尺度
+    上的一次投影"，而不是删除或修改现有`RelationOccurrence`类。本函数是
+    这个投影关系的**可验证**版本——给定一个已构造的R1本体，返回构造一个
+    对应`RelationOccurrence`所需的全部字段，字段来源全部可回指到R1本体：
+
+      relation_type    ← r1.link_gen.relation_type（ℓ_gen检测到的语义关系，
+                         不是link_type——两者区分见RelationGenLink docstring）
+      parent_a/b       ← r1.parent_a/b_instance_id（同一个身份对象，非复制新值）
+      collector_address← r1.link_gen.link_address（ℓ_gen的地址，检测发生在这里）
+      trace_scale      ← r1.link_gen.trace_scale
+
+    调用方（如`RelationFinalizer`，P2-B1X2d/c完成后）可用本函数的返回值
+    构造`RelationOccurrence(**project_to_relation_occurrence_fields(...),
+    t_detect=..., t_closed=..., occurrence_a_address=..., occurrence_b_address=...)`，
+    使"RelationOccurrence的字段确实是R1本体的时间投影"这件事从文档断言
+    变成代码层可检验的事实（见`test_r1_structure.py::test_r1s_5_*`）。
+
+    本函数不修改`RelationFinalizer`当前生产路径（仍直连字段赋值，见
+    `relation_occurrence.py`），只提供投影关系的显式表达，供P2-B1X2c/d
+    在需要时复用，避免两处各自维护一份"哪个字段对应哪个"的隐式约定。
+    """
+    if r1.parent_a_instance_id is None or r1.parent_b_instance_id is None:
+        raise ValueError(
+            "project_to_relation_occurrence_fields: R1本体的parent_a/b_instance_id"
+            "尚未填入，无法投影为RelationOccurrence（父实例身份是必需字段）")
+    return {
+        "relation_type": r1.link_gen.relation_type,
+        "parent_a_instance_id": r1.parent_a_instance_id,
+        "parent_b_instance_id": r1.parent_b_instance_id,
+        "collector_address": r1.link_gen.link_address,
+        "trace_scale": r1.link_gen.trace_scale,
+        "t_detect": t_detect,
+        "t_closed": t_closed,
+        "occurrence_a_address": occurrence_a_address,
+        "occurrence_b_address": occurrence_b_address,
+    }

@@ -24,7 +24,12 @@ from nexus_v1.relations.temporal_r_prec_plastic import RPrecCircuitT1Plastic
 from nexus_v1.relations.r1_structure import (
     KappaTen, RelationGenLink, R1OutputLink, R1PhysicalInterval,
     R1StructureBlock, R1OutputBinding, LINK_TYPE_RPREC_FAST,
+    project_to_relation_occurrence_fields,
 )
+from nexus_v1.relations.relation_occurrence import (
+    RelationOccurrence, RELATION_TYPE_A_PREC_B_FAST,
+)
+from nexus_v1.generators.occurrence import OccurrenceInstanceId
 
 
 def _build_kappa_ten(circuit, site_index: int, polarity: str) -> KappaTen:
@@ -67,6 +72,7 @@ def _build_link_gen(circuit) -> RelationGenLink:
 
     return RelationGenLink(
         link_type=LINK_TYPE_RPREC_FAST,
+        relation_type=RELATION_TYPE_A_PREC_B_FAST,
         trace_scale="fast",
         trace_a=circuit.rprec_trace_a_fast,
         trace_b=circuit.rprec_trace_b_fast,
@@ -244,14 +250,83 @@ def test_r1s_4_output_binding():
     print("✓ T-R1S-4 PASS: R1OutputBinding正确绑定R1本体+ℓ_out，桥梁校验生效")
 
 
+def test_r1s_5_projection_to_relation_occurrence():
+    """T-R1S-5：P2-B1X2b——project_to_relation_occurrence_fields()验证
+    RelationOccurrence确实是R1本体的时间投影Π_τ(R1_AB[I])。
+
+    验证：
+    - 缺失parent_a/b_instance_id时应拒绝投影（ValueError）
+    - 填入父实例身份后，投影字段可直接构造出合法的RelationOccurrence
+    - relation_type取自link_gen.relation_type（语义关系类型），不是
+      link_gen.link_type（链路机制类型）——两者不能混用
+    - collector_address/trace_scale确实来自r1.link_gen，不是凭空填入
+    """
+    from nexus_v1.relations.r1_structure import project_to_relation_occurrence_fields
+
+    circuit = RPrecCircuitT1()
+    site_a = circuit.rprec_site_a
+    site_b = circuit.rprec_site_b
+    kappa_a = _build_kappa_ten(circuit, site_a, "warm")
+    kappa_b = _build_kappa_ten(circuit, site_b, "warm")
+    link_gen = _build_link_gen(circuit)
+    r1 = R1StructureBlock(kappa_a=kappa_a, kappa_b=kappa_b, link_gen=link_gen)
+
+    # 未填父实例身份时应拒绝投影
+    try:
+        project_to_relation_occurrence_fields(
+            r1, t_detect=100, t_closed=200,
+            occurrence_a_address=kappa_a.address, occurrence_b_address=kappa_b.address)
+        raise AssertionError("缺失parent_a/b_instance_id时应拒绝投影")
+    except ValueError:
+        pass
+
+    # 补上父实例身份（模拟真实生产路径中finalizer已解析出的父身份）
+    parent_a_id = OccurrenceInstanceId(generator_address=_fake_generator_addr("a"), epoch_id=1)
+    parent_b_id = OccurrenceInstanceId(generator_address=_fake_generator_addr("b"), epoch_id=1)
+    r1.parent_a_instance_id = parent_a_id
+    r1.parent_b_instance_id = parent_b_id
+
+    fields = project_to_relation_occurrence_fields(
+        r1, t_detect=100, t_closed=200,
+        occurrence_a_address=kappa_a.address, occurrence_b_address=kappa_b.address)
+
+    # relation_type取自link_gen.relation_type（语义），不是link_type（机制）
+    assert fields["relation_type"] == RELATION_TYPE_A_PREC_B_FAST
+    assert fields["collector_address"] is link_gen.link_address
+    assert fields["trace_scale"] == "fast"
+    assert fields["parent_a_instance_id"] is parent_a_id
+    assert fields["parent_b_instance_id"] is parent_b_id
+
+    # 投影字段应能直接构造出合法RelationOccurrence
+    ro = RelationOccurrence(**fields)
+    assert ro.relation_type == RELATION_TYPE_A_PREC_B_FAST
+
+    print(f"T-R1S-5: 投影字段relation_type={fields['relation_type']}, "
+          f"collector_address={fields['collector_address'].uid}")
+    print("✓ T-R1S-5 PASS: RelationOccurrence字段确实是R1本体的时间投影Π_τ，"
+          "relation_type取自语义层非链路机制层")
+
+
+def _fake_generator_addr(label: str):
+    """T-R1S-5测试辅助：构造一个最小GeneratedAddress，仅用于填充
+    parent_instance_id（不代表真实生产路径的地址来源）。"""
+    from nexus_v1.components.structural_address import (
+        DOMAIN_OCC_THERMAL, GeneratedAddress,
+    )
+    skin = StructuralAddress(domain=DOMAIN_SKIN_PATCH, uid=f"skin.patch:thermpt_{label}")
+    return GeneratedAddress(domain=DOMAIN_OCC_THERMAL, uid=f"occ.thermal:thermpt_{label}_warm",
+                             parent_addresses=(skin,), generation_depth=1)
+
+
 def run():
     test_r1s_1_kappa_ten_mapping()
     test_r1s_2_link_gen_separation()
     test_r1s_3_r1block_body_no_output()
     test_r1s_4_output_binding()
+    test_r1s_5_projection_to_relation_occurrence()
     print()
     print("=" * 60)
-    print("T-R1S-1~4 ALL PASS")
+    print("T-R1S-1~5 ALL PASS")
     print("=" * 60)
 
 

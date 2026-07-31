@@ -1,10 +1,27 @@
 """nexus_v1.relations.relation_occurrence — P2-B1X1c：在线D2关系实例闭合
-（P2-B1X1e：补充去重防线）。
+（P2-B1X1e：补充去重防线；P2-B1X2b：重新定型为R1时间投影）。
 
 TYPE:INFRA（数据结构与状态机，不执行神经动力学）
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-30T130442.029.md`（P2-B1X1c）+
-`cell-cell/交叉比对/document - 2026-07-31T203403.976.md`（P2-B1X1e：去重防线）。
+`cell-cell/交叉比对/document - 2026-07-31T203403.976.md`（P2-B1X1e：去重防线）+
+`cell-cell/交叉比对/document - 2026-07-31T221144.140.md`（P2-B1X2b：重新定型）。
+
+P2-B1X2b 重新定型（评判用词："重新定型"，不是"降格"）：
+  `RelationOccurrence` 不再被视为"完整关系本体"——完整本体是
+  `r1_structure.R1StructureBlock`（κ_A^10, κ_B^10, ℓ_gen, 区间, 耦合轨迹）。
+  `RelationOccurrence` 重新定型为该本体的**时间投影**：
+
+      RelationOccurrence = Π_τ(R1_AB^(1))
+
+  它记录的是R1本体在时间维度上已经取得的资格证据：哪两次D1发生参与、
+  检测到什么先后关系、用什么时间尺度、哪个关系collector产生了该投影——
+  不记录链路的完整耦合轨迹、不记录物理区间的进入/退出判断（那些是R1本体
+  自身的字段，见P2-B1X2d）。本文件的生产代码（RelationDraft/
+  RelationFinalizer的自动闭合逻辑）**不删除、不改变行为**——`project_
+  from_r1()` 函数只是把"RelationOccurrence的字段从何而来"这件事显式化：
+  证明其每个字段都可以从(R1本体, 两个父occurrence)推导得出，即
+  RelationOccurrence ≡ Π_τ(R1) 对当前实现成立（见模块末尾）。
 
 P2-B1X1e 背景：P2-B1X1d端到端场景调试时发现，连续（非脉冲）驱动下collector
 可能因神经元残余振荡在同一对父occurrence的rearm间隔内产生第二次上升沿，
@@ -46,6 +63,7 @@ from ..components.structural_address import GeneratedAddress, StructuralAddress
 from ..generators.occurrence import OccurrenceInstanceId
 from ..generators.occurrence_identity import OccurrenceIdentityRegistry
 from ..generators.occurrence_tap import CollectorOccurrenceTap
+from .r1_structure import R1StructureBlock, LINK_TYPE_RPREC_FAST, LINK_TYPE_RPREC_SLOW
 
 
 # ── 关系类型常量 ──
@@ -88,8 +106,25 @@ class RelationDraft:
 
 @dataclass(frozen=True)
 class RelationOccurrence:
-    """正式D2关系实例：父A/B两次D1 occurrence都完成rearm并被registry登记后，
+    """D2关系实例：父A/B两次D1 occurrence都完成rearm并被registry登记后，
     由RelationFinalizer自动完成闭合。
+
+    P2-B1X2b重新定型（评判`document - 2026-07-31T205641.086.md`"重新定型"，
+    非"降格"）：本类不再是"完整关系本体"，而是：
+
+        RelationOccurrence = Π_τ(R1_AB[I])
+
+    即R1StructureBlock（`r1_structure.py`）在**时间尺度**上的一次投影与
+    谱系审计记录——记录"检测到A≺B"这一时间关系事实发生过、用什么trace_scale
+    检测、父实例是谁、collector地址是什么。完整R1本体还包含ℓ_gen的具体
+    链路对象、物理区间I、耦合轨迹Γ（P2-B1X2d/c补全），本类不持有这些，
+    只持有投影后的标量/身份信息。
+
+    不删除、不改变现有字段——本类字段本身已经是Π_τ需要的全部信息
+    （relation_type/parent_ids/t_detect/t_closed/collector_address/
+    trace_scale/occurrence_addresses），P2-B1X2b只是明确这个定位，不
+    修改结构。`r1_structure.py`尚未实现Γ_AB^I（耦合轨迹）时，本类继续
+    充当"已发生过的时间关系"的唯一记录来源。
 
     谱系：RelationOccurrence^(2) → NaturalUnitA^(1) / NaturalUnitB^(1)
           → OccurrenceA/B^(1) → Generator → D0/D_{-1}物理支撑。
