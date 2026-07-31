@@ -328,66 +328,77 @@ def _fake_generator_addr(label: str):
 
 
 def test_r1s_6_physical_interval_state_machine():
-    """T-R1S-6：R1PhysicalInterval状态机——UNBOUND→SUPPORTED→RELAXING→CLOSED。
+    """T-R1S-6：R1PhysicalInterval状态机——含迟滞阈值和双向恢复（评判045235）。
     验证：
-    - 未满足共同支撑时停在UNBOUND
-    - 满足条件后进入SUPPORTED，记录s_enter
-    - 共同支撑解除后进入RELAXING，记录s_support_end
-    - trace/collector均归零后封闭，记录s_closed
-    - 父epoch变化强制触发SUPPORTED→RELAXING
+    - UNBOUND→SUPPORTED（双父超on阈值）
+    - SUPPORTED→RELAXING（支撑跌破off阈值）
+    - RELAXING→SUPPORTED（同一谱系内恢复，lineage_broken=False）
+    - RELAXING→CLOSED（at_baseline且lineage_broken=True时不恢复）
+    - 父epoch变化置lineage_broken=True，禁止RELAXING→SUPPORTED
+    - s_candidate记录两父首次超过off阈值的时刻
     """
-    threshold = 1e-4
-    iv = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
+    on_t = 5e-3   # threshold_on
+    off_t = 1e-3  # threshold_off
+    iv = R1PhysicalInterval(threshold_on=on_t, threshold_off=off_t)
 
     assert iv.state is _R1IntervalState.UNBOUND
-    assert not iv.is_active
-    assert not iv.is_closed
+    assert iv.s_candidate is None
 
-    # t=0：只有A有支撑，B无支撑 → 停在UNBOUND
-    iv.update(0, support_a=0.5, support_b=0.0, collector_activity=0.5,
-              parent_a_epoch=1, parent_b_epoch=1,
-              _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
-    assert iv.state is _R1IntervalState.UNBOUND
+    # t=0：只有A>off，B<off → 进不了candidate
+    iv.update(0, support_a=on_t*2, support_b=0.0, collector_activity=0.0,
+              parent_a_epoch=1, parent_b_epoch=1)
+    assert iv.s_candidate is None
 
-    # t=1：双方都有支撑 → 进入SUPPORTED
-    iv.update(1, support_a=0.5, support_b=0.5, collector_activity=0.5,
-              parent_a_epoch=1, parent_b_epoch=1,
-              _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
+    # t=1：两父都>off（低门槛），记录s_candidate；但collector<on，不进SUPPORTED
+    iv.update(1, support_a=on_t*2, support_b=off_t*2, collector_activity=0.0,
+              parent_a_epoch=1, parent_b_epoch=1)
+    assert iv.s_candidate == 1
+
+    # t=2：两父和collector都>on → 进入SUPPORTED
+    iv.update(2, support_a=on_t*2, support_b=on_t*2, collector_activity=on_t*2,
+              parent_a_epoch=1, parent_b_epoch=1)
     assert iv.state is _R1IntervalState.SUPPORTED
-    assert iv.s_enter == 1
-    assert iv.is_active
+    assert iv.s_enter == 2
 
-    # t=2：支撑解除 → 进入RELAXING
-    iv.update(2, support_a=0.0, support_b=0.0, collector_activity=0.3,
+    # t=3：collector跌破off → 进入RELAXING
+    iv.update(3, support_a=on_t*2, support_b=on_t*2, collector_activity=0.0,
               parent_a_epoch=1, parent_b_epoch=1,
               _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
     assert iv.state is _R1IntervalState.RELAXING
-    assert iv.s_support_end == 2
 
-    # t=3：collector也归零 → CLOSED
-    iv.update(3, support_a=0.0, support_b=0.0, collector_activity=0.0,
+    # t=4：同一谱系，collector恢复>on → 允许RELAXING→SUPPORTED（双向）
+    iv.update(4, support_a=on_t*2, support_b=on_t*2, collector_activity=on_t*2,
               parent_a_epoch=1, parent_b_epoch=1,
               _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv.state is _R1IntervalState.SUPPORTED, (
+        "同一谱系内支撑恢复，应允许RELAXING→SUPPORTED（评判045235阻塞修正）")
+
+    # t=5：再次退出RELAXING，然后父epoch变化
+    iv.update(5, support_a=0.0, support_b=0.0, collector_activity=0.0,
+              parent_a_epoch=1, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv.state is _R1IntervalState.RELAXING
+
+    # t=6：父epoch变化 → lineage_broken=True，即使at_baseline也先检查这个路径
+    iv.update(6, support_a=on_t*2, support_b=on_t*2, collector_activity=on_t*2,
+              parent_a_epoch=2, parent_b_epoch=1,  # A有新epoch
+              _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
+    assert iv.lineage_broken, "父epoch变化应设置lineage_broken=True"
+    assert iv.state is not _R1IntervalState.SUPPORTED, (
+        "lineage_broken=True时，即使支撑重建，RELAXING也不能恢复至SUPPORTED")
+
+    # t=7：at_baseline → CLOSED
+    iv.update(7, support_a=0.0, support_b=0.0, collector_activity=0.0,
+              parent_a_epoch=2, parent_b_epoch=1,
+              _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
     assert iv.state is _R1IntervalState.CLOSED
-    assert iv.s_closed == 3
-    assert iv.duration == 2  # s_closed - s_enter = 3 - 1
+    assert iv.s_closed == 7
+    assert iv.s_candidate == 1
+    assert iv.s_enter == 2
 
-    # 父epoch变化强制退出SUPPORTED
-    iv2 = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
-    iv2.update(10, support_a=0.5, support_b=0.5, collector_activity=0.5,
-               parent_a_epoch=1, parent_b_epoch=1,
-               _parent_a_epoch_at_enter=None, _parent_b_epoch_at_enter=None)
-    assert iv2.state is _R1IntervalState.SUPPORTED
-    # epoch_a变为2（父occurrence进入新发生），即使物理支撑仍在 → 强制退出
-    iv2.update(11, support_a=0.5, support_b=0.5, collector_activity=0.5,
-               parent_a_epoch=2, parent_b_epoch=1,  # A有新epoch
-               _parent_a_epoch_at_enter=1, _parent_b_epoch_at_enter=1)
-    assert iv2.state is _R1IntervalState.RELAXING, (
-        "父epoch变化应强制SUPPORTED→RELAXING（新epoch不能并入旧区间）")
-
-    print("T-R1S-6: s_enter=1, s_support_end=2, s_closed=3, duration=2")
-    print("         父epoch变化正确触发SUPPORTED→RELAXING")
-    print("✓ T-R1S-6 PASS: R1PhysicalInterval状态机UNBOUND→SUPPORTED→RELAXING→CLOSED正确")
+    print(f"T-R1S-6: s_candidate={iv.s_candidate}, s_enter={iv.s_enter}, "
+          f"s_closed={iv.s_closed}, lineage_broken={iv.lineage_broken}")
+    print("✓ T-R1S-6 PASS: 迟滞状态机+双向恢复+lineage_broken正确")
 
 
 def test_r1s_7_measurement_window():
@@ -399,7 +410,7 @@ def test_r1s_7_measurement_window():
     - s_start >= s_end时拒绝构造
     """
     threshold = 1e-4
-    iv = R1PhysicalInterval(response_threshold=threshold, baseline_threshold=threshold)
+    iv = R1PhysicalInterval(threshold_on=threshold * 10, threshold_off=threshold)
     # 手动设置一个已封闭的区间
     iv.s_enter = 100
     iv.s_closed = 200

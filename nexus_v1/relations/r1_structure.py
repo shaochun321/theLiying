@@ -258,57 +258,75 @@ class R1OutputLink:
 
 @dataclass
 class R1PhysicalInterval:
-    """R1本体区间 I_R1 = [s_enter, s_support_end, s_closed]。
+    """R1本体区间 I_R1 = [s_candidate, s_enter, s_support_end, s_closed]。
 
-    评判040602修正：区分两个独立对象：
-      R1PhysicalInterval（本类）：回答"这条关系活了多久"
-      R1MeasurementWindow（见下）：回答"这条关系造成的作用要观察多久"
-    两者不能等同，因为R1本体不含ℓ_out，ℓ_out的电流尾部可能在R1区间
-    关闭后仍未归零（s_closed^R1 ≤ s_relax^Y）。
+    评判040602修正：区分R1PhysicalInterval（I_R1）与R1MeasurementWindow（W_Y*）。
+    评判045235阻塞修正：RELAXING必须允许恢复到SUPPORTED（同一谱系内振荡=同一区间），
+      并加迟滞阈值（θ_on > θ_off）和最短持续步数防止数值抖动触发状态切换。
 
-    状态机（评判040602）：
-      UNBOUND：等待两个父实例同时获得物理支撑且relation collector进入响应带
-      SUPPORTED：共同支撑中，collector在响应带内
-      RELAXING：共同支撑解除/collector退出响应带，但残响仍归属本区间
-      CLOSED：trace和collector均回到基线带，区间正式封闭；
-              后续残余振荡不能再触发同一R1区间的新实例
+    状态机（评判045235修正版）：
+      UNBOUND：尚未满足进入条件
+      SUPPORTED ⇄ RELAXING：双向——物理支撑短暂退出再恢复属同一区间
+      CLOSED：残响彻底归零，且lineage_broken或正式满足关闭条件
 
-    进入条件（UNBOUND→SUPPORTED）：
-      S_A(s)>0 AND S_B(s)>0 AND C_rel(s)∈B_response
-      即两父实例都有物理支撑（pre_trace>threshold），且relation collector
-      的pre_trace首次进入响应带（> response_threshold）。
+    双向条件（评判045235）：
+      RELAXING→SUPPORTED（只有在以下条件同时满足时允许）：
+        1. lineage_broken == False（父epoch和generation_link_address均未改变）
+        2. both_supported AND collector_in_band（物理支撑重新进入响应带）
+        3. 尚未满足正式关闭条件
 
-    退出至RELAXING（SUPPORTED→RELAXING）：
-      满足任一：共同支撑解除；collector退出响应带；父谱系中任一改变。
-      新epoch不能并入旧区间——新epoch只能开启新的候选R1区间。
+      一旦lineage_broken=True（父epoch变化），RELAXING只能走向CLOSED，不能恢复。
 
-    封闭条件（RELAXING→CLOSED）：
-      trace归零（< baseline_threshold）AND collector归零（< baseline_threshold）
-      AND 在迟滞期内没有重新取得同一父实例共同支撑。
+    迟滞与持续步数（评判045235非阻塞，已实现为可配置参数）：
+      θ_on > θ_off：进入阈值 > 退出阈值，消除单点抖动
+      m_on：进入SUPPORTED需要连续满足条件的步数（默认1，可配置）
+      m_off：进入RELAXING需要连续不满足条件的步数（默认1，可配置）
+      m_close：封闭需要trace+collector同时在基线带内的连续步数（默认1，可配置）
 
-    此区间用于：
-      - R1实例身份（同一父实例对+同一链路+同一区间=同一R1实例）
-      - 替代/补充P2-B1X1e的简单去重键（X2d完成后可升级）
-      - 判断残余振荡属于旧关系还是新关系（RELAXING阶段的残响归旧）
+    候选时刻（评判045235非阻塞，已实现）：
+      s_candidate：两个父发生第一次同时开始支撑ℓ_gen的时刻（s_candidate ≤ s_enter）
+      s_enter：    R1取得成立资格（collector也进入响应带）
+      s_support_end：主共同支撑解除（可多次更新，取最后一次SUPPORTED→RELAXING）
+      s_closed：   残响结束、区间正式关闭
 
-    注意：本类只含字段和状态机，update()方法由step(t_step, ...)调用，
-    不直接访问神经元——所有输入值都由调用方从神经元读出后传入。
+    关于区间的不变性：
+      - R1区间由（parent_a_epoch_at_enter, parent_b_epoch_at_enter）定义谱系
+      - 同一谱系内的振荡/短暂失配归属同一区间
+      - 一旦父epoch改变（lineage_broken），旧区间不能恢复——新epoch开启新候选
     """
-    # ── 阈值参数 ──
-    response_threshold: float = _DEFAULT_INTERVAL_EXIT_THRESHOLD  # collector响应带下界
-    baseline_threshold: float = _DEFAULT_INTERVAL_EXIT_THRESHOLD   # 归零判定上界（同值）
+    # ── 迟滞阈值（θ_on > θ_off 消除抖动） ──
+    threshold_on: float = 1e-3   # 进入SUPPORTED所需的信号强度（较高）
+    threshold_off: float = 1e-4  # 进入RELAXING的信号强度（较低，评判045235迟滞）
+
+    # ── 持续步数 ──
+    m_on: int = 1     # 进入SUPPORTED需连续满足条件的步数（最小1）
+    m_off: int = 1    # 进入RELAXING需连续不满足条件的步数
+    m_close: int = 1  # 封闭需trace+collector同时在基线带内的连续步数
 
     # ── 时刻记录 ──
-    s_enter: Optional[int] = None         # 首次进入SUPPORTED的时刻
-    s_support_end: Optional[int] = None   # 共同支撑最后一步时刻（SUPPORTED→RELAXING）
-    s_closed: Optional[int] = None        # 区间正式封闭时刻（RELAXING→CLOSED）
+    s_candidate: Optional[int] = None     # 两父首次共同支撑的时刻（候选阶段起点）
+    s_enter: Optional[int] = None         # 首次满足完整进入条件的时刻（R1正式成立）
+    s_support_end: Optional[int] = None   # 最近一次SUPPORTED→RELAXING的时刻
+    s_closed: Optional[int] = None        # 区间正式封闭时刻
+
+    # ── 谱系锁（评判045235）──
+    lineage_broken: bool = field(default=False)  # 父epoch改变后置True，禁止RELAXING→SUPPORTED
 
     # ── 状态 ──
     _state: "_R1IntervalState" = field(default=None, repr=False)
 
+    # ── 内部持续计数器 ──
+    _on_count: int = field(default=0, repr=False)   # 连续满足进入条件的步数
+    _off_count: int = field(default=0, repr=False)  # 连续不满足退出条件的步数
+    _close_count: int = field(default=0, repr=False)  # 连续满足封闭条件的步数
+
     def __post_init__(self):
         if self._state is None:
             object.__setattr__(self, '_state', _R1IntervalState.UNBOUND)
+        if self.threshold_on <= self.threshold_off:
+            raise ValueError(
+                f"R1PhysicalInterval: threshold_on({self.threshold_on}) "
+                f"must be > threshold_off({self.threshold_off})")
 
     @property
     def state(self) -> "_R1IntervalState":
@@ -325,7 +343,6 @@ class R1PhysicalInterval:
 
     @property
     def is_defined(self) -> bool:
-        """区间已有明确的enter时刻。"""
         return self.s_enter is not None
 
     @property
@@ -337,23 +354,30 @@ class R1PhysicalInterval:
     def update(
         self,
         t_step: int,
-        support_a: float,       # κ_A的collector.pre_trace（B_in方向的物理支撑代理）
-        support_b: float,       # κ_B的collector.pre_trace
-        collector_activity: float,  # ℓ_gen.relation_collector.pre_trace
-        parent_a_epoch: int,    # 当前tap_a.closure.epoch_id
-        parent_b_epoch: int,    # 当前tap_b.closure.epoch_id
-        _parent_a_epoch_at_enter: Optional[int],  # 进入时记录的epoch（由外部管理）
-        _parent_b_epoch_at_enter: Optional[int],
+        support_a: float,
+        support_b: float,
+        collector_activity: float,
+        parent_a_epoch: int,
+        parent_b_epoch: int,
+        _parent_a_epoch_at_enter: Optional[int] = None,
+        _parent_b_epoch_at_enter: Optional[int] = None,
     ) -> "_R1IntervalState":
         """推进区间状态机一步，返回当前状态。
 
-        不直接访问Neuron对象，由调用方从神经元读出值后传入。
-        调用方（RelationFinalizer或P2-B1X2c测量代码）负责在circuit.step_rprec()
-        之后调用。
+        不直接访问Neuron对象，由调用方传入信号读数。
+        支持RELAXING→SUPPORTED双向恢复（同一谱系内振荡=同一区间）。
         """
-        both_supported = support_a > self.response_threshold and \
-                         support_b > self.response_threshold
-        collector_in_band = collector_activity > self.response_threshold
+        both_on = (support_a > self.threshold_on and
+                   support_b > self.threshold_on and
+                   collector_activity > self.threshold_on)
+
+        both_off = (support_a < self.threshold_off or
+                    support_b < self.threshold_off or
+                    collector_activity < self.threshold_off)
+
+        at_baseline = (support_a <= self.threshold_off and
+                       support_b <= self.threshold_off and
+                       collector_activity <= self.threshold_off)
 
         parent_changed = (
             _parent_a_epoch_at_enter is not None and
@@ -361,23 +385,52 @@ class R1PhysicalInterval:
              _parent_b_epoch_at_enter != parent_b_epoch)
         )
 
+        if parent_changed and not self.lineage_broken:
+            self.lineage_broken = True
+
+        # 候选阶段：两父支撑超过off阈值（低门槛），记录s_candidate
+        both_candidate = (support_a > self.threshold_off and
+                          support_b > self.threshold_off)
+        if self.s_candidate is None and both_candidate:
+            self.s_candidate = t_step
+
         if self._state is _R1IntervalState.UNBOUND:
-            if both_supported and collector_in_band:
-                self.s_enter = t_step
-                object.__setattr__(self, '_state', _R1IntervalState.SUPPORTED)
+            if both_on:
+                self._on_count += 1
+                if self._on_count >= self.m_on:
+                    self.s_enter = t_step
+                    self._on_count = 0
+                    object.__setattr__(self, '_state', _R1IntervalState.SUPPORTED)
+            else:
+                self._on_count = 0
 
         elif self._state is _R1IntervalState.SUPPORTED:
-            if parent_changed or not both_supported or not collector_in_band:
-                self.s_support_end = t_step
-                object.__setattr__(self, '_state', _R1IntervalState.RELAXING)
+            if self.lineage_broken or both_off:
+                self._off_count += 1
+                if self._off_count >= self.m_off:
+                    self.s_support_end = t_step
+                    self._off_count = 0
+                    object.__setattr__(self, '_state', _R1IntervalState.RELAXING)
+            else:
+                self._off_count = 0
 
         elif self._state is _R1IntervalState.RELAXING:
-            trace_back = (support_a <= self.baseline_threshold and
-                          support_b <= self.baseline_threshold)
-            collector_back = collector_activity <= self.baseline_threshold
-            if trace_back and collector_back:
-                self.s_closed = t_step
-                object.__setattr__(self, '_state', _R1IntervalState.CLOSED)
+            # 评判045235阻塞修正：允许恢复到SUPPORTED（同一谱系，支撑重建）
+            if not self.lineage_broken and both_on:
+                self._on_count += 1
+                self._close_count = 0
+                if self._on_count >= self.m_on:
+                    self._on_count = 0
+                    object.__setattr__(self, '_state', _R1IntervalState.SUPPORTED)
+            elif at_baseline:
+                self._close_count += 1
+                self._on_count = 0
+                if self._close_count >= self.m_close:
+                    self.s_closed = t_step
+                    object.__setattr__(self, '_state', _R1IntervalState.CLOSED)
+            else:
+                self._on_count = 0
+                self._close_count = 0
 
         return self._state
 
@@ -386,7 +439,7 @@ class _R1IntervalState(Enum):
     """R1区间内部状态，不直接暴露——调用方通过R1PhysicalInterval.state读取。"""
     UNBOUND = auto()    # 尚未获得两父实例共同支撑
     SUPPORTED = auto()  # 双父支撑中，collector在响应带内
-    RELAXING = auto()   # 支撑已解除，残响仍归属本区间
+    RELAXING = auto()   # 支撑已暂时解除，残响归属本区间（可恢复至SUPPORTED）
     CLOSED = auto()     # 区间正式封闭，后续残响另开新区间
 
 
