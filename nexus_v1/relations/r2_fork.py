@@ -5,6 +5,7 @@ TYPE:INFRA（R2Occurrence/R2ForkFinalizer）+ BIO（R2ForkCircuit的新bundle）
 方案依据：
   document - 2026-08-01T230002.273.md（共同源分叉型路线）
   document - 2026-08-01T232255.527.md（R2层语义+共同源资格必须核验同一OccurrenceInstanceId）
+  document - 2026-08-02T164327.921.md（P2-C1F-b：共同源≠瞬时同步，需加R2层trace）
 
 拓扑：
        31
@@ -13,17 +14,40 @@ TYPE:INFRA（R2Occurrence/R2ForkFinalizer）+ BIO（R2ForkCircuit的新bundle）
       ↘  (T2: 28≺23的relation_collector)
        23
 
-R2 collector的输入：
-  T1 rprec_collector_a_prec_b_fast.pre_trace（28≺31被检测到时活跃）
-  T2 rprec2_collector_b_prec_c_fast.pre_trace（28≺23被检测到时活跃）
-两路同时活跃才触发R2 collector，类比R1的trace+raw AND门结构。
+评判164327核心修正（P2-C1F-b，阻塞，本轮已执行）：
+  最初版本让R2 collector直接AND两路R1 collector的**原始**pre_trace，
+  要求两条R1的检测峰在同一采样步瞬时重叠。评判指出这是错误的判据——
+  "共同源"要求的是"两条R1的起点是同一个OccurrenceInstanceId"，不是
+  "两条R1活动必须瞬时同步"。28≺31（d=1.09）和28≺23（d=1.16）两条通路
+  物理距离/响应延迟不同，同一次站点28发生完全可能先形成28≺31、稍后
+  形成28≺23，仍是同一共同源分叉，只是检测峰没有瞬时重叠。
 
-共同源资格（评判232255关键修正）：
+  修正：在R2输入侧为两条R1各增加一个短时物理保持痕迹（trace）：
+    R1_T1.relation_collector.pre_trace → z_T1^R2（衰减积分器）
+    R1_T2.relation_collector.pre_trace → z_T2^R2（衰减积分器）
+  R2 collector改为AND门读取z_T1^R2和z_T2^R2（而不是直接读原始collector
+  pre_trace）——这正是T1自己检测A≺B时用的"trace+AND门重合"机制（见
+  temporal_r_prec.py Q1），只是把它复用到R2层，让两条自然错开的R1活动
+  能在R2 trace的衰减窗口内产生物理重叠。不修改T1/T2本身（不改变已冻结
+  的R1语义），不搜索HeatSource参数，不放宽R2 collector阈值，不直接读取
+  两个RelationOccurrence后创建R2（那是纯软件组合，不经过真实物理链路）。
+
+  两道门的分工（评判164327）：
+    物理活动重叠门：R2 collector的trace+AND门（本文件新增，属于ℓ_gen^R2）
+    共同父实例谱系门：R2ForkFinalizer核验parent_28^T1 == parent_28^T2
+      （原有逻辑不变，已在T-R2F-2验证过拒绝不同epoch的组合）
+  前者防止纯软件组合，后者防止把不同epoch的站点28错误绑定。
+
+R2 collector的输入（修正后）：
+  z_T1_r2.activation（R1_T1 relation_collector.pre_trace经trace衰减后）
+  z_T2_r2.activation（R1_T2 relation_collector.pre_trace经trace衰减后）
+两路trace同时在响应带内才触发R2 collector。
+
+共同源资格（评判232255关键修正，仍然有效）：
   ρ_1（T1）的共同起点 = OccurrenceInstanceId(site28, epoch_n)
   ρ_2（T2）的共同起点 = OccurrenceInstanceId(site28, epoch_n)
   两者必须是**同一个**OccurrenceInstanceId，不是相同地址不同epoch。
-  仅当 parent_a_instance_id(ro_t1) == parent_b_instance_id_of_source(ro_t2)
-  即两条关系的"站点28 D1实例"相同时，才生成R2Occurrence。
+  由R2ForkFinalizer核验，独立于R2 collector的物理重叠判据。
 
 R2层命名规范（评判232255）：
   D1 = 基础发生
@@ -32,20 +56,27 @@ R2层命名规范（评判232255）：
   不说"D2关系"——D2是旧的D0/D1/D2深度体系，与R1/R2生成层次不是同一维度。
 
 资格目标（第一版P2-C1F）：
-  同一个u_{28,n}支撑的两条活跃R1，通过新物理链路生成共同源型R2，
-  产生非零、双父R1依赖的R2输出（不宣称散度/因果树/高阶涌现）。
+  同一个u_{28,n}支撑的两条活跃R1，通过新物理链路（含R2层trace的
+  物理重叠窗口）生成共同源型R2，产生非零、双父R1依赖的R2输出
+  （不宣称散度/因果树/高阶涌现）。
 
 RULES.md 强制三问：
-  Q1 BIO: R2 collector复用R1的AND门+trace检测机制（同T1/T2的collector，
-     BIO已在temporal_r_prec.py Q1中说明）。两条R1关系同时活跃时触发R2，
-     类比"多路STDP eligibility trace重合"的时序整合机制。
+  Q1 BIO: R2 trace复用T1自身的trace+AND门重合检测机制（temporal_r_prec.py
+     的_trace_config/Q1原文：STDP eligibility trace同一物理原理，"资格
+     窗口"部分）——把它应用到R2层：R1_T1/R1_T2各自的检测活动经衰减
+     积分后，在窗口内的重合代表"同一次共同源发生的两条分支关系都已
+     被确认"。R2 collector是"resolve阶段"（trace仍存活且两路都到达）。
   Q2 物理结构：
-     新增2条frozen bundle（T1 col → R2 col，T2 col → R2 col）和
-     1个R2 collector Neuron。不新建D1路径，不修改T1/T2已有bundle。
-     复用CollectorOccurrenceTap + OccurrenceIdentityRegistry已有接口。
-  Q3 参数：R2 collector参数全部复用T1/T2的collector标定值（已验证），
-     bundle权重参照T1的_W_RAW_XI_TO_COLLECTOR（两路都是"直接raw"输入，
-     无trace积分，因为R1 collector已经是集成后的信号），不重新标定。
+     新增2条trace Neuron（z_T1_r2/z_T2_r2）+ 2条frozen bundle
+     （T1 collector→trace，T2 collector→trace）+ 2条frozen bundle
+     （trace→R2 collector）+ 1个R2 collector Neuron。不新建D1路径，
+     不修改T1/T2已有bundle/collector本身。复用CollectorOccurrenceTap +
+     OccurrenceIdentityRegistry已有接口。
+  Q3 参数：R2 trace/collector参数全部复用T1的_trace_config/_collector_config
+     标定值（fast tau=50步）——理由：R2层要处理的时间尺度问题与T1完全
+     同构（"两个独立检测事件之间要留多久窗口才算同一次共同源"，同T1的
+     "两个站点各自发放之间要留多久窗口才算同一次先后关系"是同一类物理
+     问题），故复用同一套已验证常量，不重新标定。
 """
 
 from __future__ import annotations
@@ -63,6 +94,12 @@ from .temporal_r_prec_t2 import RPrecCircuitT2
 
 DT = 0.001
 
+# ── R2 trace参数（复用T1 fast trace标定值，见temporal_r_prec.py） ──
+_TAU_FAST_STEPS = 50
+_R_LEAK_TRACE = 5.0
+_TRACE_CAPACITANCE_FAST = _TAU_FAST_STEPS * DT / _R_LEAK_TRACE   # = 0.01
+_TRACE_GM = 20.0
+
 # ── R2 collector参数（复用T1标定值） ──
 _R2_COLLECTOR_CAPACITANCE = 0.007
 _R2_COLLECTOR_R_LEAK = 1.5
@@ -70,10 +107,31 @@ _R2_COLLECTOR_V_PEAK = 0.23
 _R2_COLLECTOR_THRESHOLD = 0.15
 _R2_COLLECTOR_GM = 3.0
 _R2_COLLECTOR_TAU_GATE = 2.0
-_R2_W_INPUT = 0.15   # 复用T1 _W_RAW_XI_TO_COLLECTOR：两路R1 collector直接接入
+
+# 评判164327修正：R1 collector → R2 trace 用T1的_W_XI_TO_TRACE(0.3)；
+# R2 trace → R2 collector 用T1的_W_TRACE_TO_COLLECTOR(0.5)——两段链路
+# 分别对应T1里"xi→trace"和"trace→collector"的同构复用，不是拍脑袋数字。
+_R2_W_R1_TO_TRACE = 0.3
+_R2_W_TRACE_TO_COLLECTOR = 0.5
 
 RELATION_TYPE_FORK_R2_FAST = "r2.fork.28prec31_and_28prec23"
 _R2_CLOSE_THRESHOLD = 1e-4
+
+
+def _r2_trace_config(label: str) -> NeuronConfig:
+    """R2层的物理保持痕迹（评判164327新增）：让两条自然错开的R1检测活动
+    能在衰减窗口内产生物理重叠，不要求瞬时同步。复用T1的trace机制
+    （非spiking RC leaky integrator），同一物理原理见temporal_r_prec.py Q1。
+    """
+    return NeuronConfig(
+        neuron_id=f"r2_fork_trace_{label}",
+        region=0x01,
+        spiking=False,
+        capacitance=_TRACE_CAPACITANCE_FAST,
+        r_leak=_R_LEAK_TRACE,
+        inertia=1.0,
+        channels=[ChannelConfig(name="default", v_threshold=0.0, gm=_TRACE_GM)],
+    )
 
 
 def _r2_collector_config() -> NeuronConfig:
@@ -167,33 +225,66 @@ class R2ForkCircuit(RPrecCircuitT1, RPrecCircuitT2):
     def __init__(self):
         super().__init__()  # 初始化T1→T2→VariantCircuit全链
 
-        # ── R2 fork collector ──
+        # ── R2层物理保持痕迹（评判164327修正：让两条自然错开的R1检测
+        # 活动在衰减窗口内产生物理重叠，不要求瞬时同步） ──
+        self.r2_trace_t1 = Neuron(_r2_trace_config("t1"))
+        self.r2_trace_t2 = Neuron(_r2_trace_config("t2"))
+
+        # ── R2 fork collector（AND门，读取两条trace而不是原始collector输出） ──
         self.r2_fork_collector = Neuron(_r2_collector_config())
 
-        # ── R2 input bundles：T1 collector → R2 col，T2 collector → R2 col ──
-        self.bundle_r1t1_to_r2 = _frozen_bundle(
-            "r2_fork_r1t1_to_collector",
+        # ── bundles: T1/T2 relation_collector → 各自R2 trace ──
+        self.bundle_r1t1_to_trace = _frozen_bundle(
+            "r2_fork_r1t1_to_trace",
             [self.rprec_collector_a_prec_b_fast],
-            [self.r2_fork_collector],
-            _R2_W_INPUT,
+            [self.r2_trace_t1],
+            _R2_W_R1_TO_TRACE,
         )
-        self.bundle_r1t2_to_r2 = _frozen_bundle(
-            "r2_fork_r1t2_to_collector",
+        self.bundle_r1t2_to_trace = _frozen_bundle(
+            "r2_fork_r1t2_to_trace",
             [self.rprec2_collector_b_prec_c_fast],
+            [self.r2_trace_t2],
+            _R2_W_R1_TO_TRACE,
+        )
+
+        # ── bundles: 各自R2 trace → R2 fork collector（AND门重合判据） ──
+        self.bundle_trace_t1_to_r2 = _frozen_bundle(
+            "r2_fork_trace_t1_to_collector",
+            [self.r2_trace_t1],
             [self.r2_fork_collector],
-            _R2_W_INPUT,
+            _R2_W_TRACE_TO_COLLECTOR,
+        )
+        self.bundle_trace_t2_to_r2 = _frozen_bundle(
+            "r2_fork_trace_t2_to_collector",
+            [self.r2_trace_t2],
+            [self.r2_fork_collector],
+            _R2_W_TRACE_TO_COLLECTOR,
         )
 
     def r2_relation_bundles(self) -> List[SynapticBundle]:
-        return [self.bundle_r1t1_to_r2, self.bundle_r1t2_to_r2]
+        return [self.bundle_r1t1_to_trace, self.bundle_r1t2_to_trace,
+                self.bundle_trace_t1_to_r2, self.bundle_trace_t2_to_r2]
 
     def get_all_bundles(self):
         return super().get_all_bundles() + self.r2_relation_bundles()
 
     def step_r2(self, dt: float = DT):
-        """传播一步R2 fork层（在step_rprec()和step_rprec2()之后调用）。"""
+        """传播一步R2 fork层（在step_rprec()和step_rprec2()之后调用）。
+
+        两段传播（评判164327新增的trace中继层）：
+          1. R1 collector → R2 trace（各自独立衰减积分，不要求同步）
+          2. R2 trace → R2 collector（AND门重合判据，读trace而非原始collector）
+        """
+        # 段1：R1 collector → 各自trace
+        for b, trace_neuron in ((self.bundle_r1t1_to_trace, self.r2_trace_t1),
+                                (self.bundle_r1t2_to_trace, self.r2_trace_t2)):
+            currents = b.propagate()
+            trace_neuron.step(currents[0] if currents else 0.0, dt)
+
+        # 段2：trace → R2 collector（两路求和后一次性注入，同T1 collector的
+        # "同一collector多路输入求和"约定，见temporal_r_prec.py step_rprec()）
         collector_current = 0.0
-        for b in self.r2_relation_bundles():
+        for b in (self.bundle_trace_t1_to_r2, self.bundle_trace_t2_to_r2):
             currents = b.propagate()
             collector_current += (currents[0] if currents else 0.0)
         self.r2_fork_collector.step(collector_current, dt)
@@ -227,14 +318,36 @@ class R2ForkFinalizer:
     completed_r2: List[R2Occurrence] = field(default_factory=list)
     _open_r2_drafts: List[dict] = field(default_factory=list, repr=False)
     _registered_r2_keys: set = field(default_factory=set, repr=False)
+    # R2 collector上升沿的候选时刻，等待T1/T2都产生RelationOccurrence后
+    # 才转为正式draft（见step()方法文档：两者时间尺度不同，不能同刻核验）。
+    _pending_since: Optional[int] = field(default=None, repr=False)
 
     def step(self, t_step: int) -> Optional[R2Occurrence]:
-        """每步调用一次，返回本步新生成的R2Occurrence（若有），否则None。"""
+        """每步调用一次，返回本步新生成的R2Occurrence（若有），否则None。
+
+        实测发现（评判164327落地时定位）：R2 collector的AND门在T1/T2的
+        relation_collector各自越阈后很快就上升沿（本轮实测t=564），
+        但T1/T2的正式RelationOccurrence要等父D1 occurrence完成完整的
+        rearm延迟（rearm_min_steps=500，见occurrence.py）才闭合（本轮
+        实测T1 t_closed=1289，T2 t_closed=1559）——R2 collector的物理
+        重叠窗口和T1/T2从检测到闭合所需时间是两个完全不同的时间尺度，
+        不是"瞬时同步"问题。因此R2共同源核验改为：R2 collector上升沿时
+        只记录候选（open draft），持续检查直到T1和T2**都**产生了正式
+        RelationOccurrence后再做共同源核验并闭合——类比RelationFinalizer
+        本身"draft等待父occurrence rearm"的既定模式（relation_occurrence.py），
+        不是本模块特例发明的新机制。
+        """
         r2_active = self.r2_collector.pre_trace > _R2_CLOSE_THRESHOLD
 
-        # R2 collector上升沿检测
+        # R2 collector上升沿：记录候选（不在此刻做共同源核验，
+        # 因为T1/T2的RelationOccurrence可能尚未闭合）
         if r2_active and not self._was_r2_active:
-            # 共同源核验：取两个finalizer最近的RelationOccurrence各一个
+            if not self._open_r2_drafts:  # 避免同一物理重叠窗口内重复挂起候选
+                self._pending_since = t_step
+        self._was_r2_active = r2_active
+
+        # 每步检查：T1和T2是否都已产生RelationOccurrence，若是则核验共同源
+        if self._pending_since is not None:
             t1_ro = (self.r1_finalizer_t1.completed_relations[-1]
                      if self.r1_finalizer_t1.completed_relations else None)
             t2_ro = (self.r1_finalizer_t2.completed_relations[-1]
@@ -252,15 +365,14 @@ class R2ForkFinalizer:
                                    t1_ro.parent_b_instance_id, t1_ro.trace_scale),
                         "t2_key": (t2_ro.relation_type, t2_ro.parent_a_instance_id,
                                    t2_ro.parent_b_instance_id, t2_ro.trace_scale),
-                        "t_detect": t_step,
+                        "t_detect": self._pending_since,  # R2 collector真实上升沿时刻
                         "r2_key": r2_key,
                     }
                     already_open = any(
                         d["r2_key"] == r2_key for d in self._open_r2_drafts)
                     if not already_open:
                         self._open_r2_drafts.append(draft)
-
-        self._was_r2_active = r2_active
+                        self._pending_since = None  # 已转为draft，清空候选态
 
         # 尝试闭合：一旦检测到就立即闭合（R2无需等待进一步rearm）
         newly_closed = None

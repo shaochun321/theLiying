@@ -47,11 +47,21 @@ def test_r2f_1_circuit_construction():
     assert circuit.r2_fork_collector.config.neuron_id == "r2_fork_collector"
 
     bundle_ids = {b.config.bundle_id for b in circuit.r2_relation_bundles()}
-    assert bundle_ids == {"r2_fork_r1t1_to_collector", "r2_fork_r1t2_to_collector"}
+    assert bundle_ids == {
+        "r2_fork_r1t1_to_trace", "r2_fork_r1t2_to_trace",
+        "r2_fork_trace_t1_to_collector", "r2_fork_trace_t2_to_collector",
+    }, f"R2层应有2条R1→trace + 2条trace→collector的bundle，实际={bundle_ids}"
+
+    # 评判164327新增：R2 trace是独立于T1/T2 trace的新Neuron对象
+    assert circuit.r2_trace_t1 is not circuit.rprec_trace_a_fast
+    assert circuit.r2_trace_t2 is not circuit.rprec2_trace_b_fast
 
     print(f"T-R2F-1: 共享站点28={circuit.rprec_site_a}, "
-          f"r2_collector={circuit.r2_fork_collector.config.neuron_id}")
-    print("✓ T-R2F-1 PASS: R2ForkCircuit构造正确，T1/T2共享站点28，R2 collector独立")
+          f"r2_collector={circuit.r2_fork_collector.config.neuron_id}, "
+          f"r2_trace_t1={circuit.r2_trace_t1.config.neuron_id}, "
+          f"r2_trace_t2={circuit.r2_trace_t2.config.neuron_id}")
+    print("✓ T-R2F-1 PASS: R2ForkCircuit构造正确（含trace中继层），"
+          "T1/T2共享站点28，R2 collector/trace独立")
 
 
 def test_r2f_2_reject_different_epoch():
