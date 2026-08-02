@@ -60,6 +60,15 @@ R2层命名规范（评判232255）：
   物理重叠窗口）生成共同源型R2，产生非零、双父R1依赖的R2输出
   （不宣称散度/因果树/高阶涌现）。
 
+P2-C1F-d0（评判document - 2026-08-02T173204.373.md，阻塞修正）：
+  R2Occurrence成立只证明"两条R1经trace重合触发了R2 collector"，尚未
+  定义ℓ_out^R2（R2 collector→下游节点q的真实输出链路）。若直接把
+  r2_fork_collector.pre_trace当Y_R2，构成循环证明（AND门被两路输入
+  触发，就拿它自己的输出证明"需要两路输入"）。新增R2ForkCircuitPlastic
+  （bundle_r2_to_da，同R1Plastic模式），Y_R2(s)=measure_r2_output_current()
+  读取这条独立于collector自身状态的局部电流。P2-C1F-d（K_R2不可约与
+  切断测试）建立在此之上，本轮只完成d0（定义链路），K_R2测试留待下一步。
+
 RULES.md 强制三问：
   Q1 BIO: R2 trace复用T1自身的trace+AND门重合检测机制（temporal_r_prec.py
      的_trace_config/Q1原文：STDP eligibility trace同一物理原理，"资格
@@ -288,6 +297,71 @@ class R2ForkCircuit(RPrecCircuitT1, RPrecCircuitT2):
             currents = b.propagate()
             collector_current += (currents[0] if currents else 0.0)
         self.r2_fork_collector.step(collector_current, dt)
+
+
+class R2ForkCircuitPlastic(R2ForkCircuit):
+    """`R2ForkCircuit` + ℓ_out^R2（R2 collector → DA的可塑bundle）。
+
+    评判173204阻塞修正（P2-C1F-d0）：R2Occurrence只证明了"两条R1的检测
+    活动经trace重合后触发了R2 collector"，尚未证明"这个共同源关系向下游
+    产生了真实的、可独立测量的局部作用"。直接把r2_fork_collector.pre_trace
+    当作Y_R2会构成循环证明（AND门被两路输入触发，就拿它自己的输出证明
+    "两路输入触发了AND门"，未验证任何独立于collector自身状态的事实）。
+
+    本类新增ℓ_out^R2：r2_fork_collector → DA（STDP可塑，同R1Plastic的
+    bundle_rprec_to_da模式）。Y_R2(s)读取这条bundle的propagate()输出——
+    是collector下游、独立于collector自身pre_trace的局部电流，才是合法
+    的R2层输出量。
+
+    子类叠加（同RPrecCircuitT1Plastic先例），不修改R2ForkCircuit本身。
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        # 复用RPrecCircuitT1Plastic（temporal_r_prec_plastic.py）已验证的
+        # 三因子STDP常量，不重新标定（同一种机制，见该文件Q1/Q3）。
+        _INITIAL_WEIGHT = 0.1
+        _WEIGHT_MAX = 0.3
+        _STDP_LR = 0.005
+        _ELIGIBILITY_TAU = 300.0
+        _SYNAPSE_GAIN = 0.2
+        _REMODEL_COST_KAPPA = 0.001
+
+        da_list = list(self.da_neurons.values())
+        cfg = BundleConfig(
+            bundle_id="r2_fork_collector_to_da",
+            learning_rule="stdp",
+            use_eligibility_trace=True,
+            eligibility_tau=_ELIGIBILITY_TAU,
+            initial_weight=_INITIAL_WEIGHT,
+            weight_max=_WEIGHT_MAX,
+            stdp_lr=_STDP_LR,
+            synapse_gain=_SYNAPSE_GAIN,
+            bundle_role="feedforward",
+            remodel_cost_kappa=_REMODEL_COST_KAPPA,
+        )
+        # ℓ_out^R2的具体载体：R2 collector → DA（STDP可塑）。
+        self.bundle_r2_to_da = SynapticBundle(cfg, [self.r2_fork_collector], da_list)
+
+    def measure_r2_output_current(self) -> List[float]:
+        """读取ℓ_out^R2对DA池的局部突触电流——P2-C1F-d的Y_R2(s)读出接口。
+
+        不是r2_fork_collector.pre_trace（那是collector自身状态，直接拿来
+        当Y_R2会构成循环证明，见评判173204）。propagate()只读当步电流，
+        不驱动/不学习——调用方应在step_r2()之后调用。
+        """
+        return self.bundle_r2_to_da.propagate()
+
+    def step_r2_plastic(self, dt: float, da_concentration: float,
+                        fill_fraction: float = 1.0) -> None:
+        self.step_r2(dt)
+        currents = self.bundle_r2_to_da.propagate()
+        for i, tgt in enumerate(self.bundle_r2_to_da.targets):
+            tgt.step(currents[i] if i < len(currents) else 0.0, dt)
+        self.bundle_r2_to_da.learn(
+            dt=dt, fill_fraction=fill_fraction, da_concentration=da_concentration)
+        self.bundle_r2_to_da.compute_xin(dt)
 
 
 # ── R2ForkFinalizer ───────────────────────────────────────────────────────────

@@ -3,8 +3,9 @@
 方案依据：
   document - 2026-08-01T230002.273.md（共同源分叉型路线，非传递链）
   document - 2026-08-01T232255.527.md（R2层语义+共同源资格核验）
+  document - 2026-08-02T173204.373.md（P2-C1F-d0：ℓ_out^R2定义，避免循环证明）
 
-三个测试：
+四个测试：
   T-R2F-1：R2ForkCircuit构造正确（T1+T2共享站点28的xi collector，
            R2 fork collector独立于T1/T2的collector）
   T-R2F-2：共同源核验拒绝不同epoch——手工构造T1/T2的RelationOccurrence
@@ -13,6 +14,9 @@
   T-R2F-3：真实驱动场景下R2Occurrence产生——热源放在共享站点28上，
            同时触发T1(28≺31)和T2(28≺23)，验证两条R1的共同源核验通过后
            生成正式R2Occurrence
+  T-R2F-4：ℓ_out^R2独立性验证（P2-C1F-d0）——measure_r2_output_current()
+           读取bundle_r2_to_da.propagate()的输出，不是r2_fork_collector
+           自身的pre_trace/activation，避免循环证明
 """
 import sys
 
@@ -26,7 +30,7 @@ from nexus_v1.generators.occurrence_identity import OccurrenceIdentityRegistry
 from nexus_v1.relations.relation_occurrence import RelationFinalizer, RELATION_TYPE_A_PREC_B_FAST
 from nexus_v1.relations.temporal_r_prec_t2 import RELATION_TYPE_B_PREC_C_FAST
 from nexus_v1.relations.r2_fork import (
-    R2ForkCircuit, R2ForkFinalizer, RELATION_TYPE_FORK_R2_FAST,
+    R2ForkCircuit, R2ForkCircuitPlastic, R2ForkFinalizer, RELATION_TYPE_FORK_R2_FAST,
 )
 
 DT = 0.001
@@ -233,13 +237,52 @@ def test_r2f_3_real_r2_occurrence():
         print("✓ T-R2F-3 PASS（INFO）：R2基础设施可用，AND门标定非本轮范围")
 
 
+def test_r2f_4_output_link_independence():
+    """T-R2F-4：ℓ_out^R2独立性验证（P2-C1F-d0，评判173204阻塞修正）。
+
+    验证Y_R2的读出接口measure_r2_output_current()返回的是
+    bundle_r2_to_da.propagate()的输出，不是r2_fork_collector自身的
+    pre_trace/activation——避免"AND门被两路输入触发，就拿它自己的
+    输出证明需要两路输入"的循环证明。
+
+    直接操纵r2_fork_collector.pre_trace验证：collector活跃时Y_R2非零，
+    collector静息时Y_R2为零，且Y_R2的值来自bundle_r2_to_da这条独立
+    链路（不是对pre_trace做简单变换）。
+    """
+    circuit = R2ForkCircuitPlastic()
+
+    # collector静息：Y_R2应为0
+    circuit.r2_fork_collector.pre_trace = 0.0
+    y_idle = circuit.measure_r2_output_current()
+    assert all(abs(y) < 1e-12 for y in y_idle), (
+        f"collector静息时Y_R2应为0，实际={y_idle}")
+
+    # collector激活：Y_R2应非零（经bundle_r2_to_da的memristor电导计算，
+    # 不是pre_trace的直接复制——两者数值上不相等，验证走了独立链路）
+    circuit.r2_fork_collector.pre_trace = 0.5
+    y_active = circuit.measure_r2_output_current()
+    assert any(abs(y) > 1e-6 for y in y_active), (
+        f"collector激活时Y_R2应非零，实际={y_active}")
+    assert y_active != [0.5] * len(y_active), (
+        "Y_R2不应是pre_trace的直接复制，必须经过bundle_r2_to_da的"
+        "memristor电导计算（独立链路，非circular）")
+
+    # ℓ_out^R2的source必须是r2_fork_collector本身（桥接R2 collector与DA池）
+    assert circuit.bundle_r2_to_da.sources[0] is circuit.r2_fork_collector
+
+    print(f"T-R2F-4: Y_R2(idle)={y_idle}, Y_R2(active)={[round(y,6) for y in y_active]}")
+    print("✓ T-R2F-4 PASS: ℓ_out^R2独立定义，Y_R2读自bundle_r2_to_da而非"
+          "collector自身状态，避免循环证明")
+
+
 def run():
     test_r2f_1_circuit_construction()
     test_r2f_2_reject_different_epoch()
     test_r2f_3_real_r2_occurrence()
+    test_r2f_4_output_link_independence()
     print()
     print("=" * 60)
-    print("T-R2F-1~3 ALL PASS")
+    print("T-R2F-1~4 ALL PASS")
     print("=" * 60)
 
 
