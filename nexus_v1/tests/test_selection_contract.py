@@ -176,14 +176,13 @@ def test_sel_5_label_permutation_invariance():
 def test_sel_6_no_fixed_index_bias_in_resource_pool():
     """T-SEL-6：完全相同候选不固定偏向某索引（评判要求的自动化审计之二）。
 
-    验证LocalResourcePool.try_allocate()对调用顺序不敏感——以任意顺序
-    向N个"相同请求量"的候选分配资源，只要总请求量不超容量，最终
-    available总量与调用顺序无关（不存在"先到先得"之外的隐藏偏置）。
-
-    这是S0-a能验证的最小版本：资源池本身的记账逻辑对索引顺序公平。
-    真正的"候选竞争结果不因索引固定偏向candidate_0"要等S0-c接入实际
-    竞争动力学（含公共抑制h）后再测——那时才有"多个候选竞争同一份
-    资源，谁先分配到"的场景，本测试只保证底层记账机制本身没有偏置。
+    评判211341阻塞加固：本测试原版只测了资源充足场景（3×0.2=0.6 <
+    capacity=1.0，从未触发分配失败），"顺序无关"在这种场景下是必然
+    结论（谁申请都成功），不能证明真正稀缺时的公平性。本轮补充资源
+    稀缺子场景，明确展示try_allocate()的"先到先得"偏置确实存在——
+    这不是bug，是评判要求必须写清楚的接口边界：try_allocate()是记账
+    接口，不是无偏选择器，S0-c实现真正竞争时必须换成batch式处理
+    （见LocalResourcePool.try_allocate()文档的"正确用法"）。
     """
     request_amount = 0.2
     n_candidates = 3
@@ -196,19 +195,40 @@ def test_sel_6_no_fixed_index_bias_in_resource_pool():
             results.append((idx, ok))
         return pool.available, results
 
+    # 子场景A（资源充足，原有验证保留）：3×0.2=0.6 < capacity=1.0
     orders = [[0, 1, 2], [2, 1, 0], [1, 0, 2]]
     finals = [run_allocation_order(o)[0] for o in orders]
-
-    # 无论调用顺序如何，3次相同金额分配后剩余可用资源应完全一致
     assert all(abs(f - finals[0]) < 1e-9 for f in finals), (
-        f"资源池最终available应与分配调用顺序无关，实际={finals}")
-
+        f"资源充足时，资源池最终available应与分配调用顺序无关，实际={finals}")
     expected_available = 1.0 - request_amount * n_candidates
     assert abs(finals[0] - expected_available) < 1e-9
 
-    print(f"T-SEL-6: 三种调用顺序下最终available均为{finals[0]:.4f}")
-    print("✓ T-SEL-6 PASS: 资源池记账对候选调用顺序无隐藏偏置"
-          "（S0-a层面验证；真正竞争偏置测试留给S0-c）")
+    # 子场景B（资源稀缺，评判要求补充）：capacity=0.3 < 3×0.2=0.6，
+    # 必然有候选申请失败——验证失败者确实由调用顺序决定（先到先得），
+    # 不是"资源池已实现公平竞争"。
+    scarce_capacity = 0.3
+
+    def run_scarce(order):
+        pool = LocalResourcePool(capacity=scarce_capacity)
+        return [(i, pool.try_allocate(request_amount)) for i in order]
+
+    results_012 = run_scarce([0, 1, 2])
+    results_210 = run_scarce([2, 1, 0])
+
+    winners_012 = {i for i, ok in results_012 if ok}
+    winners_210 = {i for i, ok in results_210 if ok}
+    assert winners_012 != winners_210, (
+        "稀缺资源下，调用顺序[0,1,2]与[2,1,0]的成功候选集合应不同——"
+        "这正是try_allocate()'先到先得'偏置的直接证据，证明它不能"
+        "被当作无偏选择器使用（评判211341核心要求）")
+
+    print(f"T-SEL-6a: 资源充足时三种调用顺序available均为{finals[0]:.4f}")
+    print(f"T-SEL-6b: 资源稀缺(capacity={scarce_capacity})时，"
+          f"顺序[0,1,2]成功集合={winners_012}, 顺序[2,1,0]成功集合={winners_210}"
+          f"（不同——确认先到先得偏置存在）")
+    print("✓ T-SEL-6 PASS: 资源充足时记账无顺序偏置；"
+          "资源稀缺时明确证实try_allocate()的先到先得偏置，"
+          "不得被误用为无偏选择器（S0-c必须换用batch处理）")
 
 
 def run():

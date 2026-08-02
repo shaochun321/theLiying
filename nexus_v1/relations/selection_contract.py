@@ -186,6 +186,10 @@ class LocalResourcePool:
 
     S0-a只定义容量上限和当前占用总量的记账接口，不实现具体的竞争动力学
     （公共抑制h、竞争强度γ等留给S0-c）。
+
+    评判211341阻塞加固：本类是纯记账工具，不是竞争选择器。
+    try_allocate()的返回值（成功/失败）不能被S0-c/d的竞争逻辑直接当作
+    "谁赢了"的判据——见try_allocate()文档详述的先到先得偏置风险。
     """
     capacity: float
     _allocated: float = field(default=0.0, repr=False)
@@ -197,9 +201,25 @@ class LocalResourcePool:
     def try_allocate(self, amount: float) -> bool:
         """尝试分配amount资源，成功返回True并记账，超出容量返回False不记账。
 
-        S0-a阶段本方法只做资源记账占位，不含任何候选选择逻辑——由谁调用
-        本方法、调用顺序如何决定，都是S0-c要解决的竞争动力学问题，不在
-        本类范围内。
+        评判211341阻塞加固：本方法是**记账接口，不是选择器**。
+
+        禁止用法（S0-c/d实现竞争时必须遵守）：
+          不得把try_allocate()的成功/失败结果直接当作候选胜负判据。
+          在资源不足的场景下，依次调用
+            candidate_0.try_allocate(r0)
+            candidate_1.try_allocate(r1)
+          天然构成"先到先得"的调用顺序偏置——第一个调用者用尽剩余容量后，
+          后续调用者必然失败，这个失败源于调用顺序，不是候选竞争力的真实
+          比较结果。T-SEL-6只验证了"契约层结构本身不含显式索引优先级"，
+          不能、也不应被解读为"稀缺资源下多候选依次调用try_allocate()的
+          分配结果与调用顺序无关"——两者是不同的陈述。
+
+          正确用法（S0-c设计方向，本轮只记录、不实现）：
+          竞争层应先收集同一物理步内的全部请求向量 r(t)=(r_1,...,r_N)，
+          再用对候选置换等变的规则一次性处理：A(π·r) = π·A(r)。
+          即"batch处理"而不是"依次调用后立即决定"——本类不提供这样的
+          batch接口，S0-c实现时需要新增，不能复用当前的逐次try_allocate()
+          做竞争判定。
         """
         if amount < 0:
             raise ValueError("try_allocate: amount必须非负")
