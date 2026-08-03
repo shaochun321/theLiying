@@ -76,45 +76,36 @@ def test_s0b_2_candidate_id_no_semantics():
 
 
 def test_s0b_3_identical_params_identical_response():
-    """T-S0B-3：运行时对称性——完全相同tau的两个候选，trace层响应完全
-    一致；collector层受既有基础设施的哈希对称性打破扰动影响会有小幅
-    差异，这不是本文件引入的偏置。
+    """T-S0B-3：运行时对称性——完全相同tau **且完全相同physical_seed**
+    的两个候选，trace层响应完全一致。
 
-    真实发现（本轮实测定位，非拍脑袋）：SynapticBundle.__init__
-    （circuit/bundle.py）对每个Memristor的初始权重按
-    zlib.crc32(f"{bundle_id}:{i_s}:{i_t}")施加±25%对称性打破扰动
-    （见site_selection.py模块文档"历史复现性风险"一节，这是既有母本
-    机制，S0-b新增的候选bundle_id天然不同（sel_candidate_0_trace_to_col
-    vs sel_candidate_1_trace_to_col），故扰动种子不同，即使tau完全相同，
-    collector.pre_trace也会因为trace_to_collector/raw_xi_to_collector
-    两条bundle的实际权重不同而产生小幅差异（实测约(0.074 vs 0.046)，
-    在scale上仍是同一量级，不是候选池执行顺序或选择逻辑造成的偏置）。
-
-    S0-b边界内的正确断言是：trace层（只经过一条bundle，且tau相同→
-    capacitance相同→衰减动力学完全相同）在数值上完全一致——这才是
-    "运行时对称性"真正要验证的东西；collector层受±25%扰动是已知的、
-    与候选选择无关的既有基础设施行为，记录但不作为偏置证据。
+    历史修正（S0-bX1，评判document-2026-08-03T125656.528.md）：本测试
+    最初只传相同tau、不显式传physical_seed，依赖默认种子分配偶然让两个
+    候选的xi_to_trace权重相同——这是脆的：S0-bX1把physical_seed与
+    candidate_id解耦后，默认种子改为按候选索引递增（471030/471031/...），
+    "只同tau"不再保证"同权重"。真正该验证的运行时对称性必须显式传入
+    相同physical_seed才成立——这正是身份-扰动解耦生效的直接证据：
+    "参数完全相同"现在唯一且明确地由(tau, physical_seed)两个显式数值
+    决定，不再有任何隐式的、依赖bundle_id字符串巧合的对称性。
     """
     same_tau = (100, 100)
-    circuit = SelectionPoolCircuit(taus=same_tau)
+    same_seed = (500000, 500000)  # 显式传入相同seed，测真正的对称性
+    circuit = SelectionPoolCircuit(taus=same_tau, physical_seeds=same_seed)
     _drive_with_pulse(circuit)
 
     c0, c1 = circuit.candidates
-    # trace层：只受xi_a驱动+capacitance（=tau_steps换算），tau相同→
-    # 完全相同的动力学，不受bundle_id扰动影响（xi_a_to_trace的扰动
-    # 只影响xi→trace这条bundle，但两个candidate的trace本身容量/leak
-    # 参数完全相同，且实测确认trace.activation数值一致）。
+    # tau相同+physical_seed相同 → 全部bundle权重相同 → trace/collector
+    # 响应逐位一致（S0-bX1新增的显式对称性保证，见test_selection_pool_seed.py
+    # T-S0BX1-2的更完整版本）。
     assert abs(c0.trace.activation - c1.trace.activation) < 1e-9
+    assert abs(c0.collector.pre_trace - c1.collector.pre_trace) < 1e-9
 
-    # collector层：记录差异幅度，不断言相等（哈希扰动导致的已知行为，
-    # 断言"合理范围内"而不是"完全相等"，避免把既有机制误判为bug）。
-    collector_diff = abs(c0.collector.pre_trace - c1.collector.pre_trace)
     print(f"T-S0B-3: candidate_0.trace={c0.trace.activation:.6f}, "
-          f"candidate_1.trace={c1.trace.activation:.6f}（相同tau，trace层完全一致）")
-    print(f"  collector.pre_trace差异={collector_diff:.6f}（既有bundle哈希"
-          f"扰动机制造成，非候选池选择逻辑偏置——见test docstring）")
-    print("✓ T-S0B-3 PASS: trace层运行时对称性成立；"
-          "collector层差异来自既有±25%权重扰动机制，与本文件无关")
+          f"candidate_1.trace={c1.trace.activation:.6f}（相同tau+相同seed，完全一致）")
+    print(f"  collector.pre_trace: {c0.collector.pre_trace:.6f} vs "
+          f"{c1.collector.pre_trace:.6f}（同样一致）")
+    print("✓ T-S0B-3 PASS: 显式传入相同(tau, physical_seed)后，"
+          "trace/collector运行时对称性完全成立")
 
 
 def test_s0b_4_different_tau_different_response():

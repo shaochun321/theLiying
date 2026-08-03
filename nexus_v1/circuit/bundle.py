@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import zlib
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 from ..components.semiconductor import Memristor, MOSFET as _MOSFET
 from ..components.neuron import Neuron
@@ -26,6 +26,16 @@ class BundleConfig:
     stdp_lr: float = 0.01
     weight_min: float = 0.0
     weight_max: float = 1.0
+    # ── S0-bX1（评判document-2026-08-03T125656.528.md）：候选身份与物理
+    # 扰动种子解耦 ──
+    # None（默认）= 完全兼容旧行为：初始权重扰动种子取自
+    #   zlib.crc32(f"{bundle_id}:{i_s}:{i_t}")，即P2的T1/T2/R2链路不受
+    #   任何影响（评判要求"不要全局改，只在候选池显式传入时才启用新规则"）。
+    # 非None = 扰动种子改用f"{physical_seed}:{i_s}:{i_t}"，与bundle_id
+    #   完全脱钩——bundle_id（承载candidate_id等审计名称）不再影响物理
+    #   权重初始化。physical_seed本身应是无语义数值（如73142），不得用
+    #   winner_seed/strong_seed这类暗示预期胜负的命名（评判明确禁止）。
+    physical_seed: Optional[object] = None
     # REF: Synaptic gain = V_drive / V_norm
     # In biology, synaptic driving force ~60 mV out of 130 mV range = 0.46
     # But the dt=0.001 scales inject() by dt, so we need to compensate
@@ -175,12 +185,20 @@ class SynapticBundle:
         # `crc32(...) % 10000` 仍可能让不同三元组偶然得到相同种子（有限
         # 种子空间的固有属性，任何取模哈希都有此性质），这不是本次修复
         # 引入的新缺陷，当前不需要为此深挖或引入 model_seed。
+        #
+        # S0-bX1（评判document-2026-08-03T125656.528.md）：身份-扰动解耦。
+        # config.physical_seed为None（默认）时，摘要种子仍取自bundle_id
+        # ——旧行为完全不变，P2的T1/T2/R2链路数值不受任何影响。只有显式
+        # 传入physical_seed时，摘要种子才改用physical_seed，与bundle_id
+        # （可能嵌入candidate_id等审计名称）完全脱钩。
+        _seed_source = (config.physical_seed if config.physical_seed is not None
+                        else config.bundle_id)
         self._memristors: List[List[Memristor]] = []
         for i_s, _s in enumerate(sources):
             row = []
             for i_t, _t in enumerate(targets):
                 # Deterministic variation: ±25% of initial_weight
-                digest_key = f"{config.bundle_id}:{i_s}:{i_t}".encode("utf-8")
+                digest_key = f"{_seed_source}:{i_s}:{i_t}".encode("utf-8")
                 seed = zlib.crc32(digest_key) % 10000
                 variation = (seed / 10000.0 - 0.5) * 0.5  # [-0.25, +0.25]
                 w0 = config.initial_weight * (1.0 + variation)

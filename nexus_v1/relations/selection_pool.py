@@ -68,6 +68,23 @@ _W_RAW_XI_TO_COLLECTOR = 0.15
 # 响应窗口不同"这一物理事实，不代表任何环境适配的真实标定。
 DEFAULT_CANDIDATE_TAUS: Tuple[int, ...] = (30, 100, 400)
 
+# S0-bX1（评判document-2026-08-03T125656.528.md）：候选物理初始化种子，
+# 与candidate_id（0,1,2...编号）刻意采用不同数值区间，避免视觉上让人
+# 误以为physical_seed是candidate_id的派生值——两者概念独立（s_physical
+# vs s_audit）。基数471030本身无任何语义（不是"谁该赢"的暗示），只是
+# 一个远离0/1/2编号的任意起点，避免与candidate_id数值混淆。
+_PHYSICAL_SEED_BASE = 471030
+DEFAULT_PHYSICAL_SEEDS: Tuple[int, ...] = tuple(
+    _PHYSICAL_SEED_BASE + i for i in range(8))  # 预留够用的默认池
+
+# 同一候选内三条bundle的角色偏移量——让同一physical_seed在
+# xi_to_trace/trace_to_collector/raw_xi_to_collector三条链路上产生
+# 不同（但确定性、可复现）的扰动，避免三条bundle退化成同一份权重。
+# 偏移量本身是结构角色标记（"这是第几条链路"），不是候选身份，无语义。
+_SEED_OFFSET_XI_TO_TRACE = 0
+_SEED_OFFSET_TRACE_TO_COLLECTOR = 100000
+_SEED_OFFSET_RAW_XI_TO_COLLECTOR = 200000
+
 
 def _candidate_trace_config(candidate_id: str, capacitance: float) -> NeuronConfig:
     """候选trace的NeuronConfig构造——neuron_id只含candidate_id（无语义），
@@ -103,20 +120,33 @@ def _candidate_collector_config(candidate_id: str) -> NeuronConfig:
     )
 
 
-def _frozen_bundle(bundle_id: str, sources, targets, weight: float) -> SynapticBundle:
+def _frozen_bundle(bundle_id: str, sources, targets, weight: float,
+                   physical_seed=None) -> SynapticBundle:
+    """S0-bX1（评判document-2026-08-03T125656.528.md）：physical_seed默认
+    None时完全走旧路径（种子取自bundle_id，兼容既有P2链路数值不变）。
+    候选池显式传入physical_seed时，Memristor初始权重扰动改用该数值种子，
+    与bundle_id（可能嵌入candidate_id等审计名称）完全脱钩。
+    """
     cfg = BundleConfig(
         bundle_id=bundle_id, learning_rule="frozen",
         initial_weight=weight, weight_max=weight, synapse_gain=1.0,
         bundle_role="feedforward", remodel_cost_kappa=0.0,
+        physical_seed=physical_seed,
     )
     return SynapticBundle(cfg, sources, targets)
 
 
 @dataclass
 class CandidateChain:
-    """单个候选的物理链路引用集合（只读容器，不含选择逻辑）。"""
+    """单个候选的物理链路引用集合（只读容器，不含选择逻辑）。
+
+    S0-bX1新增physical_seed字段：候选的物理初始化种子，与candidate_id
+    （审计/谱系身份）解耦——两者是不同的s_audit/s_physical概念（评判
+    "种子需要分三种用途"）。physical_seed是无语义数值，不暗示预期胜负。
+    """
     candidate_id: str
     tau_steps: int
+    physical_seed: int
     trace: Neuron
     collector: Neuron
     bundle_xi_to_trace: SynapticBundle
@@ -137,35 +167,53 @@ class SelectionPoolCircuit(RPrecCircuitT1):
     偏置"）：__init__对taus列表做一次for循环，每次迭代产生的
     CandidateChain结构完全相同，只有capacitance数值不同——不存在
     if candidate_id == "candidate_0": ... 这类分支代码。
+
+    S0-bX1（评判document-2026-08-03T125656.528.md）：新增physical_seeds
+    参数，与candidate_id完全解耦——candidate_id只用于查找/报告/谱系记录
+    （s_audit），physical_seeds只决定Memristor初始扰动（s_physical）。
+    两者在构造循环里各自独立传入，bundle_id字符串不再是唯一的扰动来源。
     """
 
-    def __init__(self, taus: Tuple[int, ...] = DEFAULT_CANDIDATE_TAUS):
+    def __init__(self, taus: Tuple[int, ...] = DEFAULT_CANDIDATE_TAUS,
+                physical_seeds: Tuple[int, ...] = None):
         super().__init__()
+
+        if physical_seeds is None:
+            physical_seeds = DEFAULT_PHYSICAL_SEEDS[:len(taus)]
+        if len(physical_seeds) < len(taus):
+            raise ValueError(
+                f"physical_seeds长度({len(physical_seeds)})不足以覆盖"
+                f"taus长度({len(taus)})")
 
         xi_a = self.rprec_xi_a  # 站点28（先发生）
         xi_b = self.rprec_xi_b  # 站点31（后发生，AND门的raw输入）
 
         self.candidates: List[CandidateChain] = []
         # ── 唯一的构造循环：每次迭代生成结构完全相同的候选，只有
-        # capacitance（对应tau_steps）不同 ──
+        # capacitance（对应tau_steps）和physical_seed（对应扰动种子）
+        # 不同——两者都通过参数列表传入，不从candidate_id派生 ──
         for i, tau_steps in enumerate(taus):
             cid = make_candidate_id(i)
+            p_seed = physical_seeds[i]
             capacitance = tau_steps * DT / _R_LEAK_TRACE
 
             trace = Neuron(_candidate_trace_config(cid, capacitance))
             collector = Neuron(_candidate_collector_config(cid))
 
             b_xi_to_trace = _frozen_bundle(
-                f"sel_{cid}_xi_a_to_trace", [xi_a], [trace], _W_XI_TO_TRACE)
+                f"sel_{cid}_xi_a_to_trace", [xi_a], [trace], _W_XI_TO_TRACE,
+                physical_seed=p_seed + _SEED_OFFSET_XI_TO_TRACE)
             b_trace_to_col = _frozen_bundle(
                 f"sel_{cid}_trace_to_col", [trace], [collector],
-                _W_TRACE_TO_COLLECTOR)
+                _W_TRACE_TO_COLLECTOR,
+                physical_seed=p_seed + _SEED_OFFSET_TRACE_TO_COLLECTOR)
             b_raw_xi_to_col = _frozen_bundle(
                 f"sel_{cid}_raw_xi_b_to_col", [xi_b], [collector],
-                _W_RAW_XI_TO_COLLECTOR)
+                _W_RAW_XI_TO_COLLECTOR,
+                physical_seed=p_seed + _SEED_OFFSET_RAW_XI_TO_COLLECTOR)
 
             self.candidates.append(CandidateChain(
-                candidate_id=cid, tau_steps=tau_steps,
+                candidate_id=cid, tau_steps=tau_steps, physical_seed=p_seed,
                 trace=trace, collector=collector,
                 bundle_xi_to_trace=b_xi_to_trace,
                 bundle_trace_to_collector=b_trace_to_col,
