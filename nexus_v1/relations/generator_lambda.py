@@ -1,5 +1,33 @@
 """nexus_v1.relations.generator_lambda — TSS-2b：同一活动云、双物理窗口、
-双独立输出的尺度生成算子原型 Λ_support^(1)。
+双独立输出的**嵌套支撑范围** Λ_nested^(1)（Σ_support 的子情形）。
+
+**资格降格（TSS-2b修正，实测依据）**：
+  初版命名为"尺度生成算子原型 Λ_support^(1)"并列为与 Θ_≺/Σ_support 并列的
+  第三个基础算子——**该定位过强，已撤下**。对齐 physical_seed 后实测：
+
+      Y_broad 限制到 N_LOCAL 支撑集 ≡ Y_local （diff = 0.00e+00 逐位相同）
+
+  即不存在两个算子，只有**一个求和 collector 作用在两张输入表上**。
+  local/broad 的差异全部来自成员集合大小，没有任何尺度专属变换。
+  此外 Y_broad=3.5424 而 Y_local+Y_delta=3.9983（ratio 0.886）——次可加性
+  仅来自 collector 自身的 v_peak 钳位与漏电非线性，而 local 用的是同一个
+  非线性，广域侧没有出现任何新信息。
+
+**当前实际取得的资格**：
+  同一片生成活动云可以同时进入两个嵌套的物理支撑范围（N_local ⊂ N_broad），
+  产生两个独立、可切断验证的下游输出。
+
+**禁止宣称**：
+  - 这是一个尺度算子（缺不可约性：Y_broad 可由细尺度同类运算重构）
+  - 已实现粗粒化或重整化
+  - 系统自行发现了局部与广域尺度（成员集合是外部标定后字面冻结的）
+  - 不同尺度之间可以互相转换
+  - 当前两个窗口适用于其他模态和环境
+
+**升格为真正尺度算子所缺的检验**（参照 P2-C1F-d 对 K_R2 的不可约性检验）：
+  必须证明 Y_broad 无法由 {Y_local, Y_delta} 经细尺度同类运算重构——
+  即广域侧存在细尺度不可见的量。当前 test_generator_lambda.py 的恒等断言
+  正是该门槛的守卫：任何"尺度专属变换"的宣称必须先让那条断言失败。
 
 TYPE:BIO（复用已有量子元collector机制）+ INFRA（双尺度绑定）
 
@@ -101,17 +129,35 @@ def _lambda_collector_config(label: str) -> NeuronConfig:
     )
 
 
-def _frozen_bundle(bundle_id: str, sources, targets, weight: float) -> SynapticBundle:
+# ── physical_seed基址（S0-bX1身份-扰动解耦，commit 9c8528d） ──
+# FIX(TSS-2b修正)：初版两组bundle的id分别是lambda_local_site20_to_col和
+# lambda_broad_site20_to_col，bundle.py:194-204用bundle_id的crc32生成±25%
+# 权重扰动 → 同一物理站点在local/broad两个窗口里拿到不同权重。实测后果：
+# 对齐physical_seed前 Y_broad^cut=2.4918 vs Y_local=2.3280（7%差被误读为
+# 结构效应）；对齐后 Y_broad^cut≡Y_local（diff=0.00e+00）。该7%全部是
+# 命名污染物理，无结构成分。S0-bX1已为此冻结physical_seed字段（无语义
+# 数值，不得嵌入审计名称），本文件据此改用站点号基址：同一站点在两个
+# 窗口共享同一物理权重，窗口差异只来自成员集合本身。
+_PHYS_SEED_BASE = 70000
+
+
+def _frozen_bundle(bundle_id: str, sources, targets, weight: float,
+                   phys_seed: object = None) -> SynapticBundle:
     cfg = BundleConfig(
         bundle_id=bundle_id, learning_rule="frozen",
         initial_weight=weight, weight_max=weight, synapse_gain=1.0,
         bundle_role="feedforward", remodel_cost_kappa=0.0,
+        physical_seed=phys_seed,
     )
     return SynapticBundle(cfg, sources, targets)
 
 
 class LambdaScaleCircuit(VariantCircuit):
-    """同一次外部发生驱动local/broad两个独立尺度collector。
+    """同一次外部发生驱动local/broad两个嵌套支撑范围collector。
+
+    命名保留 `LambdaScaleCircuit` 只为不打断已有 import；语义上它是
+    **嵌套支撑范围**（Σ_support 子情形），不是尺度算子——见模块文档
+    的资格降格说明。
 
     N_local/N_broad在构造期字面冻结（模块常量），__init__只按固定列表
     构造bundle，不做任何距离/半径判断。local_bundles的sources只包含
@@ -131,14 +177,16 @@ class LambdaScaleCircuit(VariantCircuit):
             src = self.thermal_quantum_collectors[f"thermpt{site}_warm"]
             self.bundles_local.append(_frozen_bundle(
                 f"lambda_local_site{site}_to_col", [src],
-                [self.lambda_local_collector], _W_SITE_TO_COLLECTOR))
+                [self.lambda_local_collector], _W_SITE_TO_COLLECTOR,
+                _PHYS_SEED_BASE + site))
 
         self.bundles_broad: List[SynapticBundle] = []
         for site in sorted(N_BROAD):
             src = self.thermal_quantum_collectors[f"thermpt{site}_warm"]
             self.bundles_broad.append(_frozen_bundle(
                 f"lambda_broad_site{site}_to_col", [src],
-                [self.lambda_broad_collector], _W_SITE_TO_COLLECTOR))
+                [self.lambda_broad_collector], _W_SITE_TO_COLLECTOR,
+                _PHYS_SEED_BASE + site))
 
     def lambda_bundles(self) -> List[SynapticBundle]:
         return self.bundles_local + self.bundles_broad

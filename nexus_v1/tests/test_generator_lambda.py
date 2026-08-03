@@ -104,12 +104,26 @@ def test_tss2b_2_cut_delta_affects_only_broad():
         f"切断N_Δ应真实改变Y_broad（broad bundles包含N_Δ站点的输入），"
         f"实际: full={y_broad_full}, cut={y_broad_cut}")
 
+    # ── 资格边界（TSS-2b修正新增）：broad限制到local支撑集后必须逐位等于
+    # local。这不是"通过"标志，恰恰是**降格依据**——它证明local/broad是
+    # 同一个求和算子作用在两张输入表上，不是两个不同的尺度算子。初版此处
+    # 有7%差（2.4918 vs 2.3280）被误读为结构效应，实为bundle_id哈希扰动
+    # 污染（见generator_lambda._PHYS_SEED_BASE）。断言恒等，以后任何"尺度
+    # 专属变换"的宣称必须先让这条断言失败。 ──
+    assert abs(y_broad_cut - y_local_full) < 1e-9, (
+        f"physical_seed对齐后，broad限制到N_LOCAL应与local逐位相同"
+        f"（同一算子同一支撑集）。实际: Y_broad^cut={y_broad_cut}, "
+        f"Y_local={y_local_full} —— 若此处出现差异，说明仍有身份信息泄漏"
+        f"进物理权重（S0-bX1门），或引入了未记录的尺度专属变换")
+
     print(f"T-TSS2B-2: Y_local(full={y_local_full:.4f}, cut={y_local_cut:.4f}) "
-          f"— 不变")
+          f"— 不变（构造保证：bundles_local不含N_Δ，非资格证据）")
     print(f"           Y_broad(full={y_broad_full:.4f}, cut={y_broad_cut:.4f}) "
           f"— 改变")
-    print("✓ T-TSS2B-2 PASS: 切断N_Δ后只影响broad不影响local，"
-          "证明输出差异来自真实结构支撑范围而非软件标签")
+    print(f"           Y_broad^cut == Y_local: {y_broad_cut:.6f} == "
+          f"{y_local_full:.6f} — 同一算子，两张输入表")
+    print("✓ T-TSS2B-2 PASS: 切断N_Δ真实改变broad；同时确认local/broad是"
+          "同一求和算子的两个支撑范围（嵌套支撑，非独立尺度算子）")
 
 
 def test_tss2b_3_membership_frozen_at_construction():
