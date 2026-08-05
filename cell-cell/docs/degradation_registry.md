@@ -214,3 +214,54 @@
 - **解决路径**: 见 `cell-cell/工作报告/技术债档案-前庭量纲带宽欠债_2026-06-30.md`
 - **关联 DEG**: ← 根因是 DEG-015（无量纲锚点）
 
+---
+
+### DEG-018: `occurrence.py` REFRACTORY→ARMED（τ_rearm）双时钟无物理载体
+- **发现时间**: 2026-08-05（TSS-R1b 审计）
+- **现象**: `generators/occurrence.py:329-344` 的 `_ClosurePhase.REFRACTORY` 阶段
+  用纯整数计步判定重新武装（`t_step - self._t_down >= rearm_min_steps`），
+  与退出判定（`theta_down` 阈值迟滞）是两个独立的软件时钟。
+- **影响层**: `generators/occurrence.py`、`relations/entry_boundary.py`
+  （TSS-R1a 参考检测器沿用了同一双时钟结构）
+- **根因**: 标定记录 `exp_P2A1b_3_closure_calibration.py:65-70` 只证明
+  `rearm_min_steps=500` 能把伪发生收敛为 1 次（即它实际扮演去抖动/防重复
+  计数滤波器的角色），与 `theta_down` 解决的是同一个问题（同一物理支撑期
+  内不要重复计数），未证明需要独立的第二时间常数。TSS-R1b 已用可重触发
+  饱和 RC 门（`relations/entry_gate.py`）证明单时钟即可满足全部资格，
+  且实测两个 oracle 变体（rearm=0 / rearm=500）在真实数据流上事件计数
+  完全相同——即现有实测数据分辨不出第二个时钟做了什么。
+- **状态**: KNOWN_DEBT（继承债务，此前多轮 P2-A/TSS 审计均未单独挑出）。
+  TSS-R1b 裁定本轮**不修改** `occurrence.py`——它被 `occurrence_tap.py` /
+  `r2_fork.py` / `test_occurrence_identity.py` /
+  `test_p2a_generator_core.py`（显式依赖 `rearm_min_steps=0` 分支）等
+  多个消费方依赖，混在审计+单支路物理化任务里改会扩大回归面。
+- **解决路径**: 独立立项，参照 `relations/entry_gate.py` 的单时钟拓扑
+  （Capacitor + MOSFET Zener 钳位）审查 `occurrence.py` 三态机是否可合并
+  为二态。见 `cell-cell/工作报告/TSS-R1b_E上箭头物理实现映射审计_2026-08-05.md`。
+- **关联 DEG**: 无（首次登记）
+
+---
+
+### DEG-019: `MOSFET.conduct()` 阈下分支注释与实现不一致
+- **发现时间**: 2026-08-05（TSS-R1b 审计）
+- **现象**: `components/semiconductor.py:151-159` 注释承诺阈下有指数尾流
+  电流（"In real MOSFETs, subthreshold current is always positive...
+  physical drain current = |I_sub|"），但实现 `max(0.0, gm·nVT·(exp(x)-1))`
+  在 `x = (v_gate - v_threshold)/nVT < 0` 时恒返回 **0.0**（因为
+  `exp(x)-1 < 0`，被 `max(0.0, ·)` 截零）。
+- **影响层**: `components/semiconductor.py`；任何依赖 MOSFET 阈下微导通
+  的组件都会得到 0 而非期望的小正值。
+- **根因**: 实现用 `max(0.0, ·)` 截断负值时，误把"取绝对值"的语义写成了
+  "截断为 0"。
+- **状态**: KNOWN_DEBT（当前被 `relations/entry_gate.py` 的
+  `PhysicalEntryGate` 依赖为硬阈值整流器——门的开闭判定用
+  `conduct(V_g) == 0.0` 作阈值门，依赖的是**当前实现行为**，不是注释
+  承诺的语义）。`test_entry_gate.py::test_r1b_3_...` 内有锁定断言
+  `conduct(θ_g - 1e-6) == 0.0`，若此实现被"修复"成注释承诺的语义
+  （阈下返回微小正值），该测试会立刻失败并报警，而不是让
+  `PhysicalEntryGate` 静默退化为永久微导通。
+- **解决路径**: 独立评估是否需要让阈下分支真正返回 `|I_sub|`（修复注释
+  与实现的不一致），评估前必须先确认 `PhysicalEntryGate` 等依赖方的
+  阈值判定方式需同步调整。
+- **关联 DEG**: 无（首次登记）
+
