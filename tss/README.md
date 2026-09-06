@@ -47,13 +47,26 @@ nexus_v1/tests/ 的近四成），与 organism 本体边界混淆。经用户裁
 PYTHONIOENCODING=utf-8 python -m tss.tests.test_<name>
 ```
 
-## 当前状态与重启指引（2026-09-06 暂停时点）
+## 当前状态（2026-09-06：时间支路 M1+M2 完成）
 
-- 进度冻结在 TSS-R1b（`entry_gate.py`/PhysicalEntryGate 已冻结，10/10 PASS）
+**基础生成元时间支路已走通**（用户裁定范围 2026-09-06）：
+
+```
+真实外部发生 → collector(p_α) → E^↑ 门(b^↑) → H_τ 历史核(h^(τ)) → C_Θ 比较器 → r_{i≺j}
+   物理热源      活体神经元      entry_gate    history_kernel    theta_comparator
+                                 (TSS-R1b)      (TSS-R1c/M1)        (TSS-M2)
+```
+
+- **M1** `relations/history_kernel.py`：H_τ 物理历史保持核，T-R1C-1~8 8/8 PASS。
+  τ_h=600 步（复用 EXP-T1-01 slow，TSS-3a 裁定），可读窗 723 步，零自由参数。
+- **M2** `relations/theta_comparator.py`：C_Θ 全物理 NMDA 型乘法符合检测器
+  （C-02 用户裁定：比较完全由 MOSFET 承担），统一 Θ 九条资格 T-TH-1~9 9/9 PASS。
+  真实链路三站点对 28≺15/21/24 实测 Δt={321,360,312} 正向产生、镜像全零。
 - 已冻结资产：p_α 边界端口（`relations/boundary_process.py`）、ℰ↑ 物理门
   （`relations/entry_gate.py`）；`occurrence.py` 冻结为后验审计；Σ/Λ 降格保留
-- 理论路线图下一步：M1 R1c — H_τ 物理历史保持核（输入只来自 PhysicalEntryGate，
-  真实电容泄漏；**不扩展门、不重构 occurrence.py**）
+  （按路线图"保持缺失，不写占位电路"）
+- 理论路线图后续（未启动）：C0/C1 首个耦合生成元（时间方向优先）、
+  S1/S2 空间来源裁定、E0/G0 事件核/生长
 - 理论文本（权威）：`cell-cell/理论文本_2026-08-14/`（原件另存于 J:/文本，两套独立保存）
   - 先读 `理论主线文档集_2026-08-14/06_当前冻结状态与未决问题.md`
   - 再读 `理论主线文档集_2026-08-14/08_下一阶段路线图.md`
