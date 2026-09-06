@@ -1,6 +1,17 @@
 # nexus_v1 降级追踪注册表 (Degradation Registry)
 
 > **格式说明**: 见 RULES.md 原则 6
+>
+> **路径迁移说明（2026-09-06）**: `nexus_v1/generators|relations|events` 已整体
+> 迁至顶层 `tss/`（纯搬迁，零改名零重构，见 `tss/README.md` 映射表）。以下
+> 历史条目中的旧路径按该映射对应。
+>
+> **⚠️ 编号分叉警告（2026-09-06 审计发现）**: 本文件与
+> `cell-cell/docs/degradation_registry.md` 已分叉——本文件 16 条，cell-cell 版
+> 21 条，且 **DEG-015 起编号冲突**（本文件 DEG-015=P2-A 生成元高输入静默
+> 2026-07-21；cell-cell 版 DEG-015=机械输入无物理量纲 2026-06-30）。引用
+> DEG-015~019 时必须注明出自哪份文件。合并/重编号需用户裁定，暂停期间两份
+> 并存不互相覆盖。
 
 ---
 

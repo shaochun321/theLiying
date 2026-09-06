@@ -40,12 +40,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Cell-CC is a **neuromorphic circuit simulator built from four semiconductor primitives** — `Capacitor` (membrane / memory), `MOSFET` (threshold / ion channel), `Memristor` (plastic synapse), `PowerRail` (metabolic energy with internal-resistance gain limiting). It simulates a full sensorimotor chain from mechanical/thermal sensing to motor output, with Hebbian/STDP learning. Every component is required to map to a real biological or physical object (see `nexus_v1/RULES.md`).
 
-Three co-existing top-level systems:
+Four co-existing top-level systems:
 - **`nexus_v1/`** — the organism (physics + learning). The active main system.
-- **`governance/`** — a *co-equal parallel* auditor (NOT subordinate): `Fuse` (physics-law circuit breaker), `Adjudicator`, `Validator`, `Modeler`, `MathCandidate`, `GovernanceLedger`. Instantiated inside `VariantCircuit.__init__` and run every step.
+- **`tss/`** — the TSS/基础生成元 theory track (temporal/spatial/scale generating-operator research), migrated out of `nexus_v1/{generators,relations,events}` on 2026-09-06 (pure move, zero renames — see `tss/README.md` for the old→new mapping and resume guide). **Strictly one-way dependency**: `tss/*` may import `nexus_v1/*`; the organism has zero imports of `tss/*`. It is an offline analysis/theory-validation layer wrapping live circuit objects, NOT part of the physics loop. Tests: `python -m tss.tests.test_<name>`. The theory corpus lives at `cell-cell/理论文本_2026-08-14/` (authoritative copy also at `J:/文本`, two independent sets, never overwrite each other).
+- **`governance/`** — a *co-equal parallel* auditor (NOT subordinate). Runtime components (instantiated inside `VariantCircuit.__init__`, run every step): `Fuse` (physics-law circuit breaker — note: trips raise `FuseTrippedError` that nothing catches in production), `GovernanceLedger`, `Adjudicator` (J2 wired 2026-09-06). On-demand design-time tools (manual invocation only, never auto-run): `Validator`, `Modeler`, `MathCandidate`.
 - **`experiments/`** — older "Morphosphere" experiment scripts (mostly hardcode `D:\cell-cc\Morphosphere_*` paths; predecessor codebase, not the current system).
 
 `cell-cell/` is an Obsidian knowledge vault (design docs, AI logs, analysis reports — Markdown only, no code). `docs/` is an older Morphosphere version archive. Generated reports go in `cell-cell/工作报告/`. (`cell-cell/报告/` is legacy archive — do not use for new reports.)
+
+⚠️ **Registry fork (2026-09-06, unresolved)**: `nexus_v1/docs/degradation_registry.md` (16 entries) and `cell-cell/docs/degradation_registry.md` (21 entries) have diverged with **conflicting DEG-015 numbering**. Always state which file a DEG-015~019 reference comes from. Merging needs user adjudication.
 
 ## Running tests & entry points
 
