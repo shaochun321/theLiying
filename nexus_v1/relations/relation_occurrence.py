@@ -195,6 +195,9 @@ class RelationFinalizer:
     _registered_keys: set = field(default_factory=set, repr=False)
 
     # 关系窗口过期判据：collector pre_trace跌落到此值以下则关系窗口关闭
+    # DEG-020（2026-09-06登记）：与 r2_fork.py 的 _R2_CLOSE_THRESHOLD 数值
+    # 相同但互不引用，无独立Q3推导，见 degradation_registry.md。改这里时
+    # 同步检查 r2_fork.py 是否也需要改。
     _RELATION_CLOSE_THRESHOLD: float = 1e-4
 
     def step(self, t_step: int) -> Optional[RelationOccurrence]:

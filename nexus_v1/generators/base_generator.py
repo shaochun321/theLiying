@@ -180,6 +180,11 @@ class BaseGenerator:
         内）。`feed()`/`tick()` 只适用于"绕开 world/body 自主物理、手动喂
         合成 dT"的标定/测试场景（同 T0~T1 现有方法论），与母本主循环
         二选一使用。
+
+        DEG-021（2026-09-06登记，见 degradation_registry.md）：本条已在
+        运行时无法验证——要做到运行时互锁需要 `VariantCircuit` 暴露"本
+        tick 是否已驱动同一批神经元"的共享状态，属于母体代码改动，本次
+        审计不擅自实施，仅正式登记该缺口。
         """
         self._claim_drive_mode(DRIVE_MODE_MANUAL_CALIBRATION)
         self._propagate(dT_raw, dt)

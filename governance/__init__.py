@@ -6,18 +6,31 @@ Architecture:
     nexus_v1/  (the organism — runs physics + learning)
     governance/ (the auditor — monitors + adjudicates + models)
 
-Five capabilities:
-    1. Fuse:           Physics law violation → circuit-break
-    2. Adjudicator:    Axiom compliance check (J1/J2 runtime)
-    3. Validator:      Parameter physical plausibility
-    4. Modeler:        Independent mathematical simulation
-    5. MathCandidate:  Formula lifecycle management
+Five capabilities, two different activation modes:
+    RUNTIME (called automatically every step by GovernanceSystem.post_step()):
+        1. Fuse:           Physics law violation → circuit-break
+        2. GovernanceLedger: Entropy/gain-chain bookkeeping
+        3. Adjudicator:    Axiom compliance check (J1/J2 runtime)
+    ON-DEMAND (design-time / code-review tools, invoked manually by a
+    developer proposing a change — NOT wired into the per-step loop):
+        4. Validator:      Parameter physical plausibility (check_stability,
+                            check_boundary, etc. — call before committing
+                            a parameter change)
+        5. Modeler:        Independent mathematical prediction, run before
+                            modifying a circuit parameter to estimate effect
+        6. MathCandidate:  Formula lifecycle management (PROPOSED→ADOPTED)
 
-The governance system is ALWAYS active unless explicitly in debug mode.
-Debug mode = fuse disabled (like shadow_sandbox._construction_power).
-Debug ends → fuse re-enabled.
+    2026-09-06 audit: prior versions of this docstring implied all five/six
+    capabilities run "every step" — false. Adjudicator was previously
+    instantiated nowhere (see fix below); Validator/Modeler/MathCandidate
+    are intentionally on-demand APIs (see their own module docstrings) and
+    have simply never been invoked by a developer during code review so far
+    — that is a process gap, not a wiring bug, and is not something this
+    module can fix by force-calling them every step without a use case.
 
-Directory: d:/cell-cc/governance/ (parallel to d:/cell-cc/nexus_v1/)
+The runtime portion (Fuse + Ledger + Adjudicator) is ALWAYS active unless
+explicitly in debug mode. Debug mode = fuse disabled (like
+shadow_sandbox._construction_power). Debug ends → fuse re-enabled.
 """
 
 from dataclasses import dataclass, field
@@ -25,6 +38,7 @@ from typing import Optional
 
 from .fuse import Fuse, FuseTrippedError
 from .ledger import GovernanceLedger
+from .adjudicator import Adjudicator
 
 
 @dataclass
@@ -73,6 +87,7 @@ class GovernanceSystem:
             enabled=not self.config.debug_mode,
         )
         self.ledger = GovernanceLedger(window_size=1000)
+        self.adjudicator = Adjudicator()
 
         # Track governance overhead
         self._overhead_us: float = 0.0
@@ -100,26 +115,18 @@ class GovernanceSystem:
         if violations:
             self.fuse.trip(violations, tick)
 
-        # ── 3. Runtime adjudication ──
+        # ── 3. Runtime adjudication (J1/J2) ──
+        # 2026-09-06 fix: this used to call a local `_check_j1_j2` stub whose
+        # J2 branch was `pass` (no-op) — Adjudicator.runtime_check() already
+        # implements the real J2 check (shadow neuron ID leak into main
+        # circuit) but was never instantiated/called from here. Delegating
+        # to it now makes the module docstring's "called every step by
+        # GovernanceSystem.post_step()" claim (adjudicator.py:50) true.
+        # J1 (subjective layer accessing objective variables) remains
+        # undetectable at runtime per Adjudicator's own docstring — reserved
+        # for a static-analysis/code-review tool, not fixable here.
         if self.config.runtime_adjudication:
-            self._check_j1_j2(circuit, tick)
-
-    def _check_j1_j2(self, circuit, tick: int):
-        """Runtime adjudication: J1 and J2.
-
-        J1: Subjective layer accessing objective variables?
-            → Cannot detect at runtime (static analysis needed).
-            → Reserved for code review tool.
-
-        J2: Read-only observer modifying circuit state?
-            → Check shadow_sandbox write-back (should be None).
-        """
-        # J2: Shadow layer should not modify main circuit
-        if hasattr(circuit, 'shadow_sandbox'):
-            sb = circuit.shadow_sandbox
-            # Shadow neurons should not appear in main circuit's neuron list
-            # This is a structural check, not a per-step check
-            pass  # Currently shadow is read-only by design
+            self.adjudicator.runtime_check(circuit, tick)
 
     def enable_fuse(self):
         """Re-enable fuse after debug session."""
@@ -137,5 +144,6 @@ class GovernanceSystem:
             'debug_mode': self.config.debug_mode,
             'fuse_enabled': self.fuse.enabled,
             'fuse_trips': self.fuse.trip_count,
+            'adjudicator_warnings': len(self.adjudicator.get_warnings()),
             'ledger': self.ledger.summary(),
         }

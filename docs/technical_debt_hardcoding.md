@@ -52,8 +52,9 @@
 - **DEG 关联**: DEG-002
 - **优先级**: 低（当前不可知是否必要）
 
-### HC-005: G_ORIENT=200 硬编码热趋性反射（最高优先级）⚠️ SEMANTIC HARDCODING
-- **位置**: `nexus_v1/circuit/variant_adapter.py` 约第 726 行
+### HC-005: G_ORIENT=200 硬编码热趋性反射（最高优先级）⚠️ SEMANTIC HARDCODING FIXED ✅ (确认于 2026-09-06)
+- **确认状态**: 2026-09-06 结构审计 grep `variant_adapter.py` 全文无 `G_ORIENT` 匹配，代码块已被移除。此条目此前长期未在本文件标记 FIXED（与 memory/project_p0_completion 记录的 P0 修复不同步），仅补状态标记，不代表本次新修复。
+- **位置**: `nexus_v1/circuit/variant_adapter.py` 约第 726 行（历史位置，代码已删除）
 - **代码**:
   ```python
   G_ORIENT = 200.0
@@ -71,8 +72,9 @@
 - **V2.0 行动**: 删除此代码块，用 patch-specific thermo→motor 通路替代
 - **优先级**: 最高（污染全部热趋性实验结论）
 
-### HC-006: feed_alignment 点积直接注入 DA 奖励（语义数学 + 目标写死）⚠️ CRITICAL
-- **位置**: `nexus_v1/circuit/variant_adapter.py`，`step()`，约 762-775 行
+### HC-006: feed_alignment 点积直接注入 DA 奖励（语义数学 + 目标写死）⚠️ CRITICAL FIXED ✅ (确认于 2026-09-06)
+- **确认状态**: 2026-09-06 结构审计 grep 确认 `dot(heat_dir, vel_dir)` 式点积代码已不存在；`feed_alignment` 现为 `self._v_feed`（物理 FeedCap 电容量，见 memory/project_energy_interface_complete），符合"从结构涌现"要求。仅补状态标记。
+- **位置**: `nexus_v1/circuit/variant_adapter.py`，`step()`，约 762-775 行（历史位置，代码已替换）
 - **代码**:
   ```python
   alignment = dot(heat_dir, vel_dir)
@@ -84,8 +86,9 @@
 - **V2.0 修复**: 创建前/后 patch relay → DA 专用 SynapticBundle，让接近信号从前后 patch 差异中物理涌现。
 - **优先级**: 最高（与 HC-005 并列）
 
-### HC-007: extra_axes 直接注入 Encoding 神经元（绕过 SynapticBundle）⚠️ CRITICAL
-- **位置**: `nexus_v1/circuit/hebbian.py`，`step()`，约 547-561 行
+### HC-007: extra_axes 直接注入 Encoding 神经元（绕过 SynapticBundle）⚠️ CRITICAL FIXED ✅ (确认于 2026-09-06)
+- **确认状态**: 2026-09-06 结构审计 grep `tonic_val \* 5` 全文无匹配，直接注入代码已移除。仅补状态标记，具体替换实现（是否为 `bundles_extra_to_enc`）未逐行复核，若后续需要应交叉核对 hebbian.py 当前 `step()` 实现。
+- **位置**: `nexus_v1/circuit/hebbian.py`，`step()`，约 547-561 行（历史位置，代码已替换）
 - **代码**:
   ```python
   enc.step(tonic_val * 5.0, dt)  # 直接注入，无 SynapticBundle

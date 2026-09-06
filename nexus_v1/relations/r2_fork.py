@@ -124,6 +124,9 @@ _R2_W_R1_TO_TRACE = 0.3
 _R2_W_TRACE_TO_COLLECTOR = 0.5
 
 RELATION_TYPE_FORK_R2_FAST = "r2.fork.28prec31_and_28prec23"
+# DEG-020（2026-09-06登记）：与 relation_occurrence.py 的
+# _RELATION_CLOSE_THRESHOLD 数值相同但互不引用，无独立Q3推导，见
+# degradation_registry.md。改这里时同步检查 relation_occurrence.py。
 _R2_CLOSE_THRESHOLD = 1e-4
 
 

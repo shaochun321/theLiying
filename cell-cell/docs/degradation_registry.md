@@ -265,3 +265,57 @@
   阈值判定方式需同步调整。
 - **关联 DEG**: 无（首次登记）
 
+---
+
+### DEG-020: `relation_occurrence.py`/`r2_fork.py` 独立声明相同魔数阈值，互不交叉引用
+- **发现时间**: 2026-09-06（全项目结构审计）
+- **现象**: `relations/relation_occurrence.py:198` 的
+  `_RELATION_CLOSE_THRESHOLD = 1e-4` 与 `relations/r2_fork.py:127` 的
+  `_R2_CLOSE_THRESHOLD = 1e-4` 数值完全相同，均用于"collector.pre_trace
+  跌破此值 → 判定活动窗口关闭"，但两处各自独立声明，代码里互不引用、
+  互不注释对方存在。对照 `generators/occurrence.py:32-42` 的
+  `theta_up=0.01`/`theta_down=0.001`——那里有详细的 Q3 参数依据段落
+  （引用具体标定脚本 EXP-P2A1b3-CALIBRATED），而这两处 `1e-4` 只有功能性
+  描述注释（"关系窗口过期判据"），没有数值本身的推导来源。
+- **影响层**: `relations/relation_occurrence.py`、`relations/r2_fork.py`
+- **根因**: 两个文件是不同轮次（P2-B1X1e 与 R2-fork）先后开发，大概率是
+  后者复制前者数值时未加交叉引用；数值相同可能是巧合（两者恰好都选了
+  "远小于 theta_down=0.001 的数量级"这一常见 float 近零判据），也可能是
+  故意复用但未留痕迹——现有资料无法区分。
+- **状态**: KNOWN_DEBT（不影响当前测试通过；相同数值目前未观察到导致
+  错误行为，但存在"改一处忘改另一处"的静默漂移风险）
+- **解决路径**: 若确认两者语义等价，应提炼为一个共享命名常量并注明来源
+  （或明确写出两者为何允许不同）；若语义不同（不同层级信号量纲不同），
+  应各自比照 `occurrence.py` 的 Q3 段落补齐推导依据，而不是保留裸数字。
+  本次审计不擅自合并或杜撰推导依据，仅完成登记 + 双向注释指向本条目。
+- **关联 DEG**: 无（首次登记）
+
+---
+
+### DEG-021: `BaseGenerator.feed()` 与 `VariantCircuit.step()` 之间的双驱动无代码级护栏
+- **发现时间**: 2026-09-06（全项目结构审计）
+- **现象**: `generators/base_generator.py` 已有 `_claim_drive_mode()` 护栏，
+  能阻止同一 `BaseGenerator` 实例被 `feed()`（MANUAL_CALIBRATION）和
+  `feed_from_skin()`（WORLD_COUPLED）两种模式交替驱动（fail-fast raise）。
+  但 `feed()` 的 docstring（约167-183行）另外声明"与 `circuit.step()` 互斥
+  ...母本主循环二选一使用"——这一条约束**只停留在文档注释**，没有对应的
+  运行时检查：如果调用方在同一个 tick 里既跑了
+  `circuit.step()`（驱动同一批 collector/ensemble 神经元）又调用了
+  `generator.feed(...)`，两条驱动路径会对同一批神经元对象做二次独立电流
+  注入，代码不会报错也不会警告。
+- **影响层**: `generators/base_generator.py`；任何同时持有
+  `VariantCircuit` 实例和其 wrap 出的 `BaseGenerator` 并在训练/测试脚本里
+  混用两者 `.step()`/`.feed()` 的调用方
+- **根因**: 要实现真正的运行时互锁，`BaseGenerator` 需要知道
+  `VariantCircuit.step()` 本 tick 是否已经驱动过同一批神经元——这要求
+  `VariantCircuit`（母体代码）暴露一个共享状态标记（例如"本 tick 是否已执行
+  quantum-thermal 通路"），属于修改母体代码新增接口，不是 generators/ 内部
+  能独立完成的修复，需要先与用户确认是否值得为此触碰
+  `circuit/variant_adapter.py` 的 `step()` 热路径。
+- **状态**: KNOWN_DEBT（当前所有已知测试/实验脚本按约定只用其中一种驱动
+  方式，尚未观测到实际双驱动事故；风险是潜在的，不是已发生的）
+- **解决路径**: 若要补齐，需在 `VariantCircuit` 侧新增一个当前 tick 的
+  "quantum-thermal 通路已驱动"标记，供 `BaseGenerator.feed()` 检查并
+  fail-fast——这一步涉及母体代码改动，按 RULES.md"不为加功能改母体代码"
+  原则，本次审计不擅自实施，仅登记 + 在 `feed()` 文档处指向本条目。
+- **关联 DEG**: 无（首次登记）

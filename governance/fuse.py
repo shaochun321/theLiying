@@ -1,11 +1,21 @@
 """governance.fuse — Physics Law Violation Circuit Breaker.
 
-Checks:
-    F1. Energy conservation (1st law): no energy creation from nothing
+Checks actually implemented in check() below:
     F2. Entropy monotonicity (2nd law): dS/dt ≥ 0 over window
     F3. Weight bounds: memristor w ∈ [config.weight_min, config.weight_max]
     F4. Membrane voltage divergence: |V| < V_max
     F5. Energy non-negativity: E ≥ 0 for all neurons
+
+    F1. Energy conservation (1st law) — NOT implemented here (2026-09-06
+        audit found this claimed but absent from check()). Equivalent
+        coverage already exists in nexus_v1.ledger.NoetherProbe
+        (energy/charge-KCL/Landauer/weight conservation, checked every
+        100 steps) — that probe is READ-ONLY (does not raise/trip), so it
+        is not a substitute for a real circuit-breaker here. Implementing
+        F1 as a genuine trip condition needs a design decision (what
+        tolerance counts as "conservation" across PowerRail + metabolic
+        recovery sources) that hasn't been made — left as an open gap
+        rather than guessed at.
 
 Behavior:
     enabled=True:  violation → FuseTrippedError (stops simulation)

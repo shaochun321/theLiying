@@ -390,7 +390,11 @@ Noether 违规出现时立即打印 `violation_counts` 明细（如 `kcl_charge`
 cd /j/cell-cc && PYTHONIOENCODING=utf-8 python -m nexus_v1.tests.test_regression
 ```
 
-**Regression: 21/21 PASS. Contracts: 15/15 PASS.**
+**Regression: 21/21 PASS.** Contracts: 13/15 PASS as of 2026-09-06 re-measurement
+(was 15/15 as of 2026-07-02) — 2 CRITICAL: C2 HC output_range `[0.0000, 0.2488]`
+vs expected `[0.001, 0.6]`, and C3 Aff frequency `2.0 Hz` vs expected `[20, 100] Hz`
+(both trace to DEG-004, still OPEN). C6 Motor (silence/signal/energy) now PASSES
+all three sub-checks — no longer an open issue.
 
 ### Experiment timeline
 
@@ -415,6 +419,8 @@ cd /j/cell-cc && PYTHONIOENCODING=utf-8 python -m nexus_v1.tests.test_regression
 ### Open issues
 - T3.2 occasional flap (therm Column vs vest Column, noise-sensitive) — non-critical
 - signal_path test PARTIAL (Release rate=0 in run_test.py) — pre-existing
-- HC-007/016/017/022/023/024 (V2.0 cleanup) — registered, not yet fixed
+- HC-016/022/023 (V2.0 cleanup) — registered, not yet fixed
+  (HC-007/017/024 confirmed FIXED as of 2026-09-06 re-audit — see
+  docs/technical_debt_hardcoding.md)
 
 See `cell-cell/00_Dashboard/` for design decisions and `cell-cell/当前状态.md` for handoff context.
