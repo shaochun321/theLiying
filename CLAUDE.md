@@ -32,7 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **语言：** 用户使用中文交流，Claude 应以中文回复。代码注释、报告文件、变量命名等技术内容保持英文。
 - **环境：** 已安装 WSL（Windows Subsystem for Linux）。在 WSL 终端下运行时，编码默认为 UTF-8，无需 `PYTHONIOENCODING=utf-8` 前缀；但在 Windows 原生终端（cmd/PowerShell/Git Bash）下仍需加该前缀。
 - **Bash 分类器设置：** Claude Code 默认权限模式为 `auto`，每条 bash 命令均需调用 Anthropic 安全分类器服务，服务器故障时命令全部阻断。已将全局设置 `C:\Users\shaoc\.claude\settings.json` 中的 `permissions.defaultMode` 改为 `acceptEdits`——bash 命令直接放行，仅文件写入时弹确认。如需恢复分类器保护，删除该字段即可。
-- **知识库搜索：** `cell-cell/00_Dashboard/` 下的文档提供设计决策、分析报告和阶段方案的聚合搜索入口。查找项目背景、规范定义、历史报告时优先查阅该目录。
+- **知识库搜索：** `cell-cell/00_Dashboard/` 下的文档提供设计决策、分析报告和阶段方案的聚合搜索入口。查找项目背景、规范定义、历史报告时优先查阅该目录。TSS 理论轨的权威理论文本在 `cell-cell/理论文本_2026-08-14/`（四卷：理论主线文档集×2、理念原典审计、双聊天对照；入口先读 `理论主线文档集_2026-08-14/06_当前冻结状态与未决问题.md`）。
 - **报告写法：** 直接写报告，无需询问确认。篇幅超出单文件合理范围时，自行拆分为 Part 1/2/3 分别存档，不需要事先征得同意。报告存档位置：`cell-cell/工作报告/`。
 - **实施方案存档：** Claude Code 撰写的实施方案（可行性分析后、动手写代码前）存档在 `J:\cell-cc\cell-cell\claudecode方案\`。命名格式：`{主题}_{日期}.md`，例如 `World2.0-Phase1-实施方案_2026-06-27.md`。
 
