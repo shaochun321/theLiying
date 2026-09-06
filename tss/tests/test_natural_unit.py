@@ -1,7 +1,7 @@
 """T-NU-1~4：P2-B0 单 occurrence 自然化接口验证（2026-07-28）。
 
 方案依据：`cell-cell/交叉比对/document - 2026-07-28T183325.248.md`（正式放行
-P2-B0）+ `nexus_v1/generators/natural_unit.py` 模块文档。
+P2-B0）+ `tss/generators/natural_unit.py` 模块文档。
 
 验证 `naturalize()` 组装出的 `NaturalUnit` 满足四个必答问题：
   T-NU-1: count_measure 恒为1，duration_seconds 精确等于 (t_rearm-t_up)*dt

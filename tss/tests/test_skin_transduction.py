@@ -1,6 +1,6 @@
 """T-TRANS-N：P2-A1b-2 皮肤-生成元转导映射契约测试。
 
-TYPE:INFRA — 验证 `nexus_v1/generators/skin_transduction.py` 的校准
+TYPE:INFRA — 验证 `tss/generators/skin_transduction.py` 的校准
 是否达成目标：参考物理过程集合(T-STP-6/7/8六场景)映射进𝒟_disc^G内部
 区间；静息态不产生虚假激活；极端输入被安全压缩；映射方向正确。
 """
