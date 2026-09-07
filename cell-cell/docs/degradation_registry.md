@@ -6,12 +6,11 @@
 > 迁至顶层 `tss/`（纯搬迁，零改名零重构，见 `tss/README.md` 映射表）。以下
 > 历史条目中的旧路径按该映射对应。
 >
-> **⚠️ 编号分叉警告（2026-09-06 审计发现）**: 本文件与
-> `nexus_v1/docs/degradation_registry.md` 已分叉——本文件 21 条，nexus_v1 版
-> 16 条，且 **DEG-015 起编号冲突**（本文件 DEG-015=机械输入无物理量纲
-> 2026-06-30；nexus_v1 版 DEG-015=P2-A 生成元高输入静默 2026-07-21）。引用
-> DEG-015~019 时必须注明出自哪份文件。合并/重编号需用户裁定，暂停期间两份
-> 并存不互相覆盖。DEG-020/021 仅存在于本文件。
+> **编号分叉已解决（2026-09-07，用户裁定重编号）**: 原与
+> `nexus_v1/docs/degradation_registry.md` 的 DEG-015/016 编号冲突已解决——
+> nexus_v1 版两条重编号为 DEG-022/DEG-023（含代码/文档引用同步）。
+> **本文件是权威编号空间**（DEG-001~021 + LIM）；两份注册表后续新增
+> 条目统一从 DEG-024 起顺延、先互查避让。
 
 ---
 
@@ -249,6 +248,23 @@
 - **解决路径**: 独立立项，参照 `relations/entry_gate.py` 的单时钟拓扑
   （Capacitor + MOSFET Zener 钳位）审查 `occurrence.py` 三态机是否可合并
   为二态。见 `cell-cell/工作报告/TSS-R1b_E上箭头物理实现映射审计_2026-08-05.md`。
+- **处置（2026-09-07，审计先行裁定 → 不合并，降为已定量刻画的设计决定）**:
+  EXP-DEG018-01（`tss/tests/_diag_deg018_dual_clock_equivalence.py`）双
+  oracle（rearm=0/500）同流对比，按维度判定：
+  ① 真实链路（site28 加热900步→撤热）发生计数与 t_up/t_down **等价**
+  （occurrence @t_up=389/t_down=2238，两 oracle 相同）；
+  ② **t_rearm 系统性 +500 步**——rearm 事件是 RelationFinalizer 的
+  occurrence 登记触发点，偏移与实测关系窗 Δt₂⊂[35,319] 同数量级，
+  消费方可见 ⇒ 时刻维度不等价；
+  ③ 对抗边界：t_down 后 gap 步开新物理支撑 epoch 再越阈，gap∈{100,300}
+  时 rearm=500 把第二次真实发生**整个丢失**（计数 1 vs 2，非延迟——
+  REFRACTORY 期间 ARMED 分支不可达，若新 epoch 的驱动窗在重臂前结束则
+  永久错过）；gap≥499 恢复等价。
+  **结论**：第二时钟不是冗余——原登记"实测数据分辨不出第二个时钟做了
+  什么"已被否证（它做两件事：延迟下游登记 +rearm 步、抑制重臂窗内的
+  新发生）。按用户裁定不合并二态；该行为是否为**期望**语义（去抖 vs
+  丢失真实发生）留待未来独立裁定，本条状态改为
+  DESIGN_DECISION_QUANTIFIED（不再是"未证明需要"的债务）。
 - **关联 DEG**: 无（首次登记）
 
 ---
@@ -274,6 +290,12 @@
 - **解决路径**: 独立评估是否需要让阈下分支真正返回 `|I_sub|`（修复注释
   与实现的不一致），评估前必须先确认 `PhysicalEntryGate` 等依赖方的
   阈值判定方式需同步调整。
+- **处置（2026-09-07，注释侧修复）**: `conduct()` docstring 已改为如实
+  描述硬阈值截零行为，并标注该行为现为 load-bearing（PhysicalEntryGate
+  开门判定依赖 `conduct(V)==0.0`）+ 迁移审计警告（任何行为修改必须先
+  审计全部阈值依赖方，D-02）。**实现零改动**；"是否让阈下返回 |I_sub|"
+  保持开放，但不再存在注释/实现不一致。状态: KNOWN_DEBT → RESOLVED
+  (comment-side)。
 - **关联 DEG**: 无（首次登记）
 
 ---
@@ -299,6 +321,12 @@
   （或明确写出两者为何允许不同）；若语义不同（不同层级信号量纲不同），
   应各自比照 `occurrence.py` 的 Q3 段落补齐推导依据，而不是保留裸数字。
   本次审计不擅自合并或杜撰推导依据，仅完成登记 + 双向注释指向本条目。
+- **处置（2026-09-07，已修复）**: 确认两处语义等价（同为 collector
+  `pre_trace` 近零 ⇒ 活动窗口关闭判据）。已提炼为
+  `relation_occurrence.RELATION_CLOSE_THRESHOLD` 单一声明点（r2_fork
+  import 同一常量），来源诚实注记为"工程近零判据，取 ≪ theta_down=0.001
+  一个数量级，保证窗口关闭严格晚于 occurrence 闭合"——不杜撰标定。
+  状态: KNOWN_DEBT → RESOLVED。
 - **关联 DEG**: 无（首次登记）
 
 ---
@@ -329,6 +357,14 @@
   "quantum-thermal 通路已驱动"标记，供 `BaseGenerator.feed()` 检查并
   fail-fast——这一步涉及母体代码改动，按 RULES.md"不为加功能改母体代码"
   原则，本次审计不擅自实施，仅登记 + 在 `feed()` 文档处指向本条目。
+- **处置（2026-09-07，已修复，用户授权母体最小标记）**:
+  `VariantCircuit.step()` 维护单调 `self._step_serial`（1 行纯赋值，
+  惰性初始化，热路径零分支）；`BaseGenerator.feed()/feed_from_skin()`
+  经 `_check_no_dual_drive()` 检查两次 feed 之间 serial 是否前进，前进
+  即 RuntimeError（基线取首次 feed 时值——wrap 前 warmup step 合法；
+  `_circuit_ref=None` 旧调用形态自动退化为文档级约束）。验证:
+  `tss/tests/test_deg021_dual_drive_interlock.py` T-DD-1~3 3/3 PASS +
+  母体回归。状态: KNOWN_DEBT → RESOLVED。
 - **关联 DEG**: 无（首次登记）
 
 ---
