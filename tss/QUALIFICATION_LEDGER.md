@@ -69,6 +69,23 @@
   - 待裁定登记 R-E0-1~5（存储方式/残差阈值流程/拓扑保护定义/
     Xin 正定义/影子层收纳）——组织候选资格在 R-E0-3 裁定前不可取得
 
+## E0-fix — E0 审计发现项修复（2026-09-07，用户裁定全修）
+
+- 命令: `python -m tss.tests.test_e0_kernel_ledger`（T-KL-1~4）+
+  `python -m tss.tests.test_deg021_dual_drive_interlock`（T-DD-1~3）+
+  `python -m tss.tests._diag_deg018_dual_clock_equivalence`（EXP-DEG018-01）
+- 结果: T-KL **4/4** / T-DD **3/3** PASS；母体回归 21 项 exit=0；
+  DEG-020 消费方 T-R2F 4/4 + T-RLI 5/5 不退化
+- 关键裁定与结论:
+  - R-E0-1 已裁定（契约代码+JSON 快照）→ K 升 EXISTS，快照入库
+    `tss/kernel_snapshots/c_ro_24_21.json`；ℒ 升 EXISTS_PARTIAL
+    （kernel_ledger.py 只读账本；MOSFET 耗散仍未建模）
+  - DEG-018 审计裁定**不合并二态**：第二时钟非冗余（t_rearm 系统性
+    +500 步消费方可见；gap<500 新发生整个丢失）→
+    DESIGN_DECISION_QUANTIFIED
+  - DEG-019（注释侧）/DEG-020/DEG-021 RESOLVED；编号分叉解决
+    （nexus_v1 版 DEG-015/016 → DEG-022/023）
+
 ## 已知未达标（LIM，不在资格清单内但保持可见）
 
 - LIM-RPREC-READOUT-001（2026-09-06 定量）: 压缩链诊断
@@ -76,6 +93,11 @@
   ~3min）——总压缩 297× = 8.3×(w→G 工作点) × 35.8×(积分稀释)；效应上限
   0.117% < 1% 阈值。外部评判 3-seed 独立复现 FAIL 一致。
   详见 cell-cell/docs/degradation_registry.md LIM 节。
+  - **设计轮一收口（2026-09-07，EXP-LIM-01 标度律实测）**：多束并行
+    读出方向被定量否证充分性——效应量层 N-不变（0.0035%@N=1 vs
+    0.0034%@N=4，上限 ΔG/G 与 N 无关）；阻断距离层线性 4.035×@N=4、
+    N*≈132 仅解一层。不建原型，LIM 保持可见；剩余方向：工作点上移 /
+    判据改机制层等效量。
 
 ## 复现指引
 

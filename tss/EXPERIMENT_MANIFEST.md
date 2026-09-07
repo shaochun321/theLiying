@@ -21,6 +21,8 @@
 | test_boundary_process | p_α 边界端口 | longrun | run() / pytest | ~7min | PASS |
 | test_occurrence_identity | D1 实例身份 | fast | pytest | ~5s | PASS |
 | test_e0_event_type_audit | E0 类型审计(T-E0-1~4 含 EXP-E0-01 复放地板) | integration | main() / pytest | ~1min | PASS |
+| test_e0_kernel_ledger | E0 修复:ℒ账本+K快照(T-KL-1~4) | fast | main() / pytest | ~30s | PASS |
+| test_deg021_dual_drive_interlock | DEG-021 双驱动互锁(T-DD-1~3) | integration | main() / pytest | ~1min | PASS |
 
 ## 二、机制/契约测试（required，快速层）
 
@@ -60,6 +62,8 @@
 | 脚本 | 用途 | 入口 |
 |---|---|---|
 | _diag_rprec_effect_compression | LIM-RPREC-READOUT-001 压缩链定量(2026-09-06) | run(), ~3min |
+| _diag_deg018_dual_clock_equivalence | DEG-018 双时钟等价性审计(EXP-DEG018-01, 2026-09-07) | main(), ~4min |
+| _diag_lim_population_readout_model | LIM 多束读出标度律(EXP-LIM-01, 2026-09-07) | main(), ~8min |
 | _diag_t3_c0_ratio_audit / _diag_t3_c0_multiseed / _probe_t3_c0_seed | T3-C0 比例/多种子对照 | run() |
 | _diag_t3_c1r_readout_ab | 读出机制 R-A/R-B 判别 | run(), 建议 PYTHONHASHSEED=0 |
 | exp_P2A1a_*(2) / exp_P2A1b_*(3) / exp_P2A3_*(2) / exp_P2A_highinput_root_cause | P2-A 系列标定/根因实验 | run() |

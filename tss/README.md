@@ -94,7 +94,12 @@ PYTHONIOENCODING=utf-8 python -m tss.tests.test_<name>
     **bit-exact**（残差精确 0.0；扰动录制则归零）⇒ C-06 的
     Replay[𝔈] 物理可执行
   - E-4 约束一单发生级证据已有、跨发生持续性未测；约束二与
-    E-5(Xin) 全部 RULING_REQUIRED——待裁定登记 R-E0-1~5
+    E-5(Xin) RULING_REQUIRED——待裁定登记 R-E0-2~5
+  - **E0-fix（2026-09-07，用户裁定全修）**：R-E0-1 已裁定（契约+JSON
+    快照）→ K=EXISTS、ℒ=EXISTS_PARTIAL（`events/kernel_ledger.py`
+    只读账本，T-KL-1~4）；DEG-019/020/021 RESOLVED（021 含母体最小
+    `_step_serial` 标记+双驱动互锁 T-DD-1~3）；DEG-018 审计裁定不合并
+    （第二时钟非冗余，DESIGN_DECISION_QUANTIFIED）；编号分叉解决
 - 理论路线图后续（未启动）：K-06"组织候选"资格实验（阻塞于 R-E0-3
   拓扑保护定义裁定 + 跨发生持续性实验）、S1/S2 空间来源裁定、G0 生长
 - 理论文本（权威）：`cell-cell/理论文本_2026-08-14/`（原件另存于 J:/文本，两套独立保存）
