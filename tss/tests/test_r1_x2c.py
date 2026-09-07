@@ -241,11 +241,14 @@ def _x2c_iso_2_b_only(dt_a_traj, dt_b_traj):
     print("✓ T-X2C-ISO-2 PASS: B-only隔离验证通过")
 
 
-def run_x2c(dt_a_traj, dt_b_traj):
-    """T-X2C-1/2/3：六条件K_R1/K_gen/K_out不可约与切断测试。"""
-    zeros = [0.0] * N_RECORD
+def _compute_six_conditions(dt_a_traj, dt_b_traj):
+    """六条件Y轨迹（每条件约1600步）。
 
-    print("运行六条件（每条件约1600步）...")
+    FIX(2026-09-08, 外部评判《TSS (3) 清单》§3): 从 run_x2c() 抽出，供
+    run() 入口与 pytest module fixture 共用——六条件只算一次，K_R1/
+    K_gen/K_out 三项断言各自成为独立 pytest 项，退化可单项定位。
+    """
+    zeros = [0.0] * N_RECORD
     Y_empty, _ = _run_condition(zeros, zeros)
     Y_a, _     = _run_condition(dt_a_traj, zeros)
     Y_b, _     = _run_condition(zeros, dt_b_traj)
@@ -253,37 +256,98 @@ def run_x2c(dt_a_traj, dt_b_traj):
     Y_gen_cut, _ = _run_condition(dt_a_traj, dt_b_traj,
                                    cut_gen_bundle_id="rprec_raw_xi_b_to_col_fast")
     Y_out_cut, _ = _run_condition(dt_a_traj, dt_b_traj, cut_out=True)
+    # ε由空条件自然波动估计（三项共用）
+    eps = _l2_norm(Y_empty) * 3 + 1e-10
+    return {"empty": Y_empty, "a": Y_a, "b": Y_b, "alb": Y_alb,
+            "gen_cut": Y_gen_cut, "out_cut": Y_out_cut, "eps": eps}
 
-    # K_R1 = ||Y_AℓB - Y_A - Y_B + Y_∅||_2
-    kappa = [Y_alb[t] - Y_a[t] - Y_b[t] + Y_empty[t] for t in range(N_RECORD)]
-    K_R1 = _l2_norm(kappa)
 
-    K_gen = _l2_norm([Y_alb[t] - Y_gen_cut[t] for t in range(N_RECORD)])
-    K_out = _l2_norm([Y_alb[t] - Y_out_cut[t] for t in range(N_RECORD)])
-
-    # ε由空条件自然波动估计
-    eps_int = _l2_norm(Y_empty) * 3 + 1e-10
-    eps_gen = eps_int
-    eps_out = eps_int
-
-    print(f"\n  Y_∅  norm = {_l2_norm(Y_empty):.6f}")
-    print(f"  Y_A  norm = {_l2_norm(Y_a):.6f}")
-    print(f"  Y_B  norm = {_l2_norm(Y_b):.6f}")
-    print(f"  Y_AℓB norm = {_l2_norm(Y_alb):.6f}")
-    print(f"\n  K_R1 = {K_R1:.6f}  (ε_int={eps_int:.6f}) → {'PASS' if K_R1 > eps_int else 'FAIL'}")
-    print(f"  K_gen = {K_gen:.6f} (ε_gen={eps_gen:.6f}) → {'PASS' if K_gen > eps_gen else 'FAIL'}")
-    print(f"  K_out = {K_out:.6f} (ε_out={eps_out:.6f}) → {'PASS' if K_out > eps_out else 'FAIL'}")
-
-    assert K_R1 > eps_int, f"T-X2C-1 FAIL: K_R1={K_R1:.6f} <= eps_int={eps_int:.6f}"
+def _assert_k_r1(cond):
+    """T-X2C-1：K_R1 = ||Y_AℓB - Y_A - Y_B + Y_∅||₂ > ε_int。"""
+    kappa = [cond["alb"][t] - cond["a"][t] - cond["b"][t] + cond["empty"][t]
+             for t in range(N_RECORD)]
+    K_R1, eps = _l2_norm(kappa), cond["eps"]
+    print(f"  K_R1 = {K_R1:.6f}  (ε_int={eps:.6f}) → {'PASS' if K_R1 > eps else 'FAIL'}")
+    assert K_R1 > eps, f"T-X2C-1 FAIL: K_R1={K_R1:.6f} <= eps_int={eps:.6f}"
     print("✓ T-X2C-1 PASS: K_R1 > ε_int（组合产生不可加和的额外作用）")
+    return K_R1
 
-    assert K_gen > eps_gen, f"T-X2C-2 FAIL: K_gen={K_gen:.6f} <= eps_gen={eps_gen:.6f}"
+
+def _assert_k_gen(cond):
+    """T-X2C-2：K_gen = ||Y_AℓB - Y_gen_cut||₂ > ε_gen。"""
+    K_gen = _l2_norm([cond["alb"][t] - cond["gen_cut"][t] for t in range(N_RECORD)])
+    eps = cond["eps"]
+    print(f"  K_gen = {K_gen:.6f} (ε_gen={eps:.6f}) → {'PASS' if K_gen > eps else 'FAIL'}")
+    assert K_gen > eps, f"T-X2C-2 FAIL: K_gen={K_gen:.6f} <= eps_gen={eps:.6f}"
     print("✓ T-X2C-2 PASS: K_gen > ε_gen（作用依赖关系生成链路）")
+    return K_gen
 
-    assert K_out > eps_out, f"T-X2C-3 FAIL: K_out={K_out:.6f} <= eps_out={eps_out:.6f}"
+
+def _assert_k_out(cond):
+    """T-X2C-3：K_out = ||Y_AℓB - Y_out_cut||₂ > ε_out。"""
+    K_out = _l2_norm([cond["alb"][t] - cond["out_cut"][t] for t in range(N_RECORD)])
+    eps = cond["eps"]
+    print(f"  K_out = {K_out:.6f} (ε_out={eps:.6f}) → {'PASS' if K_out > eps else 'FAIL'}")
+    assert K_out > eps, f"T-X2C-3 FAIL: K_out={K_out:.6f} <= eps_out={eps:.6f}"
     print("✓ T-X2C-3 PASS: K_out > ε_out（出口链路确实传递作用）")
+    return K_out
 
-    return K_R1, K_gen, K_out, eps_int
+
+def run_x2c(dt_a_traj, dt_b_traj):
+    """T-X2C-1/2/3：六条件K_R1/K_gen/K_out不可约与切断测试。"""
+    print("运行六条件（每条件约1600步）...")
+    cond = _compute_six_conditions(dt_a_traj, dt_b_traj)
+
+    print(f"\n  Y_∅  norm = {_l2_norm(cond['empty']):.6f}")
+    print(f"  Y_A  norm = {_l2_norm(cond['a']):.6f}")
+    print(f"  Y_B  norm = {_l2_norm(cond['b']):.6f}")
+    print(f"  Y_AℓB norm = {_l2_norm(cond['alb']):.6f}")
+    print()
+    K_R1 = _assert_k_r1(cond)
+    K_gen = _assert_k_gen(cond)
+    K_out = _assert_k_out(cond)
+    return K_R1, K_gen, K_out, cond["eps"]
+
+
+# ── pytest 覆盖恢复（2026-09-08，外部评判《TSS (3) 清单》§3）──────────────────
+#
+# 2026-09-06 的方案 B（_ 前缀化）修掉了 fixture 误判 ERROR，但代价是
+# pytest 只剩 cut_0 一项——ISO-1/2 与 K_R1/K_gen/K_out 核心资格仅在
+# run() 入口运行，"pytest 全绿"保护不了 X2c 资格退化。本次按评判推荐
+# 改 module-scoped fixture：真实轨迹只录一次、六条件只跑一次，五个断言
+# 各自成为独立 pytest 项，退化可单项定位。run() 入口行为不变。
+
+import pytest
+
+
+@pytest.fixture(scope="module")
+def recorded_dt_trajs():
+    return _record_dt_trajectories()
+
+
+@pytest.fixture(scope="module")
+def x2c_conditions(recorded_dt_trajs):
+    return _compute_six_conditions(*recorded_dt_trajs)
+
+
+def test_x2c_iso_1_a_only(recorded_dt_trajs):
+    _x2c_iso_1_a_only(*recorded_dt_trajs)
+
+
+def test_x2c_iso_2_b_only(recorded_dt_trajs):
+    _x2c_iso_2_b_only(*recorded_dt_trajs)
+
+
+def test_x2c_k_r1(x2c_conditions):
+    _assert_k_r1(x2c_conditions)
+
+
+def test_x2c_k_gen(x2c_conditions):
+    _assert_k_gen(x2c_conditions)
+
+
+def test_x2c_k_out(x2c_conditions):
+    _assert_k_out(x2c_conditions)
 
 
 def run():

@@ -19,8 +19,10 @@ nexus_v1/* → tss/*         禁止（organism 对本轨零 import、零感知�
 ```
 
 违反第二条即破坏"不修改母体代码加功能"原则（nexus_v1/RULES.md）。
-已知护栏缺口：`base_generator.feed()` 与 `circuit.step()` 的双驱动互斥
-仅有文档警告、无代码级互锁——见 DEG-021（cell-cell/docs/degradation_registry.md）。
+DEG-021 已解决（2026-09-07）：BaseGenerator 与 `VariantCircuit.step()`
+之间已有 `_step_serial` 双驱动 fail-fast 互锁（T-DD-1~3；母体侧为用户
+授权的 1 行最小标记）。母体版本配对约束见 `tss/VERSION_PAIRING.json`
+（运行时 fail-fast：`python -m tss.tests.test_version_pairing`）。
 
 ## 迁移记录（2026-09-06）
 

@@ -1,0 +1,15 @@
+{
+  "_comment": "TSS ↔ nexus_v1 版本配对声明（2026-09-08，外部评判《TSS (3) 全量实测后的最终修改清单》§6）。同仓库内两者 commit 恒同步；本文件针对外部拆包复现场景（TSS 包 + 独立母体副本）——配对约束的实质是下方接口清单，机器可读。运行时 fail-fast 检查见 tss/tests/test_version_pairing.py。接口清单变更时必须同步更新 tss_stamp。",
+  "tss_stamp": "f08fff7",
+  "requires_nexus_v1_interfaces": [
+    {
+      "interface": "VariantCircuit._step_serial",
+      "since": "DEG-021 母体最小标记（2026-09-07，用户授权）",
+      "semantics": "step() 内单调递增序号，惰性初始化（首次 step() 后才出现）；tss/generators/base_generator._check_no_dual_drive 依赖它做双驱动 fail-fast",
+      "compat_line": "self._step_serial = getattr(self, \"_step_serial\", 0) + 1",
+      "missing_symptom": "T-DD-2 FAIL（双驱动互锁退化为文档级约束）"
+    }
+  ],
+  "python": "3.14",
+  "dt": 0.001
+}

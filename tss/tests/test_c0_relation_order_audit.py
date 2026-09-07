@@ -205,5 +205,16 @@ def run():
     return 0
 
 
+# FIX(2026-09-08, 外部评判《TSS (3) 清单》§11 方案A): 文件名叫 test_*.py
+# 但此前无任何 pytest test 项（pytest 收集得 exit 5），全量 pytest 用户
+# 易误以为已覆盖。加薄 wrapper（不改名——遵守"不批量改名冒充新资格"）；
+# run() 返回 0=合格对≥2 / 2=停止条件3。longrun marker（~8min 与手动
+# 入口同量级）。
+def test_c0_relation_order_audit_full():
+    assert run() == 0, (
+        "C0 审计未达 PASS 条件（合格 level-2 对 < 2）——若属真实退化，"
+        "对照 QUALIFICATION_LEDGER C0 节的冻结结果（25 对合格）定位")
+
+
 if __name__ == "__main__":
     sys.exit(run())

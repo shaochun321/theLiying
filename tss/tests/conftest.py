@@ -21,9 +21,12 @@ markers 语义等价）。
 """
 
 # 按模块名显式分层（不含 test_ 前缀与 .py 后缀）
+# FIX(2026-09-08, 外部评判《TSS (3) 清单》§4): test_generator_lambda/
+# test_generator_sigma 从 _FAST 移出——外部独立实测 126s/191s，违反
+# fast 定义（纯组件+秒级），也超出 integration ≲60s → 默认落 longrun。
 _FAST = {
     "test_event_support_binding", "test_generator_contract",
-    "test_generator_lambda", "test_generator_sigma", "test_natural_unit",
+    "test_natural_unit",
     "test_occurrence_identity", "test_occurrence_tap",
     "test_selection_contract", "test_selection_pool",
     "test_selection_pool_seed", "test_skin_transduction",
@@ -33,7 +36,7 @@ _INTEGRATION = {
     "test_basegen_thermal_t0", "test_basegen_thermal_t1",
     "test_basegen_thermal_t3_ratio", "test_r1_structure", "test_r2_fork",
     "test_tss2a_scale_audit", "test_e0_event_type_audit",
-    "test_deg021_dual_drive_interlock",
+    "test_deg021_dual_drive_interlock", "test_version_pairing",
 }
 # 其余全部视为 longrun（完整母体电路/万步级训练/多种子驱动）
 

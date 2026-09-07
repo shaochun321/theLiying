@@ -86,6 +86,33 @@
   - DEG-019（注释侧）/DEG-020/DEG-021 RESOLVED；编号分叉解决
     （nexus_v1 版 DEG-015/016 → DEG-022/023）
 
+## EXT-1 — 外部实测反馈修复轮（2026-09-08，《TSS (3) 全量实测后的最终修改清单》）
+
+- 出处: 外部评判全量实测（214 pytest 212 PASS+2 XFAIL；17 非 pytest 项
+  16 exit 0 + 1 exit 1；母体 21/21）→ `cell-cell/交叉比对/` 清单
+- 修复内容与验证:
+  - **DEG-024（唯一严重实现错误）**: KernelEnergyProbe neuron heat 误乘
+    dt 少记 1000×→已修；新增 **T-KL-5 跨账本守恒**（probe vs 母体
+    Σ`_cumulative_heat_out` 增量，rel_tol=1e-9）；修复后
+    probe=0.3705778 与母体精确吻合；T-KL-1~5 **5/5 PASS**；
+    ℒ 保持 EXISTS_PARTIAL（MOSFET 耗散仍未建模，不升级）
+  - **exp_P2A1b_3（唯一 exit 1）**: 判据4 同步 epoch/token 语义（显式
+    False→True 支撑上升沿）——exit 1 是门控正确工作非状态机 bug；新增
+    判据6 负对照（同一支撑 epoch 仅 1 次 occurrence）；现 **exit 0,
+    判据 6/6 PASS**；`_epoch_consumed` 未动
+  - **X2c pytest 覆盖恢复**: module fixture 方案，ISO-1/2+K_R1/K_gen/
+    K_out 独立收集（6 项，此前仅 1 项）；**6/6 PASS (83s)**
+  - **C0 pytest wrapper**（§11 方案A，不改名）: `test_c0_relation_order_
+    audit_full` 断言 run()==0
+  - **markers**: lambda/sigma 移出 fast（外部实测 126s/191s）→ longrun；
+    fast 层 43 项 13.9s
+  - **版本配对**（§6）: `tss/VERSION_PAIRING.json`（required interface
+    清单）+ `test_version_pairing` T-VP-1~2 fail-fast **2/2 PASS**
+  - README DEG-021 过期 OPEN 段删除；manifest 双时长列（参考机/外部复现）
+- 明确不动（评判确认保持现状）: LIM 两 XFAIL（禁调阈值）、DEG-018
+  DESIGN_DECISION_QUANTIFIED、TSS-3a=测量脚本非 PASS、核心资格链
+  （C1/基础生成元/E0）零改动
+
 ## 已知未达标（LIM，不在资格清单内但保持可见）
 
 - LIM-RPREC-READOUT-001（2026-09-06 定量）: 压缩链诊断
