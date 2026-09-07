@@ -20,6 +20,7 @@
 | test_c1_coupling | C1 c_ro 资格(T-C1-1~11) | longrun | main() / pytest | ~10min(10种子) | PASS |
 | test_boundary_process | p_α 边界端口 | longrun | run() / pytest | ~7min | PASS |
 | test_occurrence_identity | D1 实例身份 | fast | pytest | ~5s | PASS |
+| test_e0_event_type_audit | E0 类型审计(T-E0-1~4 含 EXP-E0-01 复放地板) | integration | main() / pytest | ~1min | PASS |
 
 ## 二、机制/契约测试（required，快速层）
 
