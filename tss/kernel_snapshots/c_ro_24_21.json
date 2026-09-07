@@ -1,0 +1,151 @@
+{
+  "components": [
+    {
+      "address": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt24_warm"
+        ],
+        "uid": "relation.r_prec:rel28p24"
+      },
+      "bundle": {
+        "bundle_id": "rel_event_transducer_rel28p24",
+        "initial_weight": 0.3,
+        "learning_rule": "frozen",
+        "physical_seed": 91000,
+        "synapse_gain": 1.0,
+        "weight_max": 0.3
+      },
+      "class": "RelationEventAdapter",
+      "collector_capacitance": 7.920427e-07,
+      "neurons": [
+        "rel_event_in_rel28p24",
+        "rel_event_col_rel28p24"
+      ],
+      "role": "relation_event_adapter"
+    },
+    {
+      "address": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt21_warm"
+        ],
+        "uid": "relation.r_prec:rel28p21"
+      },
+      "bundle": {
+        "bundle_id": "rel_event_transducer_rel28p21",
+        "initial_weight": 0.3,
+        "learning_rule": "frozen",
+        "physical_seed": 91000,
+        "synapse_gain": 1.0,
+        "weight_max": 0.3
+      },
+      "class": "RelationEventAdapter",
+      "collector_capacitance": 7.920427e-07,
+      "neurons": [
+        "rel_event_in_rel28p21",
+        "rel_event_col_rel28p21"
+      ],
+      "role": "relation_event_adapter"
+    },
+    {
+      "address": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt24_warm"
+        ],
+        "uid": "relation.r_prec:rel28p24"
+      },
+      "class": "PhysicalEntryGate",
+      "params": {
+        "capacitance": 1.0,
+        "gm_clamp": 10.0,
+        "q_spike": 1.0,
+        "r_leak": 1.0,
+        "theta_gate": 0.3,
+        "v_clamp": 1.0
+      },
+      "role": "entry_gate"
+    },
+    {
+      "address": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt21_warm"
+        ],
+        "uid": "relation.r_prec:rel28p21"
+      },
+      "class": "PhysicalEntryGate",
+      "params": {
+        "capacitance": 1.0,
+        "gm_clamp": 10.0,
+        "q_spike": 1.0,
+        "r_leak": 1.0,
+        "theta_gate": 0.3,
+        "v_clamp": 1.0
+      },
+      "role": "entry_gate"
+    },
+    {
+      "address": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt24_warm"
+        ],
+        "uid": "relation.r_prec:rel28p24"
+      },
+      "class": "PhysicalHistoryKernel",
+      "params": {
+        "capacitance": 1.0,
+        "r_leak": 0.6
+      },
+      "role": "history_kernel"
+    },
+    {
+      "address_i": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt24_warm"
+        ],
+        "uid": "relation.r_prec:rel28p24"
+      },
+      "address_j": {
+        "domain": "relation.r_prec",
+        "generation_depth": 2,
+        "parents": [
+          "occ.thermal:thermpt28_warm",
+          "occ.thermal:thermpt21_warm"
+        ],
+        "uid": "relation.r_prec:rel28p21"
+      },
+      "class": "PhysicalThetaComparator",
+      "params": {
+        "gm": 1.0,
+        "theta_g": 0.3,
+        "theta_h": 0.3
+      },
+      "role": "theta_comparator"
+    }
+  ],
+  "contract_ref": "tss/events/event_core_contract.py",
+  "kernel_kind": "c_ro_pair_stack",
+  "note": "record-only: rebuilding instances must go through constructors; direct state write-back is forbidden (E-2 injection discipline)",
+  "qualification_refs": [
+    "tss/QUALIFICATION_LEDGER.md#C1",
+    "tss/QUALIFICATION_LEDGER.md#E0"
+  ],
+  "schema_version": 1,
+  "stamp": "2026-09-07 E0-fix baseline: qualified c_ro pair (24,21), fresh same-label same-param assembly"
+}

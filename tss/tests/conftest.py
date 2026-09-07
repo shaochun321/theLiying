@@ -27,6 +27,7 @@ _FAST = {
     "test_occurrence_identity", "test_occurrence_tap",
     "test_selection_contract", "test_selection_pool",
     "test_selection_pool_seed", "test_skin_transduction",
+    "test_e0_kernel_ledger",
 }
 _INTEGRATION = {
     "test_basegen_thermal_t0", "test_basegen_thermal_t1",

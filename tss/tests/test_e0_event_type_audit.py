@@ -165,10 +165,18 @@ def test_e0_1_contract_self_consistency():
     for st in statuses:
         assert st in ecc._VALID_AUDIT_STATUSES, f"T-E0-1: 非法状态词 {st!r}"
 
-    # 诚实守卫：类型审计不允许"全绿"——ℒ 缺口与 E-4 约束二待裁定必须可见
-    assert ecc.AUDIT_GAP in statuses, "T-E0-1: 审计表必须保留真实缺口（ℒ）"
+    # 诚实守卫：类型审计不允许"全绿"（2026-09-07 修复后 ℒ GAP→
+    # EXISTS_PARTIAL，守卫从"必须有 GAP"放宽为"不得全 EXISTS"——
+    # EXISTS_PARTIAL/RULING_REQUIRED 的缺口与待裁定必须保持可见）
+    assert any(st != ecc.AUDIT_EXISTS for st in statuses), (
+        "T-E0-1: 审计表不得全绿——ℒ 的 MOSFET 耗散缺口等必须可见")
     assert ecc.AUDIT_RULING_REQUIRED in statuses, (
         "T-E0-1: E-4 约束二必须保持 RULING_REQUIRED，契约不得代行裁定")
+    # 已裁定项与待裁定项不得重叠
+    open_ids = {r[0] for r in ecc.RULING_REQUIRED_REGISTRY}
+    resolved_ids = {r[0] for r in ecc.RESOLVED_RULINGS}
+    assert not (open_ids & resolved_ids), (
+        f"T-E0-1: 裁定登记重叠 {open_ids & resolved_ids}")
 
     assert len(ecc.RULING_REQUIRED_REGISTRY) >= 1
     ids = [r[0] for r in ecc.RULING_REQUIRED_REGISTRY]
@@ -321,11 +329,14 @@ def test_e0_4_no_overreach_guards():
     assert cand.qualification_status == STATUS_REJECTED_LINEAGE_MISMATCH, (
         "T-E0-4: 谱系错配必须被拒绝——E-3 登记不授资格")
 
-    # ℒ GAP 属实：tss 层适配器元件不在 organism census（真实链路实测）
+    # organism census 事实核查：tss 层适配器元件不在其中——这正是需要
+    # 独立 KernelCensus 的原因（ℒ 原 GAP 已由 kernel_ledger.py 修复
+    # 2026-09-07；若此断言失败说明母体 census 语义变了，ℒ 承载需重审）
     m = _recorded()
     assert m["tss_in_census"] is False, (
-        "T-E0-4: tss 适配器元件出现在 organism census——ℒ GAP 判定需修订")
-    print("[PASS] T-E0-4 越界守卫：契约纯常量 / E-3 拒绝生效 / ℒ GAP 属实")
+        "T-E0-4: tss 适配器元件出现在 organism census——kernel_ledger "
+        "的独立承载前提失效，ℒ 判定需修订")
+    print("[PASS] T-E0-4 越界守卫：契约纯常量 / E-3 拒绝生效 / census 前提成立")
 
 
 def main():

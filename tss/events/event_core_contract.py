@@ -31,10 +31,11 @@ EVENT_KERNEL_COMPONENT_AUDIT（test_e0_event_type_audit T-E0-2 逐条可执行
 
   - K（结构骨架）：类地址谱系 + 类名清单可完整枚举，但**无持久物理
     存储**——当前只存在于进程内 Python 对象；存储方式即 C-05 未冻结项。
-  - ℒ（资源账本）：**GAP**——tss 层组件（适配器神经元/门/核/比较器）
-    不在 organism census（get_all_neurons/get_all_bundles）内，对
-    nexus_v1.ledger 全部观察者不可见；𝔈 的能量账本今天不存在。
-    这是 E0 的真实缺口发现，不是文字性备注。
+  - ℒ（资源账本）：原判 **GAP**——tss 层组件（适配器神经元/门/核/
+    比较器）不在 organism census（get_all_neurons/get_all_bundles）内，
+    对 nexus_v1.ledger 全部观察者不可见。**2026-09-07 修复**：
+    kernel_ledger.py 提供独立 KernelCensus + KernelEnergyProbe（只读），
+    升为 EXISTS_PARTIAL——MOSFET 耗散仍未建模（诚实边界见该模块）。
   - 𝒞（已合格测量）：由 QUALIFICATION_LEDGER.md + 契约冻结常量承载
     （文档级，非物理存储——与 K 同属 C-05 存储裁定范围）。
 
@@ -121,9 +122,10 @@ _VALID_AUDIT_STATUSES = frozenset({
 EVENT_KERNEL_COMPONENT_AUDIT: tuple = (
     ("K", "结构骨架",
      "地址谱系元组 + 链路元件类清单（2×适配器+2×门+1×核+1×比较器）",
-     "AddressRegistry/GeneratedAddress + tss.relations 既有类（进程内对象）",
-     AUDIT_EXISTS_PARTIAL,
-     "无持久物理存储——存储方式属 C-05 未冻结项（R-E0-1）"),
+     "AddressRegistry/GeneratedAddress + tss.relations 既有类 + "
+     "kernel_ledger.snapshot_kernel JSON 快照（R-E0-1 裁定 2026-09-07）",
+     AUDIT_EXISTS,
+     "快照是记录非载体主张——重建须走构造函数，禁止状态写回"),
     ("theta", "初始条件",
      "冻结物理参数集（C/v_peak/r_leak/w/gain/physical_seed/门核比较器默认参）",
      "relation_event_adapter.py 模块常量（Q3 溯源）+ M1/M2 零自由参数默认值",
@@ -141,9 +143,11 @@ EVENT_KERNEL_COMPONENT_AUDIT: tuple = (
      "EXP-C0-02 冻结；T-E0-2 验证 well-formed（0<min≤max<723）"),
     ("L", "资源账本",
      "𝔈 所辖元件的能量/耗散账目（只读观察者语义）",
-     "（无）——tss 层组件不在 organism census，nexus_v1.ledger 不可见",
-     AUDIT_GAP,
-     "E0 真实缺口发现；补账本=新载体工程，属 U-06 后续环节+R-E0-1"),
+     "kernel_ledger.KernelCensus + KernelEnergyProbe（2026-09-07 修复；"
+     "神经元 energy/heat + 电容 Q²/2C + 泄漏 V²/R·dt + 钳位热）",
+     AUDIT_EXISTS_PARTIAL,
+     "MOSFET 导通/开关耗散未建模（原语无耗散口径，补齐涉母体）；"
+     "只读性由 T-KL-2 bit-exact 对照守卫"),
     ("C", "已合格测量",
      "资格记录（判据/命令/commit/关键统计）",
      "QUALIFICATION_LEDGER.md + coupling_contract 冻结常量 + 测试套件",
@@ -200,8 +204,6 @@ ORGANIZATION_CONSTRAINT_AUDIT: tuple = (
 # ─────────────────────────────────────────────────────────────────────
 
 RULING_REQUIRED_REGISTRY: tuple = (
-    ("R-E0-1", "𝔈 各分量（尤其 K/𝒞）的物理存储方式如何冻结？",
-     "06_当前冻结状态 C-05"),
     ("R-E0-2", "残差四类的判定阈值与判定流程（谁测、何时测、多少算可重复）？",
      "06_当前冻结状态 C-06；DEG-020 教训：不预填魔数"),
     ("R-E0-3", "拓扑关联保护的可测定义？候选：共享源站点超边（28→X 对族）/"
@@ -212,6 +214,17 @@ RULING_REQUIRED_REGISTRY: tuple = (
     ("R-E0-5", "影子层收纳对象（事件核/未闭合组织/残差源/沉积/地址候选？）"
                "及候选重新进入正式结构的裁定权归属",
      "理念原典审计 08 待裁定问题册（影子层条）"),
+)
+
+# ─────────────────────────────────────────────────────────────────────
+# 已裁定登记（从 RULING_REQUIRED_REGISTRY 移入；裁定人=用户）
+# 每行 = (编号, 裁定内容, 裁定日期)
+# ─────────────────────────────────────────────────────────────────────
+
+RESOLVED_RULINGS: tuple = (
+    ("R-E0-1", "K/𝒞 存储形式 = 契约代码 + JSON 快照（零新物理载体）；"
+               "承载：kernel_ledger.snapshot_kernel/write_snapshot",
+     "2026-09-07"),
 )
 
 # ─────────────────────────────────────────────────────────────────────
