@@ -369,6 +369,31 @@
 
 ---
 
+### DEG-024: `KernelEnergyProbe` 神经元热耗散量纲错误（少记 1000×）
+- **发现时间**: 2026-09-07（外部评判《TSS (3) 全量实测后的最终修改清单》
+  §1，跨账本交叉计数实测发现）
+- **现象**: `tss/events/kernel_ledger.py` `record()` 写
+  `total_neuron_heat += n.heat_output * dt`，但母体
+  `nexus_v1/components/neuron.py` step() 末段把 `heat_output` 设为该步
+  **实际扣除的能量**（`actual_drain`，energy per step），不是功率。
+  外部实测同轨迹交叉计数：probe=0.00037058 vs 母体累计 heat=0.37058，
+  ratio=0.001 恰等于 dt ⇒ 少记约 1000 倍。
+- **影响层**: `tss/events/kernel_ledger.py`（ℒ 账本 neuron heat 一栏）；
+  电容泄漏项 `V²/r_leak·dt` 是功率×dt，量纲正确不受影响
+- **根因**: 误把 `heat_output` 当功率处理；T-KL-3 只做非负/非 NaN
+  sanity check，无法拦截数量级错误——测试覆盖缺口与实现错误叠加。
+- **处置（2026-09-08，已修复）**: ①去掉 `* dt`（`+= n.heat_output`）+
+  量纲声明注释（"energy per step, NOT power——严禁再乘 dt"）；②新增
+  **T-KL-5 跨账本守恒测试**：probe 计数 vs 母体 Σ `_cumulative_heat_out`
+  增量，浮点级容差（rel_tol=1e-9，非百分比级），量纲错误复发会以
+  ratio≈dt 的形态立即暴露。修复后实测 probe=0.3705778 与母体精确吻合。
+  ℒ 状态**保持 EXISTS_PARTIAL**（MOSFET 耗散仍未建模，不因本修复升级）。
+  状态: RESOLVED。
+- **关联 DEG**: 无（首次登记；编号从 DEG-024 起遵循 2026-09-07 分叉
+  解决规则）
+
+---
+
 ## LIM 已知限制（非退化，结构性未达标项）
 
 > 与 DEG 的区别：DEG 是"曾经工作现在退化/发现的缺陷"；LIM 是"从未达标、

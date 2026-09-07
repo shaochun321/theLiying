@@ -313,3 +313,25 @@
 - **副作用**: 无（L1 输出高端从"理论无界"变为"cap 在 10.0"，只影响
   u 极大时的行为，不影响既有 u≤0.05 范围内任何已验证测试）。
 
+
+---
+
+### FIX-020: KernelEnergyProbe 神经元热量纲修复（去掉误乘 dt）
+- **日期**: 2026-09-08
+- **关联降级**: DEG-024（外部评判《TSS (3) 全量实测后的最终修改清单》§1
+  发现，登记于 cell-cell/docs/degradation_registry.md）
+- **修改文件**: `tss/events/kernel_ledger.py` — `record()` 中
+  `total_neuron_heat += n.heat_output * dt` → `+= n.heat_output`；
+  模块与行内补量纲声明注释。
+- **根因分析**: 母体 `Neuron.heat_output` 在 step() 末段被设为该步实际
+  扣除的能量（`actual_drain`，energy per step），不是功率；再乘 dt=0.001
+  导致 ℒ 账本 neuron heat 少记 1000×（外部交叉计数实测 ratio=0.001）。
+  电容泄漏项 `V²/r_leak·dt` 为功率×dt，量纲本来正确，未改动。
+- **推导依据**: 量纲对照 `neuron.py` step() 末段
+  （`heat_output = actual_drain; _cumulative_heat_out += actual_drain`）——
+  heat_output 与 _cumulative_heat_out 同源同步，逐步求和即增量，无 dt。
+- **验证**: 新增 T-KL-5 跨账本守恒测试（probe vs 母体
+  Σ `_cumulative_heat_out` 增量，rel_tol=1e-9 浮点级容差）；修复后实测
+  probe=0.3705778 ≈ mother_delta=0.3705778 精确吻合；T-KL-1~5 5/5 PASS。
+- **副作用**: 无（probe 为只读观察者，T-KL-2 bit-exact 只读性不变；
+  ℒ 状态保持 EXISTS_PARTIAL，不因本修复升级）。

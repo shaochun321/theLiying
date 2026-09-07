@@ -16,6 +16,10 @@ TYPE:INFRA
           脉冲后经 r_leak 恢复必然耗散）、账目字段齐全含诚实边界声明
   T-KL-4  快照往返：snapshot→JSON→load 深等；适配器冻结参数与
           relation_event_adapter 模块常量逐项一致；地址谱系在录
+  T-KL-5  跨账本守恒（DEG-024 防复发，外部评判 2026-09-07 要求）：
+          probe.total_neuron_heat ≈ 母体 Σ n._cumulative_heat_out 增量，
+          浮点级容差（rel_tol=1e-9）而非百分比级——sanity check（T-KL-3
+          仅非负/非 NaN）拦不住量纲错误，守恒比对才能
 
 驱动方式：合成 r 脉冲（同 test_c1_coupling._run_synthetic 惯例），
 无真实母体电路——纯组件层，fast。
@@ -157,14 +161,48 @@ def test_kl_4_snapshot_roundtrip():
     print("[PASS] T-KL-4 快照往返 + 冻结参数核对")
 
 
+def test_kl_5_cross_ledger_conservation():
+    """T-KL-5：跨账本守恒——probe 计数 ≡ 母体累计热增量（浮点级容差）。
+
+    背景（DEG-024）：旧实现 `total_neuron_heat += heat_output * dt` 少记
+    1000×（heat_output 已是每步能量而非功率），T-KL-3 的非负 sanity check
+    未能拦截。本测试把 TSS probe 与母体 `Neuron._cumulative_heat_out`
+    （neuron.py step() 末段与 heat_output 同源同步累积）对同一轨迹计数，
+    任何量纲/漏记/重记错误都会以数量级差异暴露。
+    """
+    adapters, stack = _fresh_pair_assembly()
+    census = _census_of(adapters, stack)
+    initial = sum(n._cumulative_heat_out for n in census.neurons())
+    probe = KernelEnergyProbe()
+    for t in range(_N):
+        for x in _PAIR:
+            r = _R_AMP if t == _PULSE[x] else 0.0
+            adapters[x].step(r, DT)
+        stack.step(t, DT)
+        probe.record(census, DT)
+    final = sum(n._cumulative_heat_out for n in census.neurons())
+    mother_delta = final - initial
+    assert mother_delta > 0.0, (
+        "T-KL-5 前提：轨迹应产生真实热耗散（basal metabolic cost > 0）")
+    assert math.isclose(probe.total_neuron_heat, mother_delta,
+                        rel_tol=1e-9, abs_tol=1e-15), (
+        f"T-KL-5: 跨账本不守恒——probe={probe.total_neuron_heat!r} vs "
+        f"mother_delta={mother_delta!r} "
+        f"(ratio={probe.total_neuron_heat / mother_delta if mother_delta else float('nan'):.6g}；"
+        f"ratio≈dt 意味着量纲错误复发)")
+    print(f"[PASS] T-KL-5 跨账本守恒（probe={probe.total_neuron_heat:.6e} "
+          f"≈ mother_delta={mother_delta:.6e}）")
+
+
 def main():
     test_kl_1_census_completeness()
     test_kl_2_probe_is_read_only()
     test_kl_3_energy_sanity()
     test_kl_4_snapshot_roundtrip()
+    test_kl_5_cross_ledger_conservation()
     print()
     print("=" * 60)
-    print("T-KL-1~4 ALL PASS — ℒ 账本 + K/𝒞 快照承载交付")
+    print("T-KL-1~5 ALL PASS — ℒ 账本 + K/𝒞 快照承载交付")
     print("=" * 60)
 
 

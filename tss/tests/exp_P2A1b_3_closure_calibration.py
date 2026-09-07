@@ -193,27 +193,37 @@ def check_second_occurrence_after_rearm():
         rearm_min_steps=CALIBRATED_REARM_MIN_STEPS,
     )
 
+    # FIX(2026-09-08, 外部评判《TSS (3) 全量实测后的最终修改清单》§2)：
+    # 本判据写于 P2-A1b-3R 二轮 epoch/token 门控之前——旧版全程不传
+    # phys_support（默认 True），从状态机看是一个从未间断的物理支撑
+    # epoch，第一轮触发即消费掉唯一名额（_epoch_consumed=True），第二次
+    # 触发被门控**正确拒绝**——exit 1 是实验语义过时，不是状态机 bug。
+    # 修复：显式建模两个物理支撑 epoch——第一轮 phys_support=True（首个
+    # False→True 上升沿），撤去/rearm 段 False，第二轮再 True（新上升沿
+    # 开启新 epoch）。评判裁定顺序：先修实验；改后若新 epoch 仍无法产生
+    # 第二 occurrence 才升级为状态机 bug（禁止为此删 _epoch_consumed）。
     t = 0
     emitted = []
-    # 第一轮：触发→跌破→满足rearm→emit
-    ev = closure.update(0.02, t); t += 1  # 越过theta_up=0.01
+    # 第一轮（物理支撑 epoch 1）：触发→支撑消失→跌破→满足rearm→emit
+    ev = closure.update(0.02, t, phys_support=True); t += 1  # 越过theta_up=0.01
     assert ev is None and closure.is_active
-    ev = closure.update(0.0, t); t += 1  # 跌破theta_down=0.001
+    ev = closure.update(0.0, t, phys_support=False); t += 1  # 跌破theta_down=0.001
     assert ev is None  # rearm_min_steps=500尚未满足
     for _ in range(CALIBRATED_REARM_MIN_STEPS):
-        ev = closure.update(0.0, t)
+        ev = closure.update(0.0, t, phys_support=False)
         t += 1
         if ev is not None:
             emitted.append(ev)
             break
     print(f"  第一轮：emitted={len(emitted)}, occurrence_count={closure.occurrence_count}")
 
-    # 第二轮：确认重整后确实回到ARMED，可以形成第二次独立发生
-    ev = closure.update(0.02, t); t += 1
+    # 第二轮（物理支撑 epoch 2，False→True 新上升沿）：
+    # 确认重整后确实回到ARMED，可以形成第二次独立发生
+    ev = closure.update(0.02, t, phys_support=True); t += 1
     assert ev is None and closure.is_active, "重整后应能重新触发进入ACTIVE"
-    ev = closure.update(0.0, t); t += 1
+    ev = closure.update(0.0, t, phys_support=False); t += 1
     for _ in range(CALIBRATED_REARM_MIN_STEPS):
-        ev = closure.update(0.0, t)
+        ev = closure.update(0.0, t, phys_support=False)
         t += 1
         if ev is not None:
             emitted.append(ev)
@@ -227,6 +237,54 @@ def check_second_occurrence_after_rearm():
         print(f"  Occ2: t_up={occ2.t_up}, t_down={occ2.t_down}, t_rearm={occ2.t_rearm}")
         ok = ok and occ2.t_up > occ1.t_rearm
     print(f"  {'PASS' if ok else 'FAIL'}")
+    return ok
+
+
+# ── 判据6（负对照，2026-09-08新增，评判《TSS (3) 清单》§2）：
+#    同一物理支撑 epoch 内不允许第二次 occurrence ──
+#
+# 冻结 epoch/token 门控的核心契约 N_χ(E_phys)≤1：phys_support 连续保持
+# True（一个从未间断的支撑 epoch）时，即使 value 上下越阈多次、rearm
+# 早已完成，也只能消费一次 occurrence 名额。这证明判据4 修复前的 exit 1
+# 正是该门控在正确工作，也证明门控不是偶然存在。
+def check_same_epoch_single_token():
+    print()
+    print("=" * 90)
+    print("  判据6（负对照）：同一支撑 epoch 内 value 多次越阈 → occurrence 仅1次")
+    print("=" * 90)
+    from tss.generators.occurrence import OccurrenceClosure
+    from nexus_v1.components.structural_address import (
+        DOMAIN_OCC_THERMAL, DOMAIN_SKIN_PATCH, GeneratedAddress, StructuralAddress,
+    )
+    parent = StructuralAddress(domain=DOMAIN_SKIN_PATCH, uid="skin.patch:neg_ctrl")
+    address = GeneratedAddress(
+        domain=DOMAIN_OCC_THERMAL, uid="occ.thermal:neg_ctrl",
+        parent_addresses=(parent,), generation_depth=1,
+    )
+    closure = OccurrenceClosure(
+        address=address, theta_down=CALIBRATED_THETA_DOWN,
+        rearm_min_steps=CALIBRATED_REARM_MIN_STEPS,
+    )
+    t = 0
+    emitted = []
+    # 三轮"越阈→跌落→等满rearm"，phys_support 全程 True（同一 epoch）
+    for cycle in range(3):
+        ev = closure.update(0.02, t, phys_support=True); t += 1
+        if ev is not None:
+            emitted.append(ev)
+        ev = closure.update(0.0, t, phys_support=True); t += 1
+        if ev is not None:
+            emitted.append(ev)
+        for _ in range(CALIBRATED_REARM_MIN_STEPS + 50):
+            ev = closure.update(0.0, t, phys_support=True)
+            t += 1
+            if ev is not None:
+                emitted.append(ev)
+    print(f"  3轮越阈（同一支撑epoch，rearm均已完成）：emitted={len(emitted)}, "
+          f"occurrence_count={closure.occurrence_count}")
+    ok = len(emitted) == 1 and closure.occurrence_count == 1
+    print(f"  {'PASS' if ok else 'FAIL'}（应恰为1：epoch token 已消费，"
+          f"后续越阈须新的 False→True 上升沿才能再触发）")
     return ok
 
 
@@ -329,6 +387,7 @@ def run():
     r2 = check_single_closure_and_exit()
     r3 = check_second_occurrence_after_rearm()
     r4 = check_jitter_does_not_double_count()
+    r5 = check_same_epoch_single_token()
     diagnose_long_tail_self_oscillation()
 
     print()
@@ -339,13 +398,14 @@ def run():
     print(f"  判据2+3(单次闭合+能退出): {'PASS' if r2 else 'FAIL'}")
     print(f"  判据4(重整后第二次发生): {'PASS' if r3 else 'FAIL'}")
     print(f"  判据5(抖动不重复计数): {'PASS' if r4 else 'FAIL'}")
+    print(f"  判据6(同一支撑epoch仅1次occurrence，负对照): {'PASS' if r5 else 'FAIL'}")
 
-    all_pass = r1 and r2 and r3 and r4
+    all_pass = r1 and r2 and r3 and r4 and r5
     if all_pass:
         print()
         print(f"  结论：theta_up=0.01(不变)/theta_down=0.001(不变)/"
               f"rearm_min_steps={CALIBRATED_REARM_MIN_STEPS}(新标定替换原占位值0)"
-              f"在真实映射轨迹下全部5条判据通过。")
+              f"全部6条判据通过（判据1-5 + epoch负对照判据6）。")
     else:
         print()
         print("  结论：仍有判据未通过，需要进一步调整。")

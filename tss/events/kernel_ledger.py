@@ -15,7 +15,10 @@ organism census，nexus_v1.ledger 不可见）、K 原判 EXISTS_PARTIAL（无�
    纪律：tss→nexus_v1 单向）。
 2. `KernelEnergyProbe` — ℒ 只读观察者（模式对照 nexus_v1.ledger.
    EntropyLedger.record，独立类不塞母体分层逻辑）。逐步采样：
-   - 神经元 energy / heat_output（Neuron 既有口径）
+   - 神经元 energy / heat_output（Neuron 既有口径；**量纲注意**：
+     heat_output 是"该步已扣除的能量"（energy per step），不是功率——
+     累加时不乘 dt。DEG-024 曾因误乘 dt 少记 1000×，T-KL-5 跨账本守恒
+     测试防复发）
    - 电容储能 E = Q²/2C（由 charge 推算，纯读）
    - 泄漏耗散 P·dt = V²/r_leak·dt（由状态推算，纯读）
    - 门 Zener 钳位热 clamp_heat（entry_gate 既有累积器）
@@ -141,7 +144,13 @@ class KernelEnergyProbe:
         neuron_energy = 0.0
         for n in census.neurons():
             neuron_energy += n.energy
-            self.total_neuron_heat += n.heat_output * dt
+            # DIMENSION (DEG-024, 外部评判 2026-09-07 实测发现):
+            # Neuron.heat_output = energy per simulation step（该步实际扣除
+            # 的能量 actual_drain，见 neuron.py step() 末段），NOT power——
+            # 严禁再乘 dt（旧实现 `* dt` 导致账本少记 1000×，ratio 恰为
+            # dt=0.001）。跨账本守恒由 T-KL-5 对 Σ n._cumulative_heat_out
+            # 增量以浮点级容差守卫。
+            self.total_neuron_heat += n.heat_output
 
         cap_energy = 0.0
         for _label, cap, r_leak in census.capacitors():
