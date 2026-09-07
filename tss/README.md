@@ -61,7 +61,11 @@ PYTHONIOENCODING=utf-8 python -m tss.tests.test_<name>
   τ_h=600 步（复用 EXP-T1-01 slow，TSS-3a 裁定），可读窗 723 步，零自由参数。
 - **M2** `relations/theta_comparator.py`：C_Θ 全物理 NMDA 型乘法符合检测器
   （C-02 用户裁定：比较完全由 MOSFET 承担），统一 Θ 九条资格 T-TH-1~9 9/9 PASS。
-  真实链路三站点对 28≺15/21/24 实测 Δt={321,360,312} 正向产生、镜像全零。
+  真实链路三站点对 28≺15/21/24 正向产生、镜像全零；Δt={321,360,312} 为
+  **representative observed run**（default seed，参考机），非冻结常数——
+  精确步数对环境/浮点执行序敏感（外部评判独立复跑得 {315,355,308}，
+  方向性质完全一致），资格依赖的是 forward-positive/reverse-zero，
+  不是具体数字。运行出处见 `tss/QUALIFICATION_LEDGER.md`。
 - **C0+C1** 关系结构第二层（2026-09-06，用户裁定直通）：
   - C0 契约+审计（`relations/coupling_contract.py` + EXP-C0-02）：候选站点
     扩至 12 个、10 种子两级判定 → **9 个 level-1 合格站点、25 个合格

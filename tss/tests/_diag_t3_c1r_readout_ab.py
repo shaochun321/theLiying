@@ -21,6 +21,12 @@ covers 输入比 1:1/2:1/3:1/4:1 × 共同放大 α∈{0.25,0.5,1,2,4,8}。
 
 from __future__ import annotations
 
+# 启动方式统一(2026-09-06, 外部实测反馈清单 §3): 补标准 shim,使
+# `python tss/tests/_diag_....py` 直接路径运行与 `python -m` 等效。
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), '..', '..'))
+
 import math
 
 from tss.relations.ratio_r_part import RPartCircuitT3, DT

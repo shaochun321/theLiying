@@ -203,7 +203,11 @@ def test_x2c_cut_0_cut_method():
     print("✓ T-X2C-CUT-0 PASS: synapse_gain=0真正切断ℓ_out电流")
 
 
-def test_x2c_iso_1_a_only(dt_a_traj, dt_b_traj):
+# FIX(2026-09-06, 外部实测反馈清单 §2): 原名 test_x2c_iso_1/2 带轨迹参数,
+# pytest 收集时会把 dt_a_traj/dt_b_traj 误当 fixture 报 ERROR。它们本就由
+# run() 驱动(先录制轨迹再传入),按反馈方案 B 改为 _ 前缀 helper——
+# 实验逻辑零改动,pytest 收集恢复干净,run() 入口行为不变。
+def _x2c_iso_1_a_only(dt_a_traj, dt_b_traj):
     """T-X2C-ISO-1：A-only隔离——只喂dT_A*，L1_b=0。
     验证 max_xi_a > θ, max_xi_b <= θ_0。
     """
@@ -220,7 +224,7 @@ def test_x2c_iso_1_a_only(dt_a_traj, dt_b_traj):
     print("✓ T-X2C-ISO-1 PASS: A-only隔离验证通过")
 
 
-def test_x2c_iso_2_b_only(dt_a_traj, dt_b_traj):
+def _x2c_iso_2_b_only(dt_a_traj, dt_b_traj):
     """T-X2C-ISO-2：B-only隔离——只喂dT_B*，L1_a=0。
     验证 max_xi_b > θ, max_xi_a <= θ_0。
     """
@@ -290,8 +294,8 @@ def run():
     print(f"  max(dT_A*)={max(dt_a_traj):.4f}, max(dT_B*)={max(dt_b_traj):.4f}")
 
     print("\n隔离验证...")
-    test_x2c_iso_1_a_only(dt_a_traj, dt_b_traj)
-    test_x2c_iso_2_b_only(dt_a_traj, dt_b_traj)
+    _x2c_iso_1_a_only(dt_a_traj, dt_b_traj)
+    _x2c_iso_2_b_only(dt_a_traj, dt_b_traj)
 
     print("\nX2c六条件实验...")
     K_R1, K_gen, K_out, eps = run_x2c(dt_a_traj, dt_b_traj)

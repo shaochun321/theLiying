@@ -21,6 +21,7 @@ import sys
 sys.path.insert(0, '.')
 
 import numpy as np
+import pytest
 from tss.relations.temporal_r_prec_plastic import RPrecCircuitT1Plastic
 
 DT = 0.001
@@ -150,10 +151,16 @@ def test_rpp_r1_learning_changes_future_response():
     print(f"✓ T-RPP-R1 PASS: 学习改变了未来响应 (D={distance:.6f})")
 
 
+@pytest.mark.xfail(
+    strict=False,
+    reason="LIM-RPREC-READOUT-001（P2-B1R L2 未达标层）: 学习效应经 297× 压缩"
+           "后 learned-vs-blocked 距离仅 ~0.000076 < 0.01 阈值——结构性不可达，"
+           "见 _diag_rprec_effect_compression.py。阈值不改、参数不调。")
 def test_rpp_r2_blocking_bundle_removes_difference():
     """T-RPP-R2：阻断bundle传播后，响应应显著改变（证明响应确实来自该bundle）。
 
-    验证 D(Y_learned⁺, Y_blocked⁺) > threshold。
+    验证 D(Y_learned⁺, Y_blocked⁺) > threshold。当前状态：预期失败
+    （效应量层，双层拆分见 test_r_prec_replay_simple.py 模块 docstring）。
 
     注意：需要用两个独立训练的电路实例，因为复放会改变电路状态。
     """
@@ -245,15 +252,21 @@ def test_rpp_r3_weight_change_correlates_with_response_change():
 
 def run():
     test_rpp_r1_learning_changes_future_response()
-    test_rpp_r2_blocking_bundle_removes_difference()
+    try:
+        test_rpp_r2_blocking_bundle_removes_difference()
+        r2 = "PASS"
+    except AssertionError as e:
+        r2 = "UNMET（已登记限制 LIM-RPREC-READOUT-001，效应量层）"
+        print(f"⚠ T-RPP-R2 {r2}")
+        print(f"  断言原文: {e}")
     test_rpp_r3_weight_change_correlates_with_response_change()
     print()
     print("=" * 60)
-    print("T-RPP-R1~R3 ALL PASS")
+    print(f"T-RPP: R1 PASS / R2 {r2} / R3 PASS")
     print("=" * 60)
     print()
-    print("P2-B1R 完成：关系结构的学习改变了未来响应，")
-    print("且该响应确实来自可塑bundle，而非其他路径。")
+    print("P2-B1R 双层定位：机制层（学习改变未来响应，R1/R3）成立；")
+    print("效应量层（R2 阈值）为已登记结构性限制，见 degradation_registry LIM 节。")
 
 
 if __name__ == "__main__":

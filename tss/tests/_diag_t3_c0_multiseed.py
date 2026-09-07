@@ -12,6 +12,10 @@ import os
 import json
 import subprocess
 
+# 启动方式统一(2026-09-06, 外部实测反馈清单 §3): 标准 shim(本脚本经
+# subprocess -m 调用探针,shim 保证直接路径运行时子进程 cwd 语义一致)。
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
 _SEEDS = ["0", "1", "42"]  # 至少2个固定seed对照（方案18.2已确认，不追求"95%seed覆盖"）
 
 
