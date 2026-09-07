@@ -290,11 +290,11 @@
 
 ### FIX-019: ThermalDeltaNeuron 输出上限钳位
 - **日期**: 2026-07-21
-- **关联降级**: DEG-015
+- **关联降级**: DEG-022（原DEG-015，2026-09-07重编号）
 - **修改文件**: `somatosensory/transducer_neurons.py` — `ThermalDeltaNeuron`
   新增类常量 `_ACTIVATION_MAX=10.0`，`step()` 里
   `self.activation = min(max(0.0, dT_raw*_WARM_ONSET_GAIN), self._ACTIVATION_MAX)`
-- **根因分析**: 见 DEG-015。`ThermalDeltaNeuron.step()` 完全覆写基类，
+- **根因分析**: 见 DEG-022（原DEG-015）。`ThermalDeltaNeuron.step()` 完全覆写基类，
   从未经过基类 ±10.0 activation 钳位，输出理论线性无界，导致下游
   ensemble PowerRail 在足够大的 dT 下被完全拖垮。
 - **推导依据**:

@@ -131,6 +131,11 @@ class BaseGenerator:
     closure: OccurrenceClosure
     trajectory: Optional[GeneratorTrajectory] = None
     _drive_mode: Optional[str] = field(default=None, repr=False)
+    # DEG-021 修复（2026-09-07，用户授权母体最小标记）：feed 与
+    # circuit.step() 的双驱动互锁。_circuit_ref 由 wrap_base_generator
+    # 传入（旧调用形态传 None 时守卫自动退化为原文档级约束）。
+    _circuit_ref: Optional[object] = field(default=None, repr=False)
+    _last_seen_step_serial: Optional[int] = field(default=None, repr=False)
 
     def _claim_drive_mode(self, mode: str) -> None:
         """驱动权归属守卫：首次调用认领模式，此后模式不一致则拒绝
@@ -143,6 +148,35 @@ class BaseGenerator:
                 f"BaseGenerator(site_index={self.site_index}, polarity="
                 f"{self.polarity!r}) 已被 {self._drive_mode!r} 模式驱动，"
                 f"不能切换到 {mode!r}——同一实例运行中不能双重驱动。")
+
+    def _check_no_dual_drive(self) -> None:
+        """DEG-021 修复（2026-09-07）：feed 与 circuit.step() 的运行时互锁。
+
+        语义：以**首次 feed 时**的 `circuit._step_serial` 为基线（wrap 前的
+        warmup step 是合法的——那时本句柄尚未开始手动驱动）；此后任何两次
+        feed 之间 serial 前进 ⇒ 调用方混用了 circuit.step() 与 feed()，
+        同一批神经元被双路径注入 ⇒ fail-fast（与 `_claim_drive_mode` 同
+        纪律：拒绝在前、不静默累加）。
+
+        退化兼容：`_circuit_ref` 为 None（旧调用形态）时不检查；母体
+        `_step_serial` 为惰性初始化（首次 step 才出现），缺失按 0 计——
+        旧版本母体（step 不维护该标记）恒为 0，等价于原文档级约束，
+        不制造假阳性。
+        """
+        if self._circuit_ref is None:
+            return
+        serial = getattr(self._circuit_ref, "_step_serial", 0)
+        if self._last_seen_step_serial is None:
+            self._last_seen_step_serial = serial
+        elif serial != self._last_seen_step_serial:
+            raise RuntimeError(
+                f"BaseGenerator(site_index={self.site_index}, polarity="
+                f"{self.polarity!r}) 双驱动违规（DEG-021）：两次 feed 之间 "
+                f"circuit.step() 前进了 {serial - self._last_seen_step_serial} "
+                "步——同一批 l1/hc/ensemble/collector 神经元正被 world 采样与"
+                "手动 feed 两条路径重复注入。feed()/tick() 与 circuit.step() "
+                "必须二选一使用（见 feed() docstring 与 degradation_registry "
+                "DEG-021）。")
 
     def _propagate(self, u_i: float, dt: float) -> None:
         """三级传播一步（L1 → L2 → ensemble → collector），与驱动模式/
@@ -181,11 +215,14 @@ class BaseGenerator:
         合成 dT"的标定/测试场景（同 T0~T1 现有方法论），与母本主循环
         二选一使用。
 
-        DEG-021（2026-09-06登记，见 degradation_registry.md）：本条已在
-        运行时无法验证——要做到运行时互锁需要 `VariantCircuit` 暴露"本
-        tick 是否已驱动同一批神经元"的共享状态，属于母体代码改动，本次
-        审计不擅自实施，仅正式登记该缺口。
+        DEG-021（2026-09-06 登记；**2026-09-07 已修复**，用户授权）：
+        互斥现在有运行时互锁——`VariantCircuit.step()` 维护单调
+        `_step_serial`（母体最小标记，纯赋值），本方法经
+        `_check_no_dual_drive()` 检查两次 feed 之间 serial 是否前进，
+        前进即 fail-fast。旧调用形态（wrap 未传 circuit 引用）自动退化
+        为原文档级约束。
         """
+        self._check_no_dual_drive()
         self._claim_drive_mode(DRIVE_MODE_MANUAL_CALIBRATION)
         self._propagate(dT_raw, dt)
 
@@ -198,6 +235,7 @@ class BaseGenerator:
         记入轨迹，见 `tick_from_skin()`——不能只记录转导后的浮点数，原始
         `q_i^skin(t)` 必须完整保留）。
         """
+        self._check_no_dual_drive()
         self._claim_drive_mode(DRIVE_MODE_WORLD_COUPLED)
         u_i = transduce(q_skin, config)
         self._propagate(u_i, dt)
@@ -332,4 +370,6 @@ def wrap_base_generator(
         l1=l1, hc=hc, ensemble=ensemble, collector=collector,
         bundle_l1_hc=bundle_l1_hc, bundle_in=bundle_in, bundle_col=bundle_col,
         closure=closure, trajectory=trajectory,
+        # DEG-021 修复：持 circuit 引用供双驱动互锁（只读 _step_serial）
+        _circuit_ref=circuit,
     )

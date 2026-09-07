@@ -14,7 +14,7 @@ occurrence（站点 28/31 的 `thermal_quantum_collectors`）接入一个时序�
 300 步后权重逐项不变"，故本模块**不修改** `RPrecCircuitT1`/`temporal_r_prec.py`
 本身（会破坏该断言），改用子类叠加**新增**一条 bundle。
 
-**DEG-016 教训（重要）**：不能假设"STDP 应该没问题"。本模块的学习资格必须在
+**DEG-023（原DEG-016）教训（重要）**：不能假设"STDP 应该没问题"。本模块的学习资格必须在
 独立、可控的驱动条件下真实测得（`test_r_prec_plastic_learning.py`），不援引
 其他电路（如 `bundles_relay_to_da`）STDP works 过就默认这里也行——只是复用
 其**已验证的参数常量**（避免裸填数字），机制本身必须重新验证。
@@ -96,7 +96,7 @@ class RPrecCircuitT1Plastic(RPrecCircuitT1):
         传播+学习新增的可塑 bundle。
 
         `da_concentration`/`fill_fraction` 由调用方显式传入（独立驱动，
-        不依赖 `circuit.step()` 主循环或 DEG-016 可能受影响的完整趋热行为
+        不依赖 `circuit.step()` 主循环或 DEG-023（原DEG-016）可能受影响的完整趋热行为
         回路——同 P2-A3 的隔离验证方法论）。
         """
         self.step_rprec(dt)

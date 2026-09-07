@@ -142,17 +142,25 @@ class MOSFET:
         """Instantaneous gate voltage → drain current.
 
         Superthreshold: linear I = gm × (Vgs - Vth)
-        Subthreshold:   exponential I ∝ exp((Vgs-Vth)/(n×VT)) - 1
-        Both give I = 0 at Vgs = Vth (continuous).
+        Subthreshold:   returns exactly 0.0 (hard cutoff) — see DEG-019.
+
+        DEG-019 (registered 2026-08-05, comment corrected 2026-09-07):
+        the subthreshold expression exp((Vgs-Vth)/(nVT)) - 1 is negative
+        below threshold and the max(0.0, ·) clamp truncates it to zero,
+        so this MOSFET does NOT model the always-positive subthreshold
+        leakage of a physical device. The hard cutoff is now LOAD-BEARING:
+        tss.relations.entry_gate.PhysicalEntryGate uses conduct(V)==0.0
+        as its gate-open predicate, and test_entry_gate locks
+        conduct(theta_g - 1e-6) == 0.0. Changing this branch to return a
+        small positive |I_sub| would silently turn every such gate into a
+        permanently micro-conducting one — any change here MUST first run
+        a migration audit of all threshold-dependent consumers
+        (degradation_registry DEG-019 / theory doc D-02).
         """
         if v_gate >= self.v_threshold:
             return self.gm * (v_gate - self.v_threshold)
         else:
-            # Subthreshold: I_sub = gm × nVT × (exp((Vgs-Vth)/(nVT)) - 1)
-            # In real MOSFETs, subthreshold current is always positive
-            # (drain current flows, just exponentially small).
-            # The formula gives negative because exp(x)-1 < 0 for x < 0,
-            # but physical drain current = |I_sub|.
+            # Hard cutoff: exp(x)-1 < 0 for x < 0, clamped to 0.0 (DEG-019).
             nVT = self.n_slope * max(self.v_thermal, 0.001)
             exponent = (v_gate - self.v_threshold) / nVT
             exponent = max(exponent, -50.0)

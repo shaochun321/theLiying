@@ -124,10 +124,10 @@ _R2_W_R1_TO_TRACE = 0.3
 _R2_W_TRACE_TO_COLLECTOR = 0.5
 
 RELATION_TYPE_FORK_R2_FAST = "r2.fork.28prec31_and_28prec23"
-# DEG-020（2026-09-06登记）：与 relation_occurrence.py 的
-# _RELATION_CLOSE_THRESHOLD 数值相同但互不引用，无独立Q3推导，见
-# degradation_registry.md。改这里时同步检查 relation_occurrence.py。
-_R2_CLOSE_THRESHOLD = 1e-4
+# DEG-020 修复（2026-09-07）：与 relation_occurrence 的窗口关闭判据语义
+# 等价（同为 collector.pre_trace 近零判定），改引同一共享常量——
+# 单一声明点，来源注释见 relation_occurrence.RELATION_CLOSE_THRESHOLD。
+from .relation_occurrence import RELATION_CLOSE_THRESHOLD as _R2_CLOSE_THRESHOLD
 
 
 def _r2_trace_config(label: str) -> NeuronConfig:

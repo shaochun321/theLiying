@@ -6,7 +6,7 @@
 RelationFinalizer/CollectorOccurrenceTap）已经完成，但此前的 T-RLI-1 用
 boosted world 同时加热两站点，5000步内关系collector未能稳定越阈——没有
 真正走通"真实D1 transition → 关系collector自然激活 → RelationDraft →
-RelationOccurrence"这条端到端链路。DEG-016教训：不能因为"物理场景不稳定"
+RelationOccurrence"这条端到端链路。DEG-023（原DEG-016）教训：不能因为"物理场景不稳定"
 就把尚未实际发生的端到端闭合判为通过。
 
 本文件用**真实单热源、精确位置**驱动确定性的 A≺B 时序（不是boosted两点）：

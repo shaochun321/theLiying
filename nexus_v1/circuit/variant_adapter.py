@@ -2048,6 +2048,11 @@ class VariantCircuit(HebbianCircuit):
         # ── Phase 0: Entropy ledger pre-step guard ──
         # Runs BEFORE all computation. Checks conservation invariants
         # from the PREVIOUS step and gates structural modifications.
+        # DEG-021 fix (2026-09-07, user-authorized): monotone step serial —
+        # read by tss BaseGenerator.feed() to fail-fast on dual driving
+        # (feed() interleaved with circuit.step()). Pure assignment, no
+        # branch on the hot path; lazy-init keeps old instances compatible.
+        self._step_serial = getattr(self, '_step_serial', 0) + 1
         if not hasattr(self, '_maturation_tick'):
             self._maturation_tick = 0
         self._ledger_pre_step(self._maturation_tick, dt)

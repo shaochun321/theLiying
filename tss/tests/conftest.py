@@ -33,6 +33,7 @@ _INTEGRATION = {
     "test_basegen_thermal_t0", "test_basegen_thermal_t1",
     "test_basegen_thermal_t3_ratio", "test_r1_structure", "test_r2_fork",
     "test_tss2a_scale_audit", "test_e0_event_type_audit",
+    "test_deg021_dual_drive_interlock",
 }
 # 其余全部视为 longrun（完整母体电路/万步级训练/多种子驱动）
 

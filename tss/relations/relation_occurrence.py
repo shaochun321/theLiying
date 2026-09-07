@@ -76,6 +76,16 @@ DRAFT_STATUS_CLOSED = "CLOSED_INTO_OCCURRENCE"
 DRAFT_STATUS_EXPIRED = "EXPIRED"
 DRAFT_STATUS_REJECTED_EPOCH = "REJECTED_PARENT_EPOCH_UNRESOLVED"
 
+# ── 活动窗口关闭判据（共享常量，DEG-020 修复 2026-09-07）──
+# collector.pre_trace 跌破此值 ⇒ 活动窗口关闭。
+# 来源（诚实登记，不杜撰标定）：工程近零判据——取 ≪ theta_down=0.001
+# （generators/occurrence.py 有 Q3 推导的闭合下阈）一个数量级，保证
+# 窗口关闭判定严格晚于 occurrence 闭合判定，二者不竞争。
+# r2_fork.py 的同语义判据（R2 collector 窗口关闭）从此处 import——
+# 两处曾各自裸声明 1e-4 且互不引用（"改一处忘一处"漂移风险），
+# 见 degradation_registry.md DEG-020（已 RESOLVED）。
+RELATION_CLOSE_THRESHOLD: float = 1e-4
+
 
 @dataclass
 class RelationDraft:
@@ -194,11 +204,10 @@ class RelationFinalizer:
     # 第二次上升沿，若不去重会生成两份"同一件事"的关系记录）。
     _registered_keys: set = field(default_factory=set, repr=False)
 
-    # 关系窗口过期判据：collector pre_trace跌落到此值以下则关系窗口关闭
-    # DEG-020（2026-09-06登记）：与 r2_fork.py 的 _R2_CLOSE_THRESHOLD 数值
-    # 相同但互不引用，无独立Q3推导，见 degradation_registry.md。改这里时
-    # 同步检查 r2_fork.py 是否也需要改。
-    _RELATION_CLOSE_THRESHOLD: float = 1e-4
+    # 关系窗口过期判据：collector pre_trace跌落到此值以下则关系窗口关闭。
+    # DEG-020 修复（2026-09-07）：改引模块级共享常量（来源注释见常量处），
+    # r2_fork.py 同判据引同一常量——单一声明点，消除双裸数字漂移风险。
+    _RELATION_CLOSE_THRESHOLD: float = RELATION_CLOSE_THRESHOLD
 
     def step(self, t_step: int) -> Optional[RelationOccurrence]:
         """每步调用一次（在circuit.step()完成之后、relation layer step之后）。

@@ -260,7 +260,7 @@ class ThermalDeltaNeuron(Neuron):
     SEMI: MOSFET half-wave: activation = max(0, dT × WARM_ONSET_GAIN).
     PHYS: step() bypasses RC (SkinPatch already applies τ=5s integration).
 
-    FIX-019 (2026-07-21, DEG-015): `activation` now clamped to
+    FIX-019 (2026-07-21, DEG-022 — renumbered from DEG-015 on 2026-09-07): `activation` now clamped to
     `_ACTIVATION_MAX=10.0` (matching the base `Neuron.step()` ±10.0
     activation clamp convention already used everywhere else — see
     `neuron.py:438/466`). Root cause: this class fully overrides
