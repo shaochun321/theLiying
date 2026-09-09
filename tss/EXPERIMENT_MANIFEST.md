@@ -50,7 +50,7 @@ pytest 收集为 0 项 exit 5，仅 run() 入口覆盖）。
 
 | 模块 | marker | 参考机 | 外部复现 | 状态 |
 |---|---|---|---|---|
-| test_r2_fork | longrun | <60s(参考机) | 182s/121.5s | PASS(marker 2026-09-10 integration→longrun：外部连续两轮实测超 integration ≲60s 定义，EXT-2 清单裁定；仅 marker 修复不改行为) |
+| test_r2_fork | longrun | ~3.5min(2026-09-10 全量复验实测 r2f_3=209s) | 182s/121.5s | PASS(marker 2026-09-10 integration→longrun：外部连续两轮实测超 integration ≲60s 定义，EXT-2 清单裁定并被参考机实测追认；仅 marker 修复不改行为) |
 | test_generator_lambda | longrun | ~2min | 126s | PASS(λ 降格保留资产守卫；2026-09-08 自 fast 移出——评判 §4：实测分钟级违反 fast 定义) |
 | test_generator_sigma | longrun | ~3min | 191s | PASS(σ 同上) |
 | test_entry_boundary | longrun | ~7min | 528s | PASS(R1a 参考检测器,已降格) |

@@ -180,6 +180,24 @@ K-06 organization qualification: BLOCKED
 `pytest tss/tests/test_c1_coupling.py` 12/12 PASS（含 6b）+ 3 diag exit 0
 + 收集数 223→224 + 母体 21 项回归（2026-09-10）。
 
+### 全量复验（2026-09-10，参考机独占 CPU——EXT-2 收口）
+
+- 完整 TSS pytest: `pytest tss/tests -q` → **222 passed + 2 xfailed /
+  0 failed**（224 项，1:56:05）；两个 XFAIL 即 LIM-RPREC-READOUT-001
+  两条 effect-size 项，确认保持
+- 非 pytest 完整边界 **20/20 exit 0**（manifest 一+五节全部：
+  exp_C1_adapter_calibration、本轮新增 3 个 _diag_c1_*、
+  _diag_rprec/_diag_t3_c1r 按 PYTHONHASHSEED=0、DEG-018/LIM/t3_c0 系列、
+  P2A 系列 8 个、memristor hash 验证）
+- 结论完整性抽查: _diag_rprec_effect_compression（297× = 8.3××35.8×、
+  上限 0.117%）与 _diag_lim_population_readout_model（N-不变/N*≈132）
+  输出与冻结记录一致（实测时长 20s/49s 低于 manifest 参考值——负载
+  因素，非提前退出）
+- nexus_v1 母体 21 项回归: exit 0
+- 慢项实测（--durations 摘录）: r_prec_t3 617s / c1_coupling(c1_1 共享
+  测量) 606s / c0_audit 597s / r2_x2c 423s / **r2_fork(r2f_3) 209s——
+  integration→longrun 裁定被参考机实测追认**
+
 ## 已知未达标（LIM，不在资格清单内但保持可见）
 
 - LIM-RPREC-READOUT-001（2026-09-06 定量）: 压缩链诊断
