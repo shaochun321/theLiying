@@ -32,9 +32,13 @@ _FAST = {
     "test_selection_pool_seed", "test_skin_transduction",
     "test_e0_kernel_ledger",
 }
+# FIX(2026-09-10, EXT-2 复审清单): test_r2_fork 从 _INTEGRATION 移出——
+# 外部连续两轮实测 182s / 121.5s，已连续超过 integration ≲60s 定义
+# （manifest 此前登记"下轮实测复核"，本轮裁定落 longrun）。仅 marker
+# 修复，不改代码行为。
 _INTEGRATION = {
     "test_basegen_thermal_t0", "test_basegen_thermal_t1",
-    "test_basegen_thermal_t3_ratio", "test_r1_structure", "test_r2_fork",
+    "test_basegen_thermal_t3_ratio", "test_r1_structure",
     "test_tss2a_scale_audit", "test_e0_event_type_audit",
     "test_deg021_dual_drive_interlock", "test_version_pairing",
 }

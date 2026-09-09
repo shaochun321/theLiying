@@ -76,13 +76,21 @@ PYTHONIOENCODING=utf-8 python -m tss.tests.test_<name>
     NMDA 树突棘波映射（Schiller 2000），HC-009 换能先例拓扑；电容由
     EXP-C1-01 单点响应反解（7.920427e-07，2× 裕量覆盖实测 r 下界）
   - **c_ro 关系次序耦合候选**：Θ 三件套在 level-2 原参数递归复用，
-    T-C1-1~11 **11/11 PASS**——含不可约实验（记忆无关基线恒零、序盲
-    对称基线不区分交换序）、10 种子真实链路 30/30 正确产生、阴性对照
-    fwd=5/10 rev=5/10 与审计精确吻合
-  - **路线图 §11 最终成功判据已单次跑通**（T-C1-11）：多个真实基础发生
-    → 合格关系 → 非学习依赖耦合 → 可阻断独立输出
-  - 措辞纪律（K-05）：c_ro 是**耦合输出/组织候选**，不是新生成元；
-    "方向"之名未冻结（§6.3：结构通过后由用户/评判冻结）
+    **C1 工程递归链通过**（T-C1 全部工程性质 PASS：10 种子真实链路
+    30/30 正确产生、阴性对照 fwd=5/10 rev=5/10 与审计精确吻合、
+    §11 判据链单次跑通 T-C1-11）
+  - **理论资格复审改判（EXT-2，2026-09-09/10）**：原 T-C1-6（现
+    T-C1-6a）只证明对 memoryless/symmetric 弱基线的次序判别，
+    **不构成理论 A8 父层同类不可重构资格**。外部同类 Θ 重构审计：
+    c_ro 可由父 relation-event 时间历史经相同 H_τ+Theta 重构至浮点
+    误差（残差 ≈5.12e-15），因此 **A8=NOT_MET**（机器守卫
+    T-C1-6b）。A9 静态地址谱系 PASS（T-C1-9a）；A9 运行时
+    relation-instance 谱系 **GAP**（adapter.step 不消费 instance
+    身份，`_diag_c1_runtime_lineage_collision` 登记）。机器可读状态：
+    `coupling_contract.C1_*` 常量。
+  - c_ro 继续保持：**递归关系输出 / 组织候选前体，非新生成元**
+    （K-05）；"方向"之名未冻结（§6.3：结构通过后由用户/评判冻结）；
+    K-06 组织资格 BLOCKED、K-07 独立未来作用 NOT_QUALIFIED
 - 已冻结资产：p_α 边界端口（`relations/boundary_process.py`）、ℰ↑ 物理门
   （`relations/entry_gate.py`）；`occurrence.py` 冻结为后验审计；Σ/Λ 降格保留
   （按路线图"保持缺失，不写占位电路"）

@@ -34,6 +34,14 @@
 - 命令: `python -m tss.tests.test_c0_relation_order_audit`
 - commit: `e855a7d`，日期 2026-09-06，时长 ~8min（12 站点 × 10 种子）
 - 种子: default(bundle_id) + 81000..89000（`_reseed_site` 显式重建）
+  - 语义注记（EXT-2 P1-6，2026-09-10）：`physical_seed` 只固定相关 bundle
+    的物理扰动，母体仍存在独立全局随机源（如 Langevin noise）——历史
+    10-seed 资格是**复合随机环境下的鲁棒性样本**，不应解释成只扫描了
+    bundle physical variation。冻结合格列表不变；未来多种子资格应区分
+    `physical_seed` 与 `world_rng_seed` 两个随机变量（可做
+    physical_seed × world_rng_seed 研究驱动），并同时保留 deterministic
+    reproduction / stochastic robustness 两种模式，不得把固定 world RNG
+    变成全部正式资格测试的唯一模式。
 - 结果: level-1 合格 **9 站点**（10/7/12 淘汰）；level-2 合格 **25 对**
   （Δt₂⊂[35,319]）；排除 11 对；r 幅度 [0.0026, 0.3660] (n=97)
 - 判据: TSS-3a 三条（全产生/全正/极差≤min），两级施加
@@ -112,6 +120,65 @@
 - 明确不动（评判确认保持现状）: LIM 两 XFAIL（禁调阈值）、DEG-018
   DESIGN_DECISION_QUANTIFIED、TSS-3a=测量脚本非 PASS、核心资格链
   （C1/基础生成元/E0）零改动
+
+## EXT-2 — 2026-09-09/10 C1 理论资格复审（基于 2026-08-14 理论文档 + 外部数值复审）
+
+- 出处: `cell-cell/交叉比对/TSS C1 理论资格复审后的代码修改清单.md`。
+  本轮**零物理路径改动**——只修 qualification semantics / test naming /
+  audit boundary / documentation，C1 工程递归链不是失败代码。
+
+### A8 父层同类不可重构
+
+- 外部实测: 对父 relation event 间隔 Δt，c_ro_actual 可由父层同型
+  PhysicalHistoryKernel + PhysicalThetaComparator 重构，测试范围内
+  最大残差 ≈ **5.12e-15**（仅浮点误差）
+- 本轮机器化: `test_c1_coupling.py::test_c1_6b_parent_theta_reconstructibility`
+  （14 个 Δt₂ ∈ [1,800]，isclose 1e-12，同型栈重构实测残差 **0.0**
+  bit-exact；Δt≥723 可读窗两边全零）——该测试 PASS 的语义 =
+  **A8_NOT_MET 被稳定复现**，不是生成元资格 PASS
+- 原 T-C1-6 改名 T-C1-6a（弱基线次序判别）：只证明不可由无记忆 AND /
+  序盲对称基线重构，不再代表 A8
+- **RULING: A8 NOT_MET**
+
+### Adapter 信息压缩（P1-4 诊断）
+
+- `_diag_c1_parent_amplitude_information_loss` exit 0（2026-09-10）:
+  固定 Δt₂=50，两父幅度 7×7=49 越阈组合（0.002~0.36，覆盖 EXP-C0-02
+  实测域）输出全等 **0.4340310902405273**（与外部实测逐位一致）；
+  发放阈值实测 ≈1.617e-3（设计点 r_min=0.0026 为其 1.61×）
+- 登记: level-2 当前消费的是"关系是否发生 + 发生时间"，而不是完整
+  父关系幅度（设计现状，不判 bug；禁改 adapter 阈值保留 amplitude）
+
+### Cross-occurrence（P1-5 诊断）
+
+- `_diag_c1_cross_occurrence_history_reconstruction` exit 0（2026-09-10）:
+  8 个 epoch gap ∈ [1204,5000] 第二次输出增强 ×1.0004~×1.1995 全部复现；
+  同型栈重构残差 0.0，解析 H_τ 指数叠加最大相对残差 **9.81e-15**
+- 登记: history dependence observed；fully explained by existing H_τ；
+  **no independent persistent organization variable established**
+
+### A9 谱系
+
+- static address lineage: **PASS**（T-C1-9a，原 T-C1-9 改名——只证明
+  静态结构地址谱系，不代表 runtime relation-instance lineage）
+- runtime relation-instance lineage through adapter: **GAP**
+  （`_diag_c1_runtime_lineage_collision` exit 0，2026-09-10：
+  adapter.step(r, dt) 无 instance 身份端口，不同 lineage 声明 + 相同
+  r trace → pulses/c_ro 逐位相同）。本轮只登记不实现 binder（P1-3：
+  未来方向 = 物理路径原样 + 独立 lineage sidecar，待理论裁定）
+
+### 总状态
+
+```text
+C1 engineering recursion: PASS
+new-generator qualification: NOT_QUALIFIED
+K-06 organization qualification: BLOCKED
+```
+
+机器可读状态常量: `tss/relations/coupling_contract.py` `C1_*`（纯审计
+状态，不进物理路径，禁止据此加 if/else）。验收运行:
+`pytest tss/tests/test_c1_coupling.py` 12/12 PASS（含 6b）+ 3 diag exit 0
++ 收集数 223→224 + 母体 21 项回归（2026-09-10）。
 
 ## 已知未达标（LIM，不在资格清单内但保持可见）
 

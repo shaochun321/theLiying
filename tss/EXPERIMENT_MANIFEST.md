@@ -24,7 +24,7 @@
 | test_theta_unified | TSS-M2 统一Θ (T-TH-1~9) | longrun | main() / pytest | ~3min | — | PASS |
 | test_c0_relation_order_audit | C0 目标对审计(EXP-C0-02) | longrun | run() / pytest | ~8min | 完整跑通 | PASS(25对合格) |
 | exp_C1_adapter_calibration | C1 适配器标定(EXP-C1-01) | 不被pytest收集 | run() | ~5s | — | PASS |
-| test_c1_coupling | C1 c_ro 资格(T-C1-1~11) | longrun | main() / pytest | ~10min(10种子) | 497s | PASS |
+| test_c1_coupling | C1 c_ro 资格(T-C1-1~11 含 6a/6b/9a，共12项) | longrun | main() / pytest | ~10min(10种子) | 497s | Engineering PASS; A8 NOT_MET; A9-runtime GAP; not generator-qualified（EXT-2 复审 2026-09-10；6b PASS 语义=A8_NOT_MET 复现） |
 | test_boundary_process | p_α 边界端口 | longrun | run() / pytest | ~7min | 530s | PASS |
 | test_occurrence_identity | D1 实例身份 | fast | pytest | ~5s | — | PASS |
 | test_e0_event_type_audit | E0 类型审计(T-E0-1~4 含 EXP-E0-01 复放地板) | integration | main() / pytest | ~1min | — | PASS |
@@ -45,12 +45,12 @@ pytest 收集为 0 项 exit 5，仅 run() 入口覆盖）。
 | test_version_pairing | integration | ~30s | — | PASS(TSS↔nexus_v1 配对 fail-fast，2026-09-08新增) |
 | test_basegen_thermal_t0/t1/t3_ratio | integration | <60s | — | PASS |
 | test_r1_structure / test_tss2a_scale_audit | integration | <60s | — | PASS |
-| test_r2_fork | integration | <60s | 182s | PASS(外部复现时长已超 integration ≲60s 定义——参考机仍在界内，marker 暂不动，下轮实测复核) |
 
 ## 三、历史原型与长程验证（长时层）
 
 | 模块 | marker | 参考机 | 外部复现 | 状态 |
 |---|---|---|---|---|
+| test_r2_fork | longrun | <60s(参考机) | 182s/121.5s | PASS(marker 2026-09-10 integration→longrun：外部连续两轮实测超 integration ≲60s 定义，EXT-2 清单裁定；仅 marker 修复不改行为) |
 | test_generator_lambda | longrun | ~2min | 126s | PASS(λ 降格保留资产守卫；2026-09-08 自 fast 移出——评判 §4：实测分钟级违反 fast 定义) |
 | test_generator_sigma | longrun | ~3min | 191s | PASS(σ 同上) |
 | test_entry_boundary | longrun | ~7min | 528s | PASS(R1a 参考检测器,已降格) |
@@ -83,6 +83,9 @@ pytest 收集为 0 项 exit 5，仅 run() 入口覆盖）。
 | _diag_t3_c1r_readout_ab | 读出机制 R-A/R-B 判别 | run(), 建议 PYTHONHASHSEED=0 |
 | exp_P2A1a_*(2) / exp_P2A1b_*(3) / exp_P2A3_*(2) / exp_P2A_highinput_root_cause | P2-A 系列标定/根因实验 | run() |
 | exp_memristor_stable_hash_verification | 哈希扰动稳定性验证 | run() |
+| _diag_c1_runtime_lineage_collision | A9 运行时实例谱系缺口登记(EXT-2 P1-2, 2026-09-10)——exit 0=GAP 已登记非 A9 PASS | main(), 秒级 |
+| _diag_c1_parent_amplitude_information_loss | adapter 二值化删除父关系幅度信息(EXT-2 P1-4)——只诊断不判 bug | main(), ~1min |
+| _diag_c1_cross_occurrence_history_reconstruction | 跨 occurrence 历史增强可由 H_τ 叠加完全重构(EXT-2 P1-5)——history dependence EXISTS / independent organization NOT ESTABLISHED | main(), ~1min |
 
 注：exp_P2A1b_3_closure_calibration 于 2026-09-08 同步 epoch/token 语义
 （评判 §2——旧版判据4 exit 1 是门控正确工作而非状态机 bug）并新增判据6

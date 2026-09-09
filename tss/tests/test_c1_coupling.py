@@ -14,11 +14,16 @@ TYPE:INFRA
   T-C1-3  交换负例：B 先 A 后 → 零（§6.2⑤ 绑定）
   T-C1-4  超窗负例：Δt₂=800 → 零；对照 Δt₂=300 窗内产生
   T-C1-5  阻断实验 ×2：阻断父 A / 父 B → c_ro 消失+下游可测差异（§6.2④）
-  T-C1-6  不可约实验：记忆无关同类运算 ≡0；序盲对称基线不区分交换序
-          而 c_ro 区分（§6.2⑤）
+  T-C1-6a 弱基线次序判别：记忆无关同类运算 ≡0；序盲对称基线不区分
+          交换序而 c_ro 区分——只证明对弱基线的次序判别能力，
+          **不构成理论 A8 父层同类不可重构资格**（EXT-2 复审改判）
+  T-C1-6b A8 反资格审计：c_ro 可由父层同类合格算子（H_τ+Θ 同型同参）
+          精确重构——PASS 语义 = A8_NOT_MET 被稳定复现，非资格 PASS
   T-C1-7  共参：level-1/level-2 三件套同类同默认参数；适配器全实例同参
   T-C1-8  阴性对照：排除对 (29,26) 跨 10 种子方向不一致 → 不可取得资格
-  T-C1-9  谱系：c_ro 携带深度 2 父谱系；适配器静态审计
+  T-C1-9a 静态地址谱系：c_ro 携带深度 2 父谱系；适配器静态审计
+          （static structural-address lineage；runtime relation-instance
+          lineage 是已登记 GAP，见 _diag_c1_runtime_lineage_collision）
   T-C1-10 非学习依赖：全链 frozen，运行前后权重零变化
   T-C1-11 §11 判据核对：真实发生→b^↑→r→c_ro→可阻断下游，单次跑通
 
@@ -30,6 +35,7 @@ import sys
 sys.path.insert(0, '.')
 
 import inspect
+import math
 
 from nexus_v1.components.semiconductor import Capacitor
 from nexus_v1.components.structural_address import (
@@ -292,8 +298,12 @@ def test_c1_5_blocking_both_parents():
     print("✓ T-C1-5 PASS")
 
 
-def test_c1_6_irreducibility():
-    """T-C1-6：不可约（§6.2⑤）——两条同类简单运算基线都无法重构 c_ro。
+def test_c1_6a_baseline_discrimination():
+    """T-C1-6a：弱基线次序判别（§6.2⑤ 的工程部分）。
+
+    资格名称（EXT-2 复审后）：**对弱基线的次序判别能力**——本测试只证明
+    c_ro 不可由无记忆 AND / 序盲对称基线重构，**不证明理论 A8**（父层
+    同类合格算子不可重构）；A8 当前 NOT_MET，由 T-C1-6b 机器守卫。
 
     基线1（记忆无关）：min(r_A(t), r_B(t)) 逐步同类运算——父脉冲不同步，
       全程恒零，连共现都测不到 ⇒ 次序信息必须有历史载体（H_τ）。
@@ -308,7 +318,7 @@ def test_c1_6_irreducibility():
         r_a = r_amp if t == 0 else 0.0
         r_b = r_amp if t == 300 else 0.0
         memoryless_sum += min(r_a, r_b)
-    assert memoryless_sum == 0.0, "T-C1-6: 父脉冲不同步，记忆无关基线应恒零"
+    assert memoryless_sum == 0.0, "T-C1-6a: 父脉冲不同步，记忆无关基线应恒零"
 
     # ── 场景 A→B ──
     fires_fwd_ab, _, ad_x, ad_y, _ = _run_synthetic({0}, {300}, n)
@@ -335,13 +345,97 @@ def test_c1_6_irreducibility():
     fwd_ba, rev_ba = _both_directions({300}, {0})     # B→A
     sym_ab, sym_ba = fwd_ab + rev_ab, fwd_ba + rev_ba
     assert sym_ab == sym_ba == 1, (
-        f"T-C1-6: 序盲对称基线两次序下应同为1，得 {sym_ab}/{sym_ba}")
+        f"T-C1-6a: 序盲对称基线两次序下应同为1，得 {sym_ab}/{sym_ba}")
     assert (fwd_ab, fwd_ba) == (1, 0), (
-        f"T-C1-6: c_ro 应仅在 A→B 产生，得 A→B:{fwd_ab} B→A:{fwd_ba}")
+        f"T-C1-6a: c_ro 应仅在 A→B 产生，得 A→B:{fwd_ab} B→A:{fwd_ba}")
 
-    print("T-C1-6: 记忆无关基线恒零（脉冲不同步）；序盲对称基线 A→B/B→A "
-          "均=1 不可区分；c_ro=(1,0) 区分次序——两条同类简单运算均无法重构")
-    print("✓ T-C1-6 PASS")
+    print("T-C1-6a: 记忆无关基线恒零（脉冲不同步）；序盲对称基线 A→B/B→A "
+          "均=1 不可区分；c_ro=(1,0) 区分次序——对弱基线的次序判别能力"
+          "成立（不构成 A8 不可约资格，A8 状态见 T-C1-6b）")
+    print("✓ T-C1-6a PASS")
+
+
+def _run_synthetic_recording(r_a_steps, r_b_steps, n, r_amp=0.17):
+    """记录版合成栈：返回 (adapter X spike 时刻, Y spike 时刻, 每步 c_ro 值)。"""
+    ad_x, ad_y, st = _synthetic_stack()
+    spikes_x, spikes_y, c_trace = [], [], []
+    for t in range(n):
+        sx = ad_x.step(r_amp if t in r_a_steps else 0.0, DT)
+        sy = ad_y.step(r_amp if t in r_b_steps else 0.0, DT)
+        if sx > 0.5:
+            spikes_x.append(t)
+        if sy > 0.5:
+            spikes_y.append(t)
+        c_trace.append(st.step(t, DT))
+    return spikes_x, spikes_y, c_trace
+
+
+def _reconstruct_from_binary_events(spikes_x, spikes_y, n):
+    """父层同型重构栈：M2 默认参数三件套直接吃二值事件时刻，返回每步输出。
+
+    与 level-2 实际栈的唯一差别是**没有适配器**——输入就是二值事件本身。
+    若该栈能逐步复现 c_ro，即证明 c_ro 可由父层同类合格算子重构（A8 NOT_MET）。
+    """
+    registry = AddressRegistry()
+    a_x = _make_l1_address(registry, 24)
+    a_y = _make_l1_address(registry, 21)
+    gate_x = PhysicalEntryGate(generator_address=a_x)
+    kernel_x = PhysicalHistoryKernel(generator_address=a_x)
+    gate_y = PhysicalEntryGate(generator_address=a_y)
+    comp = PhysicalThetaComparator(address_i=a_x, address_j=a_y)
+    sx, sy = set(spikes_x), set(spikes_y)
+    out = []
+    for t in range(n):
+        bx = gate_x.step(1.0 if t in sx else 0.0, DT)
+        hx = kernel_x.step(bx, DT)
+        by = gate_y.step(1.0 if t in sy else 0.0, DT)
+        out.append(comp.step(hx, by, DT))
+    return out
+
+
+def test_c1_6b_parent_theta_reconstructibility():
+    """T-C1-6b：A8 反资格审计——c_ro 可由父层同类合格算子精确重构。
+
+    **PASS 的语义 = A8_NOT_MET 被稳定复现**，不是生成元资格 PASS
+    （coupling_contract.C1_A8_PARENT_CLASS_IRREDUCIBILITY = "NOT_MET"）。
+
+    方法（EXT-2 复审方法的机器化）：真正实例化一套独立父层同型
+    PhysicalEntryGate / PhysicalHistoryKernel / PhysicalThetaComparator
+    （与 M2 相同默认参数，非解析公式），喂入与 C1 adapter 输出**完全
+    相同的二值事件时刻**，对 14 个 Δt₂ 逐步比较 actual c_ro 与重构输出
+    （isclose rel/abs=1e-12；外部实测最大残差 ≈5.12e-15）。
+
+    若本测试未来开始出现系统性非零残差：**不要自动修测试**——那意味着
+    可能出现了新的研究对象，应单独开启理论审查（EXT-2 裁定）。
+    """
+    deltas = [1, 5, 10, 20, 35, 42, 50, 100, 300, 600, 700, 722, 723, 800]
+    t0 = 100
+    max_residual, produced = 0.0, []
+    for d in deltas:
+        n = t0 + d + 100
+        spikes_x, spikes_y, actual = _run_synthetic_recording(
+            {t0}, {t0 + d}, n)
+        assert spikes_x == [t0] and spikes_y == [t0 + d], (
+            f"T-C1-6b 前提：Δt={d} adapter 事件时刻 {spikes_x}/{spikes_y} "
+            f"应为 [{t0}]/[{t0 + d}]")
+        recon = _reconstruct_from_binary_events(spikes_x, spikes_y, n)
+        for t, (a, r) in enumerate(zip(actual, recon)):
+            assert math.isclose(a, r, rel_tol=1e-12, abs_tol=1e-12), (
+                f"T-C1-6b: Δt={d} step={t} actual={a!r} recon={r!r}——"
+                "系统性残差出现：不要修测试，单独开启理论审查")
+            max_residual = max(max_residual, abs(a - r))
+        if d >= T_READ:
+            assert all(v == 0.0 for v in actual + recon), (
+                f"T-C1-6b: Δt={d} ≥ 可读窗 {T_READ}，两边应全零")
+        else:
+            assert any(v > 0.0 for v in actual), (
+                f"T-C1-6b 对照失败：Δt={d} 窗内应产生 c_ro——链路坏死，"
+                "重构等价不可作 A8 证据")
+            produced.append(d)
+    print(f"T-C1-6b: {len(deltas)} 个 Δt₂ 全程逐步重构等价，最大残差 "
+          f"{max_residual:.3e}（窗内产生 {len(produced)} 个；≥{T_READ} 全零）"
+          "——c_ro 可由父层同类 H_τ+Θ 精确重构")
+    print("✓ T-C1-6b PASS（语义：A8 NOT_MET 被稳定复现，非生成元资格）")
 
 
 def test_c1_7_shared_params_across_levels():
@@ -401,19 +495,29 @@ def test_c1_8_negative_control_pair():
     print("✓ T-C1-8 PASS")
 
 
-def test_c1_9_lineage_and_static_audit():
-    """T-C1-9：深度 2 父谱系正确；适配器静态审计（无软件时钟/禁止引用）。"""
+def test_c1_9a_static_address_lineage():
+    """T-C1-9a：**static structural-address lineage**——深度 2 父谱系正确；
+    适配器静态审计（无软件时钟/禁止引用）。
+
+    资格边界（EXT-2 复审改判）：本测试只证明**静态结构地址谱系**
+    （GeneratedAddress domain/深度/父端正确 + adapter 无软件 t_step/相位），
+    **不代表 runtime relation-instance lineage**——adapter.step(r, dt) 不
+    消费 RelationOccurrence / parent occurrence instance IDs / relation
+    window / epoch identity，两个不同 relation instance 只要 r_current(t)
+    相同即不可区分。该缺口已登记：A9_RUNTIME_INSTANCE_LINEAGE = GAP
+    （_diag_c1_runtime_lineage_collision，本轮只登记不实现 binder）。
+    """
     ad_x, ad_y, st = _synthetic_stack()
     addr = ad_x.generator_address
     assert addr.domain == DOMAIN_RELATION_PREC
     assert addr.generation_depth == 2
-    assert len(addr.parent_addresses) == 2, "T-C1-9: 关系地址应有两个父端"
+    assert len(addr.parent_addresses) == 2, "T-C1-9a: 关系地址应有两个父端"
     # c_ro 比较器的谱系两端 = 两条父关系的地址
     assert st.comp2.address_i is ad_x.generator_address
     assert st.comp2.address_j is ad_y.generator_address
 
     sig = inspect.signature(RelationEventAdapter.step)
-    assert "t_step" not in sig.parameters, "T-C1-9: adapter.step 含软件时钟"
+    assert "t_step" not in sig.parameters, "T-C1-9a: adapter.step 含软件时钟"
     import tss.relations.relation_event_adapter as mod
     src = inspect.getsource(mod)
     code_lines, in_doc = [], False
@@ -430,11 +534,12 @@ def test_c1_9_lineage_and_static_audit():
     # 换能先例允许写 pre_trace（bundle 兼容），故只审计 Occurrence/相位字段
     for token in ("Occurrence", "_phase", "rearm_min_steps"):
         assert token not in code, (
-            f"T-C1-9: 适配器可执行代码含禁止对象 {token!r}")
+            f"T-C1-9a: 适配器可执行代码含禁止对象 {token!r}")
 
-    print("T-C1-9: 地址域=relation.r_prec，深度=2，父=关系两端；"
-          "step 无 t_step；无 Occurrence/相位字段引用")
-    print("✓ T-C1-9 PASS")
+    print("T-C1-9a: 地址域=relation.r_prec，深度=2，父=关系两端；"
+          "step 无 t_step；无 Occurrence/相位字段引用——静态地址谱系成立"
+          "（runtime instance lineage 仍是已登记 GAP，非本测试范围）")
+    print("✓ T-C1-9a PASS")
 
 
 def test_c1_10_no_learning_dependency():
@@ -484,10 +589,11 @@ def main():
         test_c1_3_swap_zero,
         test_c1_4_beyond_window_zero,
         test_c1_5_blocking_both_parents,
-        test_c1_6_irreducibility,
+        test_c1_6a_baseline_discrimination,
+        test_c1_6b_parent_theta_reconstructibility,
         test_c1_7_shared_params_across_levels,
         test_c1_8_negative_control_pair,
-        test_c1_9_lineage_and_static_audit,
+        test_c1_9a_static_address_lineage,
         test_c1_10_no_learning_dependency,
         test_c1_11_final_criterion_chain,
     ]

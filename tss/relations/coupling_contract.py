@@ -1,4 +1,4 @@
-"""tss.relations.coupling_contract — C0：首个不越级耦合生成元的类型契约。
+"""tss.relations.coupling_contract — C0：首个不越级耦合候选 / 递归关系候选的类型契约。
 
 TYPE:INFRA（契约与冻结常量，无物理载体主张——先例：TSS-0 类型契约入代码）
 
@@ -39,9 +39,14 @@ c_ro 是**耦合输出/组织候选**（K-06 资格链"耦合 → 组织候选"�
    在后继关系产生步呈单步脉冲；自然化于输出端（K-03：不构成独立深度）。
 ④ 删除任一必要父结构时怎样失败：阻断父关系 A 或 B 任一条 → c_ro 恒零
    且下游可测差异（T-C1 阻断实验 ×2 守卫）。
-⑤ 为什么不能由父输出的同类简单运算重构：次序信息不在任一父关系的
-   单独输出里；父输出的无序共现（AND）对交换序输出相同，而 c_ro 区分
-   ——T-C1 不可约实验以 AND 基线对照证实。
+⑤ A8 不可约资格当前 **NOT_MET**（EXT-2 理论资格复审，2026-09-09/10）。
+   现有 C1 已证明其输出不能由无记忆 AND 或序盲对称基线重构
+   （T-C1-6a 弱基线次序判别）；但外部实测表明，relation event 经
+   二值化后，c_ro 可以由父层已合格的 H_τ + Θ 同类算子精确重构
+   （测试范围内最大残差 ≈5.12e-15，仅浮点误差；机器守卫
+   T-C1-6b parent-Theta reconstructibility audit）。
+   因此现有证据只支持："递归关系读出具有次序判别能力"；
+   不支持："形成父层同类算子不可重构的新生成元作用"。
 ⑥ 为什么不依赖 STDP/DA：全链 frozen 权重、无可塑 bundle 参与判定路径，
    DA 系统不在链上（T-C1 非学习依赖测试守卫；对齐 F-10）。
 
@@ -70,6 +75,23 @@ c_ro 是**耦合输出/组织候选**（K-06 资格链"耦合 → 组织候选"�
 - level-2 合格对 25 个；排除对 11 个——其中 (29,26) 5/10 种子翻转、
   (15,24) 3/10 翻转是天然阴性对照（C1 用）
 - 全部合格对 Δt₂ ⊂ [35, 319] ⊂ (0, 723) 可读窗，无边缘裕量问题
+
+═══ C1 两层资格状态（EXT-2 理论资格复审后，2026-09-09/10）═══
+
+工程资格（T-C1 全部继续 PASS，非失败代码）：
+  relation re-eventization PASS / 单父零输出 PASS / 交换序拒绝 PASS /
+  窗口边界 PASS / 父结构阻断 PASS / 弱基线次序判别 PASS（原"不可约"
+  改称，见⑤）/ 跨层共参 PASS / 阴性对照 PASS / 静态地址谱系 PASS /
+  无学习依赖 PASS / 真实端到端链 PASS
+
+理论生成元资格：
+  A8 父层同类不可重构              NOT_MET（T-C1-6b 机器守卫）
+  A9 静态地址谱系                  PASS（T-C1-9a）
+  A9 运行时 relation-instance 谱系  GAP（_diag_c1_runtime_lineage_collision）
+  K-06 组织闭合                    NOT_STARTED / BLOCKED
+  K-07 独立未来可达作用            NOT_QUALIFIED
+
+因此 c_ro = 递归关系输出 / 组织候选前体，NOT 新生成元。
 """
 
 # 共同源站点（Θ level-1 的先行方，TSS-3a 起沿用）
@@ -111,3 +133,15 @@ MEASURED_R_AMPLITUDE_RANGE: tuple = (0.0026, 0.3660)
 # 阴性对照：(29,26) 5/10 翻转——最强排除对
 C1_REPRESENTATIVE_PAIRS: tuple = ((24, 21), (29, 27), (26, 17))
 C1_NEGATIVE_CONTROL_PAIR: tuple = (29, 26)
+
+# ─────────────────────────────────────────────────────────────────────
+# C1 资格审计状态（EXT-2 理论资格复审，2026-09-09/10）——纯常量：
+# 不进入物理路径、不控制行为，只是机器可读的资格状态。
+# 禁止因这些状态增加 if/else 改变任何物理输出。
+# ─────────────────────────────────────────────────────────────────────
+
+C1_ENGINEERING_RECURSION_STATUS = "PASS"
+C1_A8_PARENT_CLASS_IRREDUCIBILITY = "NOT_MET"
+C1_A9_STATIC_ADDRESS_LINEAGE = "PASS"
+C1_A9_RUNTIME_INSTANCE_LINEAGE = "GAP"
+C1_GENERATOR_QUALIFICATION = "NOT_QUALIFIED"
