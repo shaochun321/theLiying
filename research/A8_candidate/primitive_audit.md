@@ -78,3 +78,16 @@
 4. ⟹ 在冻结约束下无法构造满足 §D/§A.2 的候选 Z
    → 本轮按 §G 以 Z0 收口：NO_CANDIDATE_WITH_EXISTING_PRIMITIVES
 ```
+
+
+---
+
+## 勘误追记（2026-09-11，第二轮固定点审计）
+
+- 第三节"𝒜⁺ 不包含多稳/迟滞"仍成立，但第四节"双稳为什么构造不出"的
+  结论**已被第二轮否证**：缺的不是"独立恒流偏置"，而是本轮实现把反馈
+  电流误写为输入门控（`k·g(v)·r1`）。轨供电写法（`k·g(v)·V_rail`）下
+  Capacitor+MOSFET+PowerRail+Zener 在 Domain B 即三固定点双稳
+  （0 稳 / V_u 不稳 / 钳位支稳，k*≈2.38）。
+- 第五节结论 4 降格为 `NO_CANDIDATE_FOUND_IN_TESTED_TOPOLOGIES`。
+- 完整第二轮数据：research/A8_state_audit/data/。

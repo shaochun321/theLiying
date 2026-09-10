@@ -1,0 +1,22 @@
+topology,param,x,y,type,deriv_or_eigs,stability
+F1,"k=1.0,C=1.0",0.0,,interior,0.998335,stable
+F1,"k=2.0,C=1.0",0.0,,interior,0.998335,stable
+F1,"k=3.0,C=1.0",0.0,,interior,0.998335,stable
+F1,"k=3.0,C=1.0",0.676831363,,interior,1.001330,unstable
+F1,"k=3.0,C=1.0",1.0,,boundary(clamp),0.000000,stable(one-sided)
+F1,"k=7.5,C=1.0",0.0,,interior,0.998335,stable
+F1,"k=7.5,C=1.0",0.386449742,,interior,1.005822,unstable
+F1,"k=7.5,C=1.0",1.0,,boundary(clamp),0.000000,stable(one-sided)
+F1,"k=3.0,C=0.001",0.0,,interior,0.998335,stable
+F1,"k=3.0,C=0.001",0.300667594,,interior,3.993339,unstable
+F1,"k=3.0,C=0.001",1.0,,boundary(clamp),0.000000,stable(one-sided)
+F2,k=1.0,0.0,0.0,interior,"(-1.667,-1.667)",stable
+F2,k=3.0,0.0,0.0,interior,"(-1.667,-1.667)",stable
+F2,k=3.0,0.675,0.675,interior,"(1.333,-4.667)",unstable(saddle)
+F2,k=3.0,1.0,1.0,boundary(clamp),one-sided 0,stable(one-sided)
+F3,"k_inh=0.5,Rs=1.2",0.327778,0.327778,interior,"(-2.000,-3.000)",stable
+F3,"k_inh=3.0,Rs=1.2",0.315152,0.315152,interior,"(0.500,-5.500)",unstable(pitchfork)
+F3,"k_inh=3.0,Rs=1.2",0.333333,0.293333,interior(winner-x),"(-2.500,-2.500)",stable
+F3,"k_inh=3.0,Rs=1.2",0.293333,0.333333,interior(winner-y),"(-2.500,-2.500)",stable
+F4,u=0.0,"[0,1]",,continuum(marginal),1.0(=marginal),marginal — M2 慢变量签名，非 M3
+F4,u=0.17,zeros=12/101,,flow(+:89 −:0),monotone,single attractor at window edge

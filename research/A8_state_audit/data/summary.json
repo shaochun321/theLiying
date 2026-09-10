@@ -1,0 +1,20 @@
+{
+  "design": "equal-count anti-counter twins (2 events each, amp 0.4340)",
+  "t0": 50000,
+  "eps_P": 1e-12,
+  "P_max_diff": 3.896921967243079e-21,
+  "P_aligned": true,
+  "Z_A": 1.0,
+  "Z_B": 2.4919782179478364e-35,
+  "dZ": 1.0,
+  "counter_A": 0.0008680621804810545,
+  "counter_B": 0.0008680621804810545,
+  "counter_diff": 0.0,
+  "future_max_diff": 1.0,
+  "readout_diff": 2.100000000005764,
+  "repeatable_bitexact": true,
+  "three_conditions": true,
+  "m3_gate": true,
+  "verdict": "M5 / A8_CANDIDATE",
+  "persistence": "infinite (attractor; stability.csv drift=0 @120k steps)"
+}

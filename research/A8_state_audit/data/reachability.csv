@@ -1,0 +1,7 @@
+history,t1,t2,c_ro_events,c_ro_amplitudes,v_final,basin,expected,as_expected
+coincident(Δ=100),500,600,2,0.4340;0.4340,1.000000,high(latched),high,True
+spread(Δ=2500),500,3000,2,0.4340;0.4340,0.000000,low,low,True
+single-pair-only,500,—,1,0.4340,0.000000,low,low,True
+no-events,—,—,0,,0.000000,low,low,True
+coincident(Δ=400),500,900,2,0.4340;0.4340,1.000000,high(latched),high,True
+spread(Δ=700),500,1200,2,0.4340;0.4340,0.000000,low,low,True
