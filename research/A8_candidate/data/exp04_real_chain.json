@@ -1,0 +1,11 @@
+{
+  "w_A": 0.5,
+  "w_B": 0.5,
+  "dw": 0.0,
+  "parent_probe_diff": 0.0,
+  "cand_probe_diff": 0.0,
+  "cand_l2": 0.0,
+  "recon_A": 0.0,
+  "recon_B": 0.0,
+  "verdict": "A8 仍 NOT_MET（候选未产生可分辨差分）"
+}

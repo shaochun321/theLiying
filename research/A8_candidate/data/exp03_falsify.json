@@ -1,0 +1,29 @@
+{
+  "falsify_order": {
+    "w_A": 1.0,
+    "w_B": 1.0,
+    "dw": 0.0,
+    "probe_maxdiff": 3.2751579226442118e-15,
+    "passed": true
+  },
+  "falsify_init": {
+    "w_final": {
+      "0.2": 1.0,
+      "0.5": 1.0,
+      "0.8": 1.0
+    },
+    "spread": 0.0,
+    "passed": true,
+    "note": "收敛(散度≈0) ⟹ 形成期抹掉初始条件 ⟹ 状态=输入历史的函数"
+  },
+  "falsify_det": {
+    "dw": 0.0,
+    "passed": true,
+    "note": "逐位相同 ⟹ 确定性 ⟹ 已知初值+完整输入的重构器必然复现"
+  },
+  "a8_viable": false,
+  "k07": {
+    "status": "NOT_APPLICABLE",
+    "reason": "A8 未成立，K-07 前置条件不满足"
+  }
+}

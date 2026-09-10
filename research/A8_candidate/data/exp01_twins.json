@@ -1,0 +1,64 @@
+{
+  "sigma_null": 1e-15,
+  "recon_floor": 6.45548268719085e-13,
+  "cn1": {
+    "l2": 0.0,
+    "rel": 0.0,
+    "max": 0.0
+  },
+  "cn2": {
+    "l2": 0.0,
+    "rel": 0.0,
+    "max": 0.0
+  },
+  "cn3": {
+    "l2": 5.357192157332014e-15,
+    "rel": 9.42220427965576e-16,
+    "max": 3.379187121094196e-16,
+    "recon_A": 6.45548268719085e-13,
+    "recon_B": 0.0
+  },
+  "washout_sweep": {
+    "S": 0.0,
+    "rows": [
+      {
+        "delta": 0.1,
+        "S": 0.0,
+        "T_w_steps": 0,
+        "h_residual": 1.155
+      },
+      {
+        "delta": 0.01,
+        "S": 0.0,
+        "T_w_steps": 0,
+        "h_residual": 1.155
+      }
+    ]
+  },
+  "candidates": {
+    "C0-ZLinearRC": {
+      "effect_rel": 9.42220427965576e-16,
+      "effect_l2": 5.357192157332014e-15,
+      "effect_max": 3.379187121094196e-16,
+      "recon_A": 6.45548268719085e-13,
+      "recon_B": 0.0,
+      "verdict": "reconstructible"
+    },
+    "C0-ZSaturating": {
+      "effect_rel": 9.42220427965576e-16,
+      "effect_l2": 5.357192157332014e-15,
+      "effect_max": 3.379187121094196e-16,
+      "recon_A": 6.45548268719085e-13,
+      "recon_B": 0.0,
+      "verdict": "reconstructible"
+    },
+    "C1-ZMemristive": {
+      "effect_rel": 0.24290352027878168,
+      "effect_l2": 14.216910006618155,
+      "effect_max": 0.6453094001813839,
+      "recon_A": 0.005802312739585423,
+      "recon_B": 0.01591051417658872,
+      "verdict": "A8_CANDIDATE"
+    }
+  }
+}
