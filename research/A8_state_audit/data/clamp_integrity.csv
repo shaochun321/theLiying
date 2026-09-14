@@ -1,0 +1,6 @@
+case,dt,v_from_0,v_from_09,bistable
+C2_continuous_prediction,0.0,nan,1.2987641119908635,True
+C1_hard,0.001,0.0,1.0,True
+C2_finite,0.001,0.0,-2.452397327264253e-144,False
+C3_finite_dt/10,0.0001,0.0,1.0,True
+C3_finite_dt/100,1e-05,0.0,1.2586377288922888,True

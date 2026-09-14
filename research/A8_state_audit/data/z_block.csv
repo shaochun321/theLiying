@@ -1,0 +1,3 @@
+case,v_high_after_washout,v_low_after_washout,readout_high,readout_low,readout_diff,z_causal
+intact(反馈器件在位),1.0,0.0,2799.9999999998986,0.0,2799.9999999998986,True
+blocked(反馈器件断开),0.00024036947641955207,0.0,0.0,0.0,0.0,False
