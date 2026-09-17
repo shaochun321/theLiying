@@ -48,7 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
-| Skill化瘦身 | CLAUDE.md 28.9KB→15.7KB：按需知识移入4个项目skill(.claude/skills/ verify-regression/work-report/exp-script/new-component)，每会话省~5k token；过时Current state(2026-07-02)替换为暂停快照指针；修正失效引用(*.log→test_runs/、七节→六段式) | 2026-09-17 | b9da73f |
+| Skill化瘦身 | CLAUDE.md 28.9KB→15.7KB：按需知识移入4个项目skill(.claude/skills/ verify-regression/work-report/exp-script/new-component)，每会话省~5k token；过时Current state(2026-07-02)替换为暂停快照指针；修正失效引用(*.log→test_runs/、七节→六段式) | 2026-09-17 | d75a6e2 |
 | DA重标验证 | T-088 RPE签名3/4(新奇爆发/撤源dip/非饱和;S1阈值假失败)+T-089热趋性保全2/4(P1到源/P4动态PASS;P2/P3非回归=第二把锁);印证两把锁模型;安全 | 2026-07-08 | 2b711ac |
 | DA源重标(总闸门) | 修DA=1.0饱和：intake_to_da sg1.0→0.05(G(w=1)=10致10×超标)/shadow_to_da sg1.0→0.1(col饱和);拒绝AG Fix-2(satiety-5.0→DA≡0);实测DA恢复动态范围(接近1.0→进食0.2→撤源0.06);21/21 PASS | 2026-07-08 | 928d92a |
 | STDP根因复核+方案评判 | ①STDP无意义两层根因(冗余+DA饱和)②DA=1.0修订版Fix-2评判(可逆性破坏)③修复方案补充评判(实测T-084修正病灶:intake+8~14A为真凶,非shadow BCM缺θ_M)；4份报告 | 2026-07-08 | — |
