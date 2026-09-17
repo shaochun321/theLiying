@@ -1,5 +1,5 @@
 {
-  "expected_commit": "4402c9624630edb1feca7164096e2eee65718e78",
+  "expected_commit": "a31219092503663cb86150c1c1f7434076f3bd11",
   "generated_by": "research/A8_state_audit/gen_nexus_manifest.py",
   "imported_nexus_modules": [
     "nexus_v1.circuit.bundle",
