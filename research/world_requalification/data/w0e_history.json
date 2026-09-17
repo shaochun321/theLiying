@@ -1,0 +1,82 @@
+{
+  "contract": {
+    "collapse": "<0.01",
+    "partial": "[0.01,0.5)",
+    "preserved": ">=0.5",
+    "precondition_dworld": ">0.1"
+  },
+  "scale_1.0": {
+    "injected": {
+      "A": 300.0,
+      "B": 300.0,
+      "C": 300.0
+    },
+    "temp_range_A": [
+      0.0,
+      61.825973790494665
+    ],
+    "pairs": {
+      "A-B": {
+        "D_world_hat": 0.201257902806584,
+        "D_support_hat": 1.15218761564376,
+        "D_support_linear_hat": 0.10837795808934723,
+        "collapse_ratio": 5.724931044079562,
+        "collapse_ratio_linear": 0.5385028690947967,
+        "verdict": "PRESERVED"
+      },
+      "A-C": {
+        "D_world_hat": 0.8616568383618992,
+        "D_support_hat": 1.36059094054589,
+        "D_support_linear_hat": 0.4640046796330342,
+        "collapse_ratio": 1.5790403789198926,
+        "collapse_ratio_linear": 0.5385028690947967,
+        "verdict": "PRESERVED"
+      },
+      "B-C": {
+        "D_world_hat": 0.860354807253408,
+        "D_support_hat": 1.3088727651552026,
+        "D_support_linear_hat": 0.46181466488998024,
+        "collapse_ratio": 1.5213174310417825,
+        "collapse_ratio_linear": 0.5367723420576621,
+        "verdict": "PRESERVED"
+      }
+    }
+  },
+  "scale_0.1": {
+    "injected": {
+      "A": 30.000000000000156,
+      "B": 30.000000000000156,
+      "C": 30.00000000000003
+    },
+    "temp_range_A": [
+      0.0,
+      6.18259737904947
+    ],
+    "pairs": {
+      "A-B": {
+        "D_world_hat": 0.20125790280658387,
+        "D_support_hat": 0.0,
+        "D_support_linear_hat": 0.009333894539265229,
+        "collapse_ratio": 0.0,
+        "collapse_ratio_linear": 0.046377779004461946,
+        "verdict": "WORLD_TO_SUPPORT_COLLAPSE"
+      },
+      "A-C": {
+        "D_world_hat": 0.8616568383618992,
+        "D_support_hat": 0.0,
+        "D_support_linear_hat": 0.03996173042723154,
+        "collapse_ratio": 0.0,
+        "collapse_ratio_linear": 0.04637777900446194,
+        "verdict": "WORLD_TO_SUPPORT_COLLAPSE"
+      },
+      "B-C": {
+        "D_world_hat": 0.8603548072534083,
+        "D_support_hat": 0.0,
+        "D_support_linear_hat": 0.03972148755431463,
+        "collapse_ratio": 0.0,
+        "collapse_ratio_linear": 0.04616872855179513,
+        "verdict": "WORLD_TO_SUPPORT_COLLAPSE"
+      }
+    }
+  }
+}

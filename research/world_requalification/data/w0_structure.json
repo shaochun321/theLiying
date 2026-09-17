@@ -1,0 +1,38 @@
+{
+  "W0A": {
+    "normalized_n_dyn": 3,
+    "normalized_active": 3,
+    "instant_field_own_dyn": 0,
+    "instant_proxy_total": 113,
+    "verdict": "少数节点+单变量（3×1）——方案 §6 W0-A 的怀疑属实"
+  },
+  "W0B": {
+    "mid_from_0": 13.589762521865824,
+    "mid_from_2": 13.589762521865824,
+    "coupling_class_normalized": "weakly_coupled_linear_field",
+    "coupling_class_instant": "independent_channel"
+  },
+  "W0D": {
+    "superposition_residual": 4.440892098500626e-14,
+    "linear": true,
+    "n_attractors": 1,
+    "perturbation_growth": false,
+    "classification": "线性 / 单吸引子 / 无敏感依赖"
+  },
+  "W0C": {
+    "tau_measured": {
+      "leak": 200.00000000000028,
+      "antisym": 17.764105136850002,
+      "curvature": 5.969474631900505
+    },
+    "tau_predicted": {
+      "leak": 200.0,
+      "anti": 18.181818181818183,
+      "curv": 6.451612903225805
+    },
+    "independent_params": 2,
+    "default_binding": "r_leak=10/kappa",
+    "MULTISCALE_SUPPORT": "NOT_ESTABLISHED",
+    "note": "τ 谱 {6.5,18,200} 全部由 κ 单参数+固定 10× 绑定派生；非独立多尺度"
+  }
+}
