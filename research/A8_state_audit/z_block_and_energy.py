@@ -15,10 +15,9 @@ TYPE:INFRA（research/ 隔离层）
 ## P1-6：能源账本
 
 记录 feedback 电流、rail 电流/电压、clamp 耗散、储能、反馈供能，
-计算 E_hold(T) 随保持时间的增长；标注
-  ENERGY_SUPPORT = EXTERNAL_IDEAL_RAIL
-  GLOBAL_ENERGY_CLOSURE = NOT_ESTABLISHED
-不得把"120k 步漂移 0"单独解释为无代价的无限持久性。
+计算 E_hold(T) 随保持时间的增长。第四轮起供能已因果化（路径 B），
+声明改由 candidate_config.energy_state() 输出；局部闭合残差收敛实验
+在 exp_F1_rail_causality.py。仍不得把"漂移 0"解释为无代价持久性。
 
 输出：data/z_block.csv, data/energy_ledger.csv
 """
@@ -127,11 +126,19 @@ def main() -> int:
         led = z2.energy_ledger()
         erows.append({"hold_steps": T, **led})
         print(f"  T={T:<7} V={z2.state:.6f}  E_fb={led['feedback_energy']:.6e}  "
-              f"E_clamp={led['clamp_dissipation']:.6e}  "
-              f"stored={led['stored_energy']:.6e}")
+              f"E_clamp(exact)={led['clamp_dissipation']:.6e}  "
+              f"E_clamp(legacy)={led['clamp_dissipation_legacy']:.6e}  "
+              f"stored={led['stored_capacitor_energy']:.6e}")
+        if T == 120000:
+            # 外部 N=1 基准（方案 §十，legacy 公式同源可比）：
+            #   feedback ≈ 83.6606, clamp ≈ 582.418；N=3 旧值 250.982/5258.481
+            fb_ok = abs(led['feedback_energy'] - 83.6606) < 0.5
+            cl_ok = abs(led['clamp_dissipation_legacy'] - 582.418) < 5.0
+            print(f"          外部 N=1 基准比对: E_fb≈83.6606 匹配={fb_ok}  "
+                  f"E_clamp(legacy)≈582.418 匹配={cl_ok}")
 
     print(f"\n  {energy_state()}")
-    print("  ⇒ 高态由外部轨持续供能维持，非免费永久保存；"
+    print("  ⇒ 高态由 rail 经负载线因果供能维持，非免费永久保存；"
           "全局能量闭合未建立（Noether 未对该候选记账）")
 
     with open(os.path.join(DATA_DIR, "energy_ledger.csv"), "w", newline="",

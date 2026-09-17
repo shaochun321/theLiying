@@ -1,5 +1,5 @@
 {
-  "fingerprint": "72c828f910f7243b",
+  "fingerprint": "bdbdb0305c191e94",
   "M1": {
     "rows": {
       "Scale-A/N=1": {
@@ -137,9 +137,15 @@
     }
   },
   "M3M4": {
-    "p_fields": 714,
+    "p_fields": 902,
     "p_max_diff": 3.896921967243079e-21,
     "p_aligned": true,
+    "p_exact_fields": 20,
+    "p_exact_mismatch": [],
+    "hist_fields": 10,
+    "hist_diff_count": 3,
+    "hist_purge_proof": true,
+    "purged_entries": 6,
     "Z_A": 1.0,
     "Z_B": 2.4919782179478364e-35,
     "dZ": 1.0,
@@ -149,17 +155,23 @@
     "repeatable": true
   },
   "dt_replay": {
-    "V_A": 1.2586377288922888,
+    "V_A": 1.0690527910459633,
     "V_B": 2.2343513129971693e-06,
     "pattern_consistent": true
   },
   "final": {
     "Scale-A": "M1_ONLY_NOT_REACHED",
-    "Scale-B": "F1_M5_VALIDATED",
+    "Scale-B": "F1_A8v2_PHYSICALLY_VALIDATED",
+    "M5P": {
+      "power_cut_zero_current": true,
+      "power_cut_forgets": true,
+      "energy_auditable": true,
+      "pass": true
+    },
     "conditional_on": [
       "canonical=Scale-B ruling",
-      "dt=0.001 + hard clamp (numerical limit)",
-      "ENERGY_SUPPORT=EXTERNAL_IDEAL_RAIL"
+      "dt=0.001 + hard clamp (numerical limit; physical high branch = continuous-limit value)",
+      "ENERGY_SUPPORT=CAUSAL_RAIL_LOAD_LINE(path-B); GLOBAL_ENERGY_CLOSURE=NOT_ESTABLISHED"
     ]
   }
 }

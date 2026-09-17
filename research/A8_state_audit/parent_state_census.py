@@ -24,6 +24,7 @@ TYPE:INFRA（research/ 隔离层）
 from __future__ import annotations
 
 import csv
+import hashlib
 import os
 import sys
 
@@ -42,6 +43,11 @@ EPS_P = 1e-12
 # 分类规则（字段名 → 类别），脚本自动套用
 _RULES = [
     ("fire_steps", "HISTORICAL_LOG"),
+    # spike_times：发放时刻日志（append-only）。第四轮勘误：全递归 census 首跑
+    # 将其兜底为 DYNAMIC_CAUSAL，致 P 对齐假 FAIL（Δ=2.4 = 事件时刻差本身）。
+    # 归类判据 = purge 实证（f1_revalidation m34：T0 清空后 future 逐位不变）
+    # + 外部全递归审计同分类。非阈值调整。
+    ("spike_times", "HISTORICAL_LOG"),
     ("generator_address", "ADDRESS_METADATA"),
     ("neuron_id", "ADDRESS_METADATA"),
     ("bundle_id", "ADDRESS_METADATA"),
@@ -69,8 +75,62 @@ def classify(name: str, owner_class: str) -> str:
     return "DYNAMIC_CAUSAL"
 
 
+_LIST_INLINE_MAX = 64      # 标量表 ≤64 逐项记录；更长 → (len, sha256) 摘要
+
+
+def _record(out: list, path: str, cls: str, value, name: str) -> None:
+    out.append({"path": path, "owner_class": cls, "value": value,
+                "category": classify(name, cls)})
+
+
+def _walk(val, path: str, name: str, cls: str, seen: set, out: list) -> None:
+    """值分发器（第四轮 P1-3 修正：dict/对象 list/空容器全覆盖）。
+
+    第三轮缺陷勘误：dict 无处理分支被整体跳过（_channels/_channel_configs
+    共 0 条）、对象 list 不递归（_memristors/_delay_buffer 共 0 条）、float
+    list 只记长度字符串、空 list 被 `val and ...` 跳过。"""
+    if isinstance(val, bool) or val is None or isinstance(val, (str, bytes)):
+        return
+    if isinstance(val, (int, float)):
+        _record(out, path, cls, val, name)
+        return
+    if isinstance(val, dict):
+        if id(val) in seen:
+            return
+        seen.add(id(val))
+        if not val:
+            _record(out, path, cls, "{0}", name)
+            return
+        for k, v in val.items():
+            _walk(v, f"{path}[{k!r}]", name, cls, seen, out)
+        return
+    if isinstance(val, (list, tuple)):
+        if id(val) in seen:
+            return
+        seen.add(id(val))
+        if not val:
+            _record(out, path, cls, "[0]", name)
+            return
+        if all(isinstance(x, (int, float)) and not isinstance(x, bool)
+               for x in val):
+            if len(val) <= _LIST_INLINE_MAX:
+                for i, x in enumerate(val):
+                    _record(out, f"{path}[{i}]", cls, x, name)
+            else:
+                digest = hashlib.sha256(
+                    repr(list(val)).encode()).hexdigest()[:16]
+                _record(out, f"{path}[*]", cls,
+                        f"len={len(val)}#sha={digest}", name)
+            return
+        for i, x in enumerate(val):
+            _walk(x, f"{path}[{i}]", name, cls, seen, out)
+        return
+    if hasattr(val, "__dict__"):
+        census(val, path, seen, out)
+
+
 def census(obj, prefix: str, seen: set, out: list) -> None:
-    """递归收集数值字段（不进入静态配置对象）。"""
+    """递归收集全部数值/容器字段（第四轮：全容器递归版）。"""
     if id(obj) in seen:
         return
     seen.add(id(obj))
@@ -78,15 +138,41 @@ def census(obj, prefix: str, seen: set, out: list) -> None:
         return
     cls = type(obj).__name__
     for name, val in vars(obj).items():
-        path = f"{prefix}.{name}"
-        if isinstance(val, (int, float)) and not isinstance(val, bool):
-            out.append({"path": path, "owner_class": cls, "value": val,
-                        "category": classify(name, cls)})
-        elif isinstance(val, (list, tuple)) and val and isinstance(val[0], float):
-            out.append({"path": path, "owner_class": cls,
-                        "value": f"[{len(val)}]", "category": classify(name, cls)})
-        elif hasattr(val, "__dict__") and not isinstance(val, (str, bytes)):
-            census(val, path, seen, out)
+        _walk(val, f"{prefix}.{name}", name, cls, seen, out)
+
+
+_HISTORICAL_LIST_NAMES = ("fire_steps", "spike_times")
+
+
+def purge_historical_logs(root_objs) -> int:
+    """清空全部 fire_steps/spike_times 表，返回清除条目数。
+
+    用途（方案 §十三）：对"历史日志不进入 parent future dynamics"给**实证
+    证明**——T0 时刻清空后 future 演化必须逐位不变；若变，说明日志被动力学
+    读取，必须按 DYNAMIC_CAUSAL 重新归类。"""
+    cleared = 0
+    seen: set = set()
+    stack = list(root_objs)
+    while stack:
+        o = stack.pop()
+        if id(o) in seen:
+            continue
+        seen.add(id(o))
+        if isinstance(o, dict):
+            stack.extend(o.values())
+            continue
+        if isinstance(o, (list, tuple)):
+            stack.extend(o)
+            continue
+        if not hasattr(o, "__dict__"):
+            continue
+        for name, val in vars(o).items():
+            if name in _HISTORICAL_LIST_NAMES and isinstance(val, list):
+                cleared += len(val)
+                val.clear()
+            elif isinstance(val, (dict, list, tuple)) or hasattr(val, "__dict__"):
+                stack.append(val)
+    return cleared
 
 
 def collect_parent() -> list[dict]:

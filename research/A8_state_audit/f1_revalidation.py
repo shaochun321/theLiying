@@ -17,12 +17,16 @@ Scale-A 与 Scale-B 都跑（§八诊断要求）：
   dt 鲁棒性        c_ro 事件回放进 finite-clamp dt/100 候选，
                    验证 latch/no-latch 模式一致（回应 PHYSICAL_BISTABILITY_DT_LIMITED）
 
-## 判定（§16 四分支）
+## 第四轮变更
 
-  Scale-A：固定点成立但真实 c_ro 无法进入 basin ⇒ M1 only / NOT_REACHED
-  Scale-B（canonical）：若 M1-M4 全成立且阻断实验 SUPPORTED（z_block 数据）
-      ⇒ F1_M5_VALIDATED（不写 A8 MET / new generator / organization）
-  结论显式条件化于 canonical 裁定（candidate_config docstring 的自曝条款）。
+  1. canonical N=1（最小化）；M1 仍两尺度 × N∈{1,3} 全跑，Scale-B 资格看 N=1，
+     Scale-A 对照沿用 N=3（外部"Scale-A M1✓/M2✗"基线的原始配置）。
+  2. census 全递归版：P 对齐 = DYNAMIC_CAUSAL 数值逐项 + 摘要串等值；
+     HISTORICAL_LOG（fire_steps/spike_times）单独比对，并用 purge 实证
+     （T0 清空日志 → future 必须逐位不变）证明其不进入 parent future dynamics。
+  3. M5-P 第六门（方案 §十八）：读取 data/rail_causality.json；
+     M1-M5 ✓ + M5-P ✓ ⇒ F1_A8v2_PHYSICALLY_VALIDATED；
+     M5-P ✗/缺 ⇒ DYNAMICAL_CANDIDATE_ONLY（§十九守卫：不开 K-07）。
 
 输出：data/f1_revalidation.json
 """
@@ -38,7 +42,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from research.A8_state_audit.candidate_config import (
     CANONICAL, SCALE_A_DIAG, assert_fingerprint)
 from research.A8_state_audit.rail_latch import RailLatch
-from research.A8_state_audit.parent_state_census import census
+from research.A8_state_audit.parent_state_census import (
+    census, purge_historical_logs)
 from tss.tests.test_c1_coupling import _synthetic_stack
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
@@ -98,8 +103,10 @@ def m1(out: dict) -> None:
     out["M1"] = {"rows": {k: {kk: vv for kk, vv in v.items() if kk != "fixed_points"}
                           for k, v in rows.items()},
                  "external_checks": checks,
+                 # 第四轮：Scale-B 资格看 canonical N=1；Scale-A 对照沿用 N=3
+                 # （外部 Scale-A M1✓/M2✗ 基线的原始配置）
                  "verdict": {"Scale-A": rows["Scale-A/N=3"]["bistable"],
-                             "Scale-B": rows["Scale-B/N=3"]["bistable"]}}
+                             "Scale-B": rows["Scale-B/N=1"]["bistable"]}}
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -194,21 +201,34 @@ class Twin:
         return v
 
     def parent_census_values(self) -> dict:
+        """全递归 census 快照，按比对方式分三桶（第四轮）：
+        num   = DYNAMIC_CAUSAL 数值（int/float）→ max|Δ| 阈值比对
+        exact = DYNAMIC_CAUSAL 摘要/占位串（>64 标量表 sha 等）→ 等值比对
+        hist  = HISTORICAL_LOG 全部条目 → 单独报告 + purge 实证"""
         rows: list = []
         seen: set = set()
         for tag, (adx, ady, pair) in (("s1", self.s1), ("s2", self.s2)):
             census(adx, f"{tag}.adx", seen, rows)
             census(ady, f"{tag}.ady", seen, rows)
             census(pair, f"{tag}.pair", seen, rows)
-        return {r["path"]: r["value"] for r in rows
-                if r["category"] == "DYNAMIC_CAUSAL"
-                and isinstance(r["value"], float)}
+        num, exact, hist = {}, {}, {}
+        for r in rows:
+            cat, v = r["category"], r["value"]
+            if cat == "DYNAMIC_CAUSAL":
+                if isinstance(v, (int, float)):
+                    num[r["path"]] = float(v)
+                else:
+                    exact[r["path"]] = v
+            elif cat == "HISTORICAL_LOG":
+                hist[r["path"]] = v
+        return {"num": num, "exact": exact, "hist": hist}
 
 
-def run_twin(ev1, ev2):
+def run_twin(ev1, ev2, purge_logs: bool = False):
     tw = Twin()
     for t in range(T0):
         tw.step(t, ev1, ev2)
+    purged = (purge_historical_logs([tw.s1, tw.s2]) if purge_logs else 0)
     p = tw.parent_census_values()
     z0 = tw.z.state
     counter0 = tw.counter
@@ -216,16 +236,26 @@ def run_twin(ev1, ev2):
     future = [tw.step(T0 + k, T0 + 200, -10**9) for k in range(PROBE_STEPS)]
     return {"p": p, "z": z0, "counter": counter0, "future": future,
             "readout_delta": tw._read_cap.voltage - read0,
-            "c_record": tw.c_record}
+            "c_record": tw.c_record, "purged_entries": purged}
 
 
 def m34(out: dict) -> dict:
-    print("\n[M3/M4] 等计数双胞胎（canonical，census 自动 P 对齐）")
+    print("\n[M3/M4] 等计数双胞胎（canonical，全递归 census P 对齐）")
     A = run_twin(550, 650)
     B = run_twin(550, 3050)
-    keys = set(A["p"]) & set(B["p"])
-    assert len(keys) == len(A["p"]) == len(B["p"]), "census 路径不一致"
-    p_max = max(abs(A["p"][k] - B["p"][k]) for k in keys)
+    # 1. DYNAMIC_CAUSAL 数值：max|Δ| 阈值比对
+    keys = set(A["p"]["num"]) & set(B["p"]["num"])
+    assert len(keys) == len(A["p"]["num"]) == len(B["p"]["num"]), "census 路径不一致"
+    p_max = max(abs(A["p"]["num"][k] - B["p"]["num"][k]) for k in keys)
+    # 2. DYNAMIC_CAUSAL 摘要串：等值比对（>64 标量表 sha 等）
+    ex_keys = set(A["p"]["exact"]) | set(B["p"]["exact"])
+    exact_mismatch = [k for k in ex_keys
+                      if A["p"]["exact"].get(k) != B["p"]["exact"].get(k)]
+    # 3. HISTORICAL_LOG：单独报告（期望有差——事件时刻不同），purge 实证其
+    #    不进入 future dynamics
+    h_keys = set(A["p"]["hist"]) | set(B["p"]["hist"])
+    hist_diff = [k for k in h_keys
+                 if A["p"]["hist"].get(k) != B["p"]["hist"].get(k)]
     dz = abs(A["z"] - B["z"])
     dcounter = abs(A["counter"] - B["counter"])
     fdiff = max(abs(a - b) for a, b in zip(A["future"], B["future"]))
@@ -233,13 +263,28 @@ def m34(out: dict) -> dict:
     A2 = run_twin(550, 650)
     rep = (A2["z"] == A["z"] and
            max(abs(a - b) for a, b in zip(A2["future"], A["future"])) == 0.0)
-    print(f"  P（census DYNAMIC_CAUSAL {len(keys)} 项）max|Δ| = {p_max:.3e} "
+    # purge 实证：T0 清空 fire_steps/spike_times → future 必须逐位不变
+    A3 = run_twin(550, 650, purge_logs=True)
+    hist_purge_ok = (A3["z"] == A["z"] and max(
+        abs(a - b) for a, b in zip(A3["future"], A["future"])) == 0.0)
+    print(f"  P 数值（DYNAMIC_CAUSAL {len(keys)} 项）max|Δ| = {p_max:.3e} "
           f"(≤{EPS_P:.0e}: {p_max <= EPS_P})")
+    print(f"  P 摘要串（{len(ex_keys)} 项）不等值 = {len(exact_mismatch)}"
+          f"{'  ' + str(exact_mismatch[:4]) if exact_mismatch else ''}")
+    print(f"  HISTORICAL_LOG（{len(h_keys)} 项）A/B 有差 = {len(hist_diff)} "
+          f"（事件时刻不同所致，属预期）")
+    print(f"  purge 实证：清空 {A3['purged_entries']} 条日志后 future 逐位不变 = "
+          f"{hist_purge_ok} ⇒ 历史日志不进入 parent future dynamics")
     print(f"  Z_A={A['z']:.6f}  Z_B={B['z']:.6f}  |ΔZ|={dz:.6f}")
     print(f"  counter_A−counter_B = {dcounter:.3e}（等计数 ⇒ 计数器盲 ✓）")
     print(f"  future max|Δ|={fdiff:.6f}  读出电荷差={dread:.6f}  逐位可重复={rep}")
     out["M3M4"] = {"p_fields": len(keys), "p_max_diff": p_max,
-                   "p_aligned": p_max <= EPS_P,
+                   "p_aligned": p_max <= EPS_P and not exact_mismatch,
+                   "p_exact_fields": len(ex_keys),
+                   "p_exact_mismatch": exact_mismatch,
+                   "hist_fields": len(h_keys), "hist_diff_count": len(hist_diff),
+                   "hist_purge_proof": hist_purge_ok,
+                   "purged_entries": A3["purged_entries"],
                    "Z_A": A["z"], "Z_B": B["z"], "dZ": dz,
                    "counter_diff": dcounter, "future_max_diff": fdiff,
                    "readout_diff": dread, "repeatable": rep}
@@ -253,6 +298,7 @@ def m34(out: dict) -> dict:
 def dt_replay(c_records: dict, out: dict) -> None:
     print("\n[dt 鲁棒性] c_ro 事件回放 → finite clamp @ dt/100")
     res = {}
+    v_cont = make_latch(CANONICAL, clamp_mode="finite").continuous_limit_fixed_point()
     for tag, series in c_records.items():
         z = make_latch(CANONICAL, clamp_mode="finite")
         z.dt = CANONICAL["dt"] / 100.0
@@ -263,7 +309,7 @@ def dt_replay(c_records: dict, out: dict) -> None:
             z.step(0.0)
         res[tag] = z.state
         print(f"  twin {tag}: 回放+保持后 V = {z.state:.6f} "
-              f"({'高支(物理值≈1.299)' if z.state > 0.9 else '低支'})")
+              f"({'高支(连续极限' + format(v_cont, '.4f') + ')' if z.state > 0.9 else '低支'})")
     ok = res["A"] > 0.9 and res["B"] < 0.1
     print(f"  ⇒ latch/no-latch 模式与 hard-clamp dt=0.001 一致: {ok}")
     out["dt_replay"] = {"V_A": res["A"], "V_B": res["B"], "pattern_consistent": ok}
@@ -285,7 +331,7 @@ def main() -> int:
     c_records = m34(out)
     dt_replay(c_records, out)
 
-    # ── 总判定（§16 四分支）──
+    # ── 总判定（§16 四分支 + 第四轮 M5-P 第六门）──
     print("\n" + "=" * 70)
     b = out
     scaleA_reject = (b["M1"]["verdict"]["Scale-A"]
@@ -294,18 +340,45 @@ def main() -> int:
           and "REACHED" in b["M2"]["verdict"]["Scale-B"]
           and b["M3M4"]["p_aligned"] and b["M3M4"]["dZ"] > 1e-6
           and b["M3M4"]["future_max_diff"] > 1e-6 and b["M3M4"]["repeatable"]
+          and b["M3M4"]["hist_purge_proof"]
           and b["dt_replay"]["pattern_consistent"])
+    # M5-P：rail causality 实验结果（exp_F1_rail_causality.py 落盘）
+    m5p_path = os.path.join(DATA_DIR, "rail_causality.json")
+    m5p = None
+    if os.path.exists(m5p_path):
+        with open(m5p_path, encoding="utf-8") as f:
+            m5p = json.load(f).get("M5P")
+    m5p_pass = bool(m5p and m5p.get("pass"))
     print(f"  Scale-A: M1 成立但真实 c_ro 不可达 ⇒ M1 only / NOT_REACHED "
           f"({scaleA_reject})")
-    print(f"  Scale-B(canonical): {'F1_M5_VALIDATED' if m5 else 'F1_REJECTED'}")
+    print(f"  Scale-B(canonical) M1-M5: {'PASS' if m5 else 'FAIL'}")
+    if m5p is None:
+        print("  M5-P: NOT_RUN（缺 data/rail_causality.json —— "
+              "先跑 exp_F1_rail_causality.py）")
+    else:
+        print(f"  M5-P physical support: {'PASS' if m5p_pass else 'FAIL'} "
+              f"(断电零流={m5p.get('power_cut_zero_current')} "
+              f"断电失忆={m5p.get('power_cut_forgets')} "
+              f"账本可审计={m5p.get('energy_auditable')})")
+    if m5 and m5p_pass:
+        verdict_b = "F1_A8v2_PHYSICALLY_VALIDATED"
+    elif m5:
+        verdict_b = "DYNAMICAL_CANDIDATE_ONLY"     # §十九：不得进入生成元资格链
+    else:
+        verdict_b = "F1_REJECTED"
+    print(f"  ⇒ Scale-B(canonical): {verdict_b}")
     print("  ── 条件化声明：该判定以 canonical=Scale-B 裁定为前提（自曝条款）；")
     print("     以 dt=0.001+hard clamp 为数值建模限制（DT 限制声明）；")
     print("     不写 A8 MET / new generator / organization。")
     out["final"] = {"Scale-A": "M1_ONLY_NOT_REACHED" if scaleA_reject else "?",
-                    "Scale-B": "F1_M5_VALIDATED" if m5 else "F1_REJECTED",
-                    "conditional_on": ["canonical=Scale-B ruling",
-                                       "dt=0.001 + hard clamp (numerical limit)",
-                                       "ENERGY_SUPPORT=EXTERNAL_IDEAL_RAIL"]}
+                    "Scale-B": verdict_b,
+                    "M5P": m5p,
+                    "conditional_on": [
+                        "canonical=Scale-B ruling",
+                        "dt=0.001 + hard clamp (numerical limit; "
+                        "physical high branch = continuous-limit value)",
+                        "ENERGY_SUPPORT=CAUSAL_RAIL_LOAD_LINE(path-B); "
+                        "GLOBAL_ENERGY_CLOSURE=NOT_ESTABLISHED"]}
 
     with open(os.path.join(DATA_DIR, "f1_revalidation.json"), "w",
               encoding="utf-8") as f:

@@ -42,7 +42,16 @@ canonical = 项目 dt=0.001 + hard clamp。hard clamp 是"物理有限钳位
 
 所有实验模块启动时必须调用 `assert_fingerprint(cfg)`；指纹不一致 →
 INVALID_EXPERIMENT，不得给资格结论。指纹含：C、R、dt、θ、gm、反馈拓扑(N)、
-V_rail、钳位模式、钳位 gm、输入换能、输入增益。
+V_rail、钳位模式、钳位 gm、输入换能、输入增益、供能模型。
+
+## 第四轮变更（依据 F1_FEEDBACK_POWER_CONTRACT.md）
+
+1. **N_feedback: 3 → 1**（最小化）：外部实测 N=1 双稳；第三轮报告 §10 自认
+   "N=1 已双稳、N≥1 恒双稳" ⇒ N=3（仅为兼容第二轮无出处 k=3.0）非最小。
+   仅当 N=1 失败某资格条件时才允许 N>1。
+2. **supply_model 进入指纹**：路径 B（电导×供电负载线闭解）为新 canonical
+   供能模型；第三轮旧指纹 LEGACY_FP_ROUND3 退役为历史指纹，不得作为最终
+   候选指纹引用。
 """
 from __future__ import annotations
 
@@ -64,9 +73,12 @@ CANONICAL = {
     "tau_steps": 600.0,
     "theta": 0.3,          # MOSFET.v_threshold 默认（semiconductor.py:117）
     "gm": 1.0,             # MOSFET.gm 默认
-    "n_feedback_fets": 3,  # 物理支路数（取代自由增益 k；量纲=P0-4 修正）
+    "n_feedback_fets": 1,  # 物理支路数；第四轮最小化 3→1（外部实测 N=1 双稳
+                           #   + 第三轮报告 §10 "N≥1 恒双稳" ⇒ N=3 非最小）
     "v_rail": 1.0,         # PowerRail vdd（= entry_gate _DEFAULT_V_CLAMP）
     "rail_r_internal": 0.0,
+    "supply_model": "B_conductance_load_line",  # 契约路径 B：
+                           #   I_fb = G(Vg)·vdd/(1+G·Rs)，G = Σ (gm/V_REF)(Vg−θ)
     "clamp_mode": "hard",  # "hard" | "finite"
     "clamp_gm": 10.0,      # 同 entry_gate _DEFAULT_GM_CLAMP
     "clamp_threshold": 1.0,
@@ -79,13 +91,18 @@ CANONICAL = {
 # ── 诊断对照（报告 §八 要求，必须与 canonical 同码跑） ──
 SCALE_A_DIAG = dict(CANONICAL, name="Scale-A", C=1.0, R=0.6)
 SCALE_B_DIAG = dict(CANONICAL, name="Scale-B", C=0.001, R=600.0)
+# 第三轮 legacy 配置（N=3）：仅供勘误对照实验（clamp_integrity legacy 段、
+# 能耗对照），不得作为资格结论输入
+LEGACY_N3_DIAG = dict(CANONICAL, name="Legacy-N3", n_feedback_fets=3)
+# 第三轮退役指纹（供能因果闭合前生成，方案 §十六：不得再作最终候选指纹）
+LEGACY_FP_ROUND3 = "72c828f910f7243b"
 
 
 def fingerprint(cfg: dict) -> str:
-    """同实例参数指纹（P0-3）：C/R/dt/θ/gm/反馈拓扑/Vrail/钳位/输入。"""
+    """同实例参数指纹（P0-3）：C/R/dt/θ/gm/反馈拓扑/Vrail/钳位/输入/供能模型。"""
     keys = ("C", "R", "dt", "theta", "gm", "n_feedback_fets", "v_rail",
             "rail_r_internal", "clamp_mode", "clamp_gm", "clamp_threshold",
-            "input", "k_in")
+            "input", "k_in", "supply_model")
     payload = json.dumps({k: cfg.get(k) for k in keys}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
@@ -105,8 +122,11 @@ def assert_fingerprint(cfg: dict, expected: str | None = None) -> str:
 
 
 def energy_state() -> str:
-    """P1-6：能源账本的固定声明（不得把 120k 步漂移 0 解释为无代价持久性）。"""
-    return "ENERGY_SUPPORT=EXTERNAL_IDEAL_RAIL; GLOBAL_ENERGY_CLOSURE=NOT_ESTABLISHED"
+    """能源声明（第四轮更新）：供能已因果化（路径 B），局部闭合状态由
+    z_block_and_energy 的残差收敛实验裁定，此处不预写结论。"""
+    return ("ENERGY_SUPPORT=CAUSAL_RAIL_LOAD_LINE(path-B); "
+            "LOCAL_ENERGY_CLOSURE=SEE_RESIDUAL_CONVERGENCE_TEST; "
+            "GLOBAL_ENERGY_CLOSURE=NOT_ESTABLISHED")
 
 
 if __name__ == "__main__":

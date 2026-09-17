@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | DA源重标+验证已完成并提交 | — | — | 下一优先级：死锁二 增益调制（见待执行 P1） |
+| （空闲） | F1-R4 已完成并提交 | — | — | 待裁：canonical C / A8-v2 采纳 / K-07 是否开启 |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| F1-R4 | F1 A8-v2 最小物理闭合复审(第四轮)：rail因果化(路径B电导×负载线,断电I_fb逐位0,分界720步=解析T_off*)+N=1最小化(能耗基准83.66/582.42双复现)+方法勘误3件(clamp等时长20s复测DT_LIMITED保持/census全递归1125项/spike_times分类purge实证)+M5-P第六门PASS→F1_A8v2_PHYSICALLY_VALIDATED(条件化Scale-B);新fingerprint bdbdb0305c191e94;21/21+tss fast 43绿 | 2026-09-18 | （本提交） |
 | Skill化瘦身 | CLAUDE.md 28.9KB→15.7KB：按需知识移入4个项目skill(.claude/skills/ verify-regression/work-report/exp-script/new-component)，每会话省~5k token；过时Current state(2026-07-02)替换为暂停快照指针；修正失效引用(*.log→test_runs/、七节→六段式) | 2026-09-17 | d75a6e2 |
 | DA重标验证 | T-088 RPE签名3/4(新奇爆发/撤源dip/非饱和;S1阈值假失败)+T-089热趋性保全2/4(P1到源/P4动态PASS;P2/P3非回归=第二把锁);印证两把锁模型;安全 | 2026-07-08 | 2b711ac |
 | DA源重标(总闸门) | 修DA=1.0饱和：intake_to_da sg1.0→0.05(G(w=1)=10致10×超标)/shadow_to_da sg1.0→0.1(col饱和);拒绝AG Fix-2(satiety-5.0→DA≡0);实测DA恢复动态范围(接近1.0→进食0.2→撤源0.06);21/21 PASS | 2026-07-08 | 928d92a |

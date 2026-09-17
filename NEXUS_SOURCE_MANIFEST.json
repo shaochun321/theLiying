@@ -1,0 +1,79 @@
+{
+  "expected_commit": "4402c9624630edb1feca7164096e2eee65718e78",
+  "generated_by": "research/A8_state_audit/gen_nexus_manifest.py",
+  "imported_nexus_modules": [
+    "nexus_v1.circuit.bundle",
+    "nexus_v1.circuit.variant_adapter",
+    "nexus_v1.components.compensation",
+    "nexus_v1.components.graded_potential_relay",
+    "nexus_v1.components.neuron",
+    "nexus_v1.components.semiconductor",
+    "nexus_v1.components.skin_network",
+    "nexus_v1.components.skin_three_point",
+    "nexus_v1.components.structural_address",
+    "nexus_v1.components.world",
+    "nexus_v1.somatosensory.transducer_neurons"
+  ],
+  "files": [
+    {
+      "path": "nexus_v1/__init__.py",
+      "sha256": "bae2454b7f4e47817a86d329654fd2d5960202e0972c934100f7f9aaa3e1a185"
+    },
+    {
+      "path": "nexus_v1/circuit/__init__.py",
+      "sha256": "c26bdaeffb236bc6738a07b909d097782076764595f0b6210c14c0e1712b41fb"
+    },
+    {
+      "path": "nexus_v1/circuit/bundle.py",
+      "sha256": "4be67347d18c78f3e03f1cd0c0f99f364e14b3fe2b27826659542fbb5ad57c54"
+    },
+    {
+      "path": "nexus_v1/circuit/variant_adapter.py",
+      "sha256": "b1c39968ffb8cd68ca55486f8a4b26ce6aea528a7cc0fe585217fc19aaebd534"
+    },
+    {
+      "path": "nexus_v1/components/__init__.py",
+      "sha256": "d62b28b44eb6f3551c85571a810d947ec68760dbea5c6c813dc7c0c972bd7469"
+    },
+    {
+      "path": "nexus_v1/components/compensation.py",
+      "sha256": "2e1e16e7933e62b44287a4be01fb74c13a7bf3dd8df18664b0fb854eeb6d2084"
+    },
+    {
+      "path": "nexus_v1/components/graded_potential_relay.py",
+      "sha256": "27f50df23b87f136ec58697a83f5e707e7db0fb4ce551a94941fa73d2270b24f"
+    },
+    {
+      "path": "nexus_v1/components/neuron.py",
+      "sha256": "0aa526782bc952c349340fee4fa52179cbf2dc5f2151f831f6df1b3cd149d3f7"
+    },
+    {
+      "path": "nexus_v1/components/semiconductor.py",
+      "sha256": "fc6eb11b02c3274856976e856918dc96f87f93be76e65bb92b631359b2161690"
+    },
+    {
+      "path": "nexus_v1/components/skin_network.py",
+      "sha256": "f3ac683f6e5b28737e2501f7755bde4fee13b3ff75581c3225760ef54d9ed135"
+    },
+    {
+      "path": "nexus_v1/components/skin_three_point.py",
+      "sha256": "407792ced67c60a2dd178bb650ba268f6d455635d8a929721f14a3d8719b26ee"
+    },
+    {
+      "path": "nexus_v1/components/structural_address.py",
+      "sha256": "2ecd40c543fca8be30847d4850ebf7a19b52a4580ad69f5bf79dbaff4c163f28"
+    },
+    {
+      "path": "nexus_v1/components/world.py",
+      "sha256": "1eb28c76be2ca8e0ecff830b70437a375252e22cb8b64c0dde942211b4903c45"
+    },
+    {
+      "path": "nexus_v1/somatosensory/__init__.py",
+      "sha256": "75060cc6c62f8c6cb525f3e4b9da9ac65f227ae00fcd5ef2b8b30045f8d429f4"
+    },
+    {
+      "path": "nexus_v1/somatosensory/transducer_neurons.py",
+      "sha256": "f305a7b901a596c943ad572379c2596e701cdc863909146089d6b252df9f0c76"
+    }
+  ]
+}

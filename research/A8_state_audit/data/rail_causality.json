@@ -1,0 +1,32 @@
+{
+  "fingerprint": "bdbdb0305c191e94",
+  "matrix_zero_current_ok": true,
+  "power_cut": {
+    "v_u": 0.301002506033021,
+    "t_off_star": 720.382013146092,
+    "last_refire": 720,
+    "boundary_ok": true,
+    "all_agree": true,
+    "long_forget": true,
+    "zero_current_during_off": true
+  },
+  "energy_closure": {
+    "relative_residuals": [
+      0.15756257251897923,
+      0.018369100767037315,
+      0.001867885969000593
+    ],
+    "ratios": [
+      8.577587684734114,
+      9.834166042194562
+    ],
+    "first_order": true,
+    "verdict": "AUDITABLE"
+  },
+  "M5P": {
+    "power_cut_zero_current": true,
+    "power_cut_forgets": true,
+    "energy_auditable": true,
+    "pass": true
+  }
+}
