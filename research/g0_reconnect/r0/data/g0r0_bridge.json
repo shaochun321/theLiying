@@ -1,0 +1,51 @@
+{
+  "replay": {
+    "bit_exact": true,
+    "n_samples": 61
+  },
+  "twin2": {
+    "boundary_same_until_sample": 21,
+    "g0_identical_during_same": true,
+    "g0_diverges_after": true,
+    "pass": true
+  },
+  "bridge": {
+    "v1_equiv_3node": {
+      "finite": true,
+      "l1_max": 10.0,
+      "collector_jump_ok": true,
+      "n_occurrences_recorded": 1,
+      "pass": true
+    },
+    "v2_ordinary": {
+      "finite": true,
+      "l1_max": 10.0,
+      "collector_jump_ok": true,
+      "n_occurrences_recorded": 1,
+      "pass": true
+    },
+    "strong_dissipation": {
+      "finite": true,
+      "l1_max": 10.0,
+      "collector_jump_ok": true,
+      "n_occurrences_recorded": 1,
+      "pass": true
+    },
+    "multi_source": {
+      "finite": true,
+      "l1_max": 10.0,
+      "collector_jump_ok": true,
+      "n_occurrences_recorded": 1,
+      "pass": true
+    },
+    "hidden_twin_variant": {
+      "finite": true,
+      "l1_max": 10.0,
+      "collector_jump_ok": true,
+      "n_occurrences_recorded": 1,
+      "pass": true
+    }
+  },
+  "bridge_all_pass": true,
+  "note": "B 桥 L1 饱和（scheduler 轮登记 33.3% 子步 u>0.05）不在 §26 判据内——量级重标属 occurrence revalidation"
+}

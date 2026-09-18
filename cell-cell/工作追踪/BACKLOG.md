@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | T1-B 已完成并提交（TRANSDUCTION_V2_QUALIFIED） | — | — | 下一轮：G0_RECONNECT（只做定点修改：typed port implementation / L1 input semantics / timebase plumbing / legacy compatibility；G0_PORT_CONTRACT_V2 已冻结待实施）→ Occurrence Revalidation（χ 全重验，closure 阈值 v2 重资格化——smoke 已示 occ=0）→ SCALE-0 → TSS 回接 |
+| G0-R0 | 统一物理时间与多率回接（外部 45 节方案 ADOPT with D1-D6；**含 D2 勘误：T1-B C2"dt 非物理秒"断言被代码证据推翻，状态 A 成立**）：时间语义普查+census→MultiRateScheduler(N_sub=1000, S0/S1/S2×A/B0/B1)+连续参照→dt_G 不变性攻击+延迟/RC/剂量审计→multirate replay+Twin-2+B bridge 五场景→六门终裁；production READ_ONLY，只增 research/g0_reconnect/r0/ | 2026-09-19 | 评判已交付，开始时间审计 | 审计→scheduler→invariance→replay/bridge→终裁→文档→§42全量回归→收口 |
 
 ---
 

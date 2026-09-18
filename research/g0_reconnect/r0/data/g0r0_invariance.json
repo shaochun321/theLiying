@@ -1,0 +1,42 @@
+{
+  "dtg_attack": {
+    "tier1_2ms_vs_1ms": 0.11033029872472025,
+    "tier1_05ms_vs_1ms": 0.09102170863146468,
+    "full_2ms_vs_1ms": 0.15415379222388678,
+    "full_05ms_vs_1ms": 0.1421232381116059,
+    "tier1_converges": true
+  },
+  "rc": {
+    "taus": {
+      "0.001": 6.420113241076579,
+      "0.0005": 6.42018187439084
+    },
+    "invariant": true
+  },
+  "delay": {
+    "delays": {
+      "0.001": {
+        "steps": 5,
+        "physical_ms": 5.0
+      },
+      "0.0005": {
+        "steps": 5,
+        "physical_ms": 2.5
+      }
+    },
+    "step_coupling_latent": true
+  },
+  "dose": {
+    "E_proxy": {
+      "multirate_A": 0.6598163702034137,
+      "fine_ref_A": 0.6591627559811809,
+      "old_1to1_A": 0.000663544184734402,
+      "B0": 5.9132974371318285,
+      "B1_S1": 5.935045377486635
+    },
+    "multirate_over_ref": 1.0009915824525915,
+    "old_over_ref": 0.0010066469604258802,
+    "b0_over_b1": 0.9963356741235201,
+    "no_dose_duplication": true
+  }
+}

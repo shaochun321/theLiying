@@ -1,0 +1,10 @@
+module,dt,semantics,evidence,g0r0_action
+World/Boundary (ThermalFieldGraph),1.0,PHYSICAL_TIME [s],W1 dt 收敛+本轮 E1/E2 同族,保留
+Capacitor.inject/leak,调用方,PHYSICAL_TIME,E1/E2 实验 + semiconductor.py:64/74,保留（状态 A 基石）
+Neuron 基类(膜RC/traces/适应),0.001,PHYSICAL_TIME [s],E3 实验 + neuron.py:527/537/587-588(ms→s 显式换算),保留
+ThermalDeltaNeuron.pre_trace,0.001,DISCRETE_COUNTER,E4 实验(τ 比=0.500) + _TRACE_DECAY=0.99 每步,登记 G0_DT_COUPLED_PHYSICS(定点)；修复属 G0-R1
+SynapticBundle.delay_steps,-,DISCRETE_COUNTER,bundle.py:46-49 int 步数常量(G0 核心链 delay=0 未行使；DA 路径 100-500 steps 隐性耦合),登记 DELAY_STEP_COUPLING(隐性)；修复属 G0-R1
+DelayedBundle(bundle_v2),-,PHYSICAL_TIME,bundle_v2.py:118 τ_steps=round(τ_ms/dt_ms) dt-aware,保留（正确先例）
+SynapticBundle.da_ema β,动态,PHYSICAL_TIME,bundle.py:125-127 β=dt/(dt+τ) 动态（Phase B P1 陷阱教训已制度化）,保留
+OccurrenceClosure(t_up/t_down/t_rearm/rearm=500),-,DISCRETE_COUNTER (by design),occurrence.py:135 t_up=step_index；rearm 步数标定,§22 n→t_phys 映射（G0-R1 实施）；本轮不改阈值(§20)
+SkinPatch(体感),1.0,PHYSICAL_TIME [s],world.py step_thermal RC+τ=5s 约定；dT=每步差分未除 dt（T1-A D2 已登记，速率语义靠 dt 恒定）,保留+登记 dT 未归一约束

@@ -1,0 +1,25 @@
+{
+  "errors_full_vector_FIRST_RESULT": {
+    "A_S0_vs_ref": 0.11508707000004796,
+    "A_S1_vs_ref": 0.10473824876017492,
+    "A_S1_dtB0.1_vs_ref": 0.10857321857026395,
+    "B0_vs_B1ref": 0.24819588877512927,
+    "B1_S1_vs_B1ref": 0.0
+  },
+  "dtB_ratio_full": 1.0366147978936537,
+  "converges_full_vector": false,
+  "tier1_interface": {
+    "err_dtB1": 0.0024803401886288284,
+    "err_dtB01": 0.0002510897094787257,
+    "ratio": 0.10123196432080234,
+    "converges": true
+  },
+  "tier2_oscillator_err": 0.4903336695730901,
+  "findings": [
+    "G0_OSCILLATOR_PHASE_SENSITIVITY（先证=exp_P2A1b_3自持振荡；对任何采样策略不可收敛）",
+    "B_BRIDGE_L1_SATURATION（u>0.05 占比 0.333；g 量级属 revalidation）"
+  ],
+  "s1_better_than_s0": true,
+  "s1_causality_note": "S1 需下一样本；live=1 dt_B 滞后",
+  "canonical_recommendation": "S1 (CANONICAL_FOR_IMPLEMENTATION, 非 OPTIMAL；S0 为零滞后备选)"
+}

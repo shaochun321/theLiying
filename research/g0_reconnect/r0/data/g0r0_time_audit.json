@@ -1,0 +1,33 @@
+{
+  "E1_leak": {
+    "vals": {
+      "0.001": 0.018315638888733998,
+      "0.0005": 0.018315638888734588
+    },
+    "physical": true
+  },
+  "E2_inject": {
+    "vals": {
+      "0.001": 0.20000000000000015,
+      "0.0005": 0.20000000000000015
+    },
+    "physical": true
+  },
+  "E3_neuron_trace_tau_s": {
+    "0.001": 0.020000000000000004,
+    "0.0005": 0.019999999999999955
+  },
+  "E3_physical": true,
+  "E4_l1_trace_tau_s": {
+    "0.001": 0.09949916247342205,
+    "0.0005": 0.04974958123671104
+  },
+  "E4_drift_ratio": 0.5000000000000001,
+  "E4_discrete_counter": true,
+  "ruling": "STATE_A",
+  "exceptions": [
+    "ThermalDeltaNeuron.pre_trace",
+    "SynapticBundle.delay_steps(隐性)",
+    "OccurrenceClosure counters(by design,需映射)"
+  ]
+}

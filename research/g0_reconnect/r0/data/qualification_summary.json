@@ -1,0 +1,39 @@
+{
+  "gates": {
+    "R0_M1_time_semantics": {
+      "pass": true,
+      "evidence": "行为实验 E1-E4：inject/leak/基类 trace 全 PHYSICAL（τ=0.0200s 两档不变）⇒ 状态 A（GENERATOR_DT=0.001 物理秒）；例外三项定点登记"
+    },
+    "R0_M2_single_physical_time": {
+      "pass": true,
+      "evidence": "t_phys 唯一；timestamped 帧(t_phys/dt_B/sample_id)；MultiRateScheduler=纯 time coordination（无 GlobalClock 对象，§24）"
+    },
+    "R0_M3_multirate_convergence": {
+      "pass": true,
+      "evidence": "Tier-1 接口层一阶收敛（dt_B 比=0.101：2.48e-3→2.51e-4）；dt_G Tier-1 收敛；全向量 FIRST_RESULT FAIL 原样保留——根因=G0_OSCILLATOR_PHASE_SENSITIVITY（先证=exp_P2A1b_3 自持振荡，非调度器缺陷）"
+    },
+    "R0_M4_delay_rc_invariance": {
+      "pass": true,
+      "evidence": "HC trace τ=6.4201/6.4202 s 不变；L1 pre_trace DISCRETE_COUNTER 但传播链消费 activation（bundle.py:284-287 非 spiking→activation）⇒ 链内惰性；delay_steps=5 实证 5.0/2.5ms 漂移=隐性（G0 核心 delay=0 未行使）——两项定点登记留 G0-R1"
+    },
+    "R0_M5_replay_purity": {
+      "pass": true,
+      "evidence": "live(交替步进) vs 纯帧重建逐位一致；Twin-2 相同边界段 G0 逐位同/分叉后才异（无 CROSS_LAYER_HIDDEN_LEAK）"
+    },
+    "R0_M6_no_dose_duplication": {
+      "pass": true,
+      "evidence": "multirate/ref=1.0010；B0/B1=0.996；旧 1:1 耦合=0.00101（1/1000 物理不一致定量化=§40 负结果）"
+    }
+  },
+  "verdict": "G0_MULTIRATE_TIMEBASE_QUALIFIED",
+  "findings_registered": [
+    "GENERATOR_DT=PHYSICAL_INTEGRATION_STEP(0.001s) 状态 A（T1-B C2 断言勘误）",
+    "G0_OSCILLATOR_PHASE_SENSITIVITY（ensemble/collector 极限环相位失相干；任何采样策略不可收敛；先证 exp_P2A1b_3）",
+    "B_BRIDGE_L1_SATURATION（真实秒制 u>0.05 占 33.3% 子步；g 量级属 revalidation）",
+    "L1 pre_trace=DISCRETE_COUNTER（链内惰性；修复留 G0-R1）",
+    "DELAY_STEP_COUPLING（隐性；bundle.delay_steps 步数制）",
+    "旧 1:1 耦合剂量=1/1000（冻结结果为 step 语义内部自洽，不重审）",
+    "多率下 B bridge 五场景 occurrence=1（只登记；对比旧耦合smoke=0）"
+  ],
+  "next": "G0-R1"
+}
