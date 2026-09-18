@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | T1-A 已完成并提交 | — | — | 下一轮：W1（World v2 建设——三缺口：局部自由度/独立时间尺度解绑 r_leak=10κ⁻¹/驱动复杂性；不加模态不造混沌；§18 禁按转导窗调参；raw boundary qualification 先行）；T1-B 前须裁定 LAYER_CATEGORY_CONFLICT |
+| W1 | World v2 构建轮（外部 65 节方案 ADOPT with B1-B6）：research/world_v2/ 核心四对象（Spec/Sampler/Episode/BoundaryView/Ledger，production 零改动）+4 资格实验（六门 M1-M6/NC1-5/E1-5/极端案例；阈值预登记 ε_B<1e-2, ε_X>0.2, ε_F>5e-2）+4 文档+终裁十二问；复用 ThermalFieldGraph(总能量/closure_residual 在产)+DynamicHeatSource(energy_remaining 在产)；M3 零代码（r_leak 本就自由参数） | 2026-09-18 | 评判已交付，开始 world_v2_core | 评判存档→core→structure_scan→hidden_twins→physics_audit→final_qualification→文档→收口 |
 
 ---
 

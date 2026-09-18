@@ -1,0 +1,78 @@
+{
+  "M1": {
+    "worst_residual": 4.956746124662459e-11,
+    "pass": true
+  },
+  "dt_convergence": {
+    "per_dt": {
+      "1.0": {
+        "E_final": 0.03153471949183042,
+        "tau_relax": 200.00000000000037
+      },
+      "0.1": {
+        "E_final": 0.03160578508629938,
+        "tau_relax": 200.00000000000844
+      },
+      "0.01": {
+        "E_final": 0.031612897513807824,
+        "tau_relax": 199.99999999983552
+      }
+    },
+    "diff_1.0_to_0.1": 0.002248499579267471,
+    "diff_0.1_to_0.01": 0.00022498499244921725,
+    "pass": true
+  },
+  "negative_controls": {
+    "nc1_monotone": true,
+    "nc1_zero_injection": true,
+    "nc2_bitwise_same_as_nc1": true,
+    "nc3_isolated": true,
+    "pass": true,
+    "nc4_nc5": "见 w1_hidden_twins.py Full-vs-Reduced（交叉引用）"
+  },
+  "episode_families": {
+    "families": {
+      "E1": {
+        "E_final": 0.03153471949183042,
+        "peak_T0": 50.747570414394595
+      },
+      "E2_n0": {
+        "E_final": 0.03153471949183042,
+        "peak_T0": 50.747570414394595
+      },
+      "E2_n2": {
+        "E_final": 0.03153471949183045,
+        "peak_T0": 27.547279819911168
+      },
+      "E2_n4": {
+        "E_final": 0.03153471949183042,
+        "peak_T0": 19.863595589173542
+      },
+      "E3_sync": {
+        "E_final": 0.06306943898366088,
+        "peak_T0": 69.47043514753928
+      },
+      "E3_stag": {
+        "E_final": 1.0758212078543703,
+        "peak_T0": 50.747570414394595
+      },
+      "E4_r20": {
+        "E_final": 2.3718995949030013e-36,
+        "peak_T0": 12.14043934990755
+      },
+      "E4_r2000": {
+        "E_final": 119.04121628983005,
+        "peak_T0": 79.13878546812923
+      }
+    },
+    "e2_distinct": true,
+    "e5": "见 w1_hidden_twins.py"
+  },
+  "extremes": {
+    "kappa_min": 0.01006,
+    "kappa_max": 0.19928,
+    "tau_env_min": 25.130933585901598,
+    "tau_env_max": 1844.6376836752006,
+    "max_energy_residual": 5.7980287238024175e-11
+  }
+}

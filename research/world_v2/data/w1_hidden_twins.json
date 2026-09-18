@@ -1,0 +1,44 @@
+{
+  "thresholds": {
+    "eps_B": 0.01,
+    "eps_X": 0.2,
+    "eps_F": 0.05
+  },
+  "twin1_field_hidden": {
+    "d_boundary_t0": 2.1589234866751753e-17,
+    "d_x_t0": 3.72081270739176,
+    "d_future_max": 2.3279581567219787,
+    "gates": [
+      true,
+      true,
+      true
+    ],
+    "pass": true
+  },
+  "twin1_scale_b": 618.5389503796504,
+  "twin1_causal_block": {
+    "future_residual": 2.527203521163463e-13,
+    "causally_supported": true
+  },
+  "twin2_source_hidden": {
+    "d_boundary_t0": 0.0,
+    "d_x_t0": 0.30151134457776363,
+    "d_future_max": 1.4397872729949521,
+    "gates": [
+      true,
+      true,
+      true
+    ],
+    "pass": true
+  },
+  "twin2_field_identical_t0": true,
+  "twin2_causal_block": {
+    "future_residual": 0.0,
+    "causally_supported": true
+  },
+  "full_vs_reduced": {
+    "d_full_t0": 3.902421289896415,
+    "partial_observation_confirmed": true
+  },
+  "M6_pass": true
+}
