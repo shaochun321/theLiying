@@ -1,0 +1,32 @@
+{
+  "summary": {
+    "boundary": {
+      "diff_1.0_to_0.1": 0.0019929315867432684,
+      "diff_0.1_to_0.01": 0.0001983977233588544,
+      "converges": true
+    },
+    "A": {
+      "diff_1.0_to_0.1": 0.001992931586743266,
+      "diff_0.1_to_0.01": 0.00019839772335885616,
+      "converges": true
+    },
+    "B": {
+      "diff_1.0_to_0.1": 0.0077184981348071575,
+      "diff_0.1_to_0.01": 0.00073888826902915,
+      "converges": true
+    }
+  },
+  "naive_magnitude_ratio": {
+    "0.1/1.0": 0.10001151002578486,
+    "0.01/0.1": 0.09984918736441158
+  },
+  "naive_series_reldiff": {
+    "0.1vs1": 0.9016784212048398,
+    "0.01vs0.1": 0.9001509141726577
+  },
+  "verdicts": {
+    "AMPLITUDE_PORT_DT_INVARIANT": true,
+    "RATE_PORT_DT_AWARE_CONVERGES": true,
+    "NAIVE_RATE_DT_DEPENDENT_FAIL_CONFIRMED": true
+  }
+}

@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | W1 已完成并提交（WORLD_V2_RAW_QUALIFIED） | — | — | 下一轮：T1-B（World v1 reference + v2 calibration + v2 **held-out** 三集合上完成 Transduction v2 终选与参数标定；cross-pair 共谋攻击必做；开工时先裁定 LAYER_CATEGORY_CONFLICT 文字归类——B3 折中）；之后 G0 reconnect→occurrence revalidation→SCALE-0→TSS 回接（§54 主线不再变化） |
+| T1-B | Transduction v2 跨 World 标定轮（外部 61 节方案 ADOPT with C1-C5）：①合同文档（LAYER_CATEGORY_CONFLICT 合同层裁定+MAINLINE_TIMEBASE_CONTRACT Δt_ext=1s+U_T/U_Ṫ typed port）②五脚本（dataset cal30/hold20 blind→calibration+cross-pair+LORO→timebase 三档→heldout+replay+双twin→终裁六门）③occurrence smoke④四文档+负结果；G0/L1/closure READ_ONLY，nexus/tss/world_v2 零改动 | 2026-09-19 | 评判已交付，开始合同文档 | 合同→dataset→calibration→timebase→heldout(blind一次)→smoke→终裁→收口 |
 
 ---
 

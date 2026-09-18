@@ -1,0 +1,47 @@
+{
+  "lock": {
+    "canonical_fingerprint": "a64cf243772ea356aaa8d3c2beba5569e32ffef25f804110a804196cb2d0a4ca",
+    "heldout_sha256": "17db7a7f4323ee56ccb3c43b6c8e6ed3acb8badbfa181e05c0e23b3f73f482cd",
+    "lock_time": "2026-09-19 00:52:25",
+    "canonical_config": {
+      "candidate_A": {
+        "arch": "thin_amplitude_U_T",
+        "S": 0.00137531,
+        "Y_ref": 0.0,
+        "provenance": "CANONICAL_REFERENCE/PHYSICAL"
+      },
+      "candidate_B": {
+        "arch": "explicit_rate_U_dT",
+        "g": 0.275062,
+        "dt_ext": 1.0,
+        "init": "prev=first_sample",
+        "provenance": "CANONICAL_REFERENCE/PHYSICAL"
+      },
+      "timebase": "MAINLINE_TIMEBASE_CONTRACT dt_ext=1s",
+      "contract": "T1B_PORT_AND_TIMEBASE_CONTRACT.md"
+    }
+  },
+  "twins": {
+    "A_t1_equal": true,
+    "A_t2_equal": true,
+    "B_t2_equal": true,
+    "B_t1_replay_explained": true,
+    "hidden_access_leak_free": true,
+    "future_div_A_twin1": 1.0537284928101542,
+    "future_div_B_twin2": 0.2736901225516972
+  },
+  "replay_pure": true,
+  "first_heldout_result": {
+    "legacy": {
+      "SEMANTIC_FAIL": 8,
+      "DEGRADED": 12
+    },
+    "A": {
+      "QUALIFIED": 20
+    },
+    "B": {
+      "QUALIFIED": 20
+    }
+  },
+  "heldout_pass": true
+}

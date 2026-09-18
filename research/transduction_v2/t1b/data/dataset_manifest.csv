@@ -1,0 +1,51 @@
+group,episode_id,n_nodes,n_sources,r_leak,kappa_mean,boundary,strata,loro_A_member,loro_B_member
+calibration,cal000,3,3,1550.141,0.05787,"REDUCED:(0, 2)",three_source;low_dof;staggered_source,True,False
+calibration,cal001,5,2,36.323,0.06258,"FULL:(0, 1, 2, 3, 4)",strong_dissipation,False,True
+calibration,cal002,3,2,288.257,0.03597,"FULL:(0, 1, 2)",low_dof,True,True
+calibration,cal003,10,3,173.73,0.07122,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",three_source;staggered_source,True,False
+calibration,cal004,5,2,90.64,0.05272,"REDUCED:(0,)",staggered_source,True,True
+calibration,cal005,10,1,31.03,0.06221,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",strong_dissipation,False,True
+calibration,cal006,3,3,92.626,0.02925,"FULL:(0, 1, 2)",three_source;low_dof;staggered_source,True,False
+calibration,cal007,10,1,22.931,0.06149,"REDUCED:(1,)",strong_dissipation;reduced_non_node0,False,True
+calibration,cal008,10,1,120.671,0.07012,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",-,True,True
+calibration,cal009,10,3,229.998,0.05628,"REDUCED:(7, 8)",three_source;staggered_source;reduced_non_node0,True,False
+calibration,cal010,3,1,31.945,0.03772,"FULL:(0, 1, 2)",strong_dissipation;low_dof,False,True
+calibration,cal011,5,3,1926.076,0.06226,"REDUCED:(3, 4)",three_source;staggered_source;reduced_non_node0,True,False
+calibration,cal012,20,3,905.63,0.0577,"REDUCED:(6,)",three_source;high_dof;staggered_source;reduced_non_node0,True,False
+calibration,cal013,20,2,1356.877,0.06802,"REDUCED:(12, 14)",high_dof;reduced_non_node0,True,True
+calibration,cal014,5,2,728.141,0.07014,"REDUCED:(2, 3)",reduced_non_node0,True,True
+calibration,cal015,10,3,643.362,0.0316,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",three_source;staggered_source,True,False
+calibration,cal016,5,2,37.106,0.02685,"FULL:(0, 1, 2, 3, 4)",strong_dissipation;staggered_source,False,True
+calibration,cal017,20,3,249.385,0.05461,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",three_source;high_dof;staggered_source,True,False
+calibration,cal018,20,1,525.624,0.06796,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",high_dof,True,True
+calibration,cal019,10,3,154.8,0.07254,"REDUCED:(1, 7)",three_source;staggered_source;reduced_non_node0,True,False
+calibration,cal020,3,3,228.345,0.0273,"FULL:(0, 1, 2)",three_source;low_dof;staggered_source,True,False
+calibration,cal021,5,2,935.504,0.09903,"FULL:(0, 1, 2, 3, 4)",staggered_source,True,True
+calibration,cal022,5,2,382.229,0.11903,"FULL:(0, 1, 2, 3, 4)",staggered_source,True,True
+calibration,cal023,3,3,1474.496,0.0661,"REDUCED:(1, 2)",three_source;low_dof;staggered_source;reduced_non_node0,True,False
+calibration,cal024,20,3,201.808,0.08248,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",three_source;high_dof;staggered_source,True,False
+calibration,cal025,3,3,27.896,0.03824,"FULL:(0, 1, 2)",strong_dissipation;three_source;low_dof;staggered_source,False,False
+calibration,cal026,3,1,1466.272,0.06377,"FULL:(0, 1, 2)",low_dof;staggered_source,True,True
+calibration,cal027,10,3,150.228,0.05318,"REDUCED:(3, 9)",three_source;reduced_non_node0,True,False
+calibration,cal028,10,1,32.608,0.07511,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",strong_dissipation;staggered_source,False,True
+calibration,cal029,5,2,568.844,0.05607,"FULL:(0, 1, 2, 3, 4)",staggered_source,True,True
+heldout,hold_pool002,20,3,24.593,0.05564,"REDUCED:(6, 13)",strong_dissipation;three_source;high_dof;reduced_non_node0,False,False
+heldout,hold_pool014,5,2,24.934,0.06838,"REDUCED:(1, 3)",strong_dissipation;staggered_source;reduced_non_node0,False,False
+heldout,hold_pool019,5,2,31.685,0.09456,"FULL:(0, 1, 2, 3, 4)",strong_dissipation;staggered_source,False,False
+heldout,hold_pool000,3,3,401.158,0.02066,"FULL:(0, 1, 2)",three_source;low_dof;staggered_source,False,False
+heldout,hold_pool001,20,3,85.05,0.06396,"REDUCED:(8, 17)",three_source;high_dof;staggered_source;reduced_non_node0,False,False
+heldout,hold_pool005,20,3,424.105,0.07514,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",three_source;high_dof;staggered_source,False,False
+heldout,hold_pool004,3,1,1914.098,0.05476,"REDUCED:(0, 1)",low_dof,False,False
+heldout,hold_pool011,3,3,120.57,0.05123,"REDUCED:(1, 2)",three_source;low_dof;staggered_source;reduced_non_node0,False,False
+heldout,hold_pool012,3,2,700.785,0.01824,"FULL:(0, 1, 2)",low_dof;staggered_source,False,False
+heldout,hold_pool003,20,2,91.865,0.05347,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",high_dof;staggered_source,False,False
+heldout,hold_pool006,20,3,348.157,0.063,"REDUCED:(2,)",three_source;high_dof;staggered_source;reduced_non_node0,False,False
+heldout,hold_pool008,20,3,524.233,0.06268,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)",three_source;high_dof;staggered_source,False,False
+heldout,hold_pool013,3,3,1472.515,0.08438,"FULL:(0, 1, 2)",three_source;low_dof;staggered_source,False,False
+heldout,hold_pool015,3,1,276.972,0.08284,"REDUCED:(1,)",low_dof;staggered_source;reduced_non_node0,False,False
+heldout,hold_pool016,5,2,672.982,0.07711,"REDUCED:(3,)",staggered_source;reduced_non_node0,False,False
+heldout,hold_pool007,10,1,141.114,0.06199,"REDUCED:(7,)",reduced_non_node0,False,False
+heldout,hold_pool009,10,1,161.255,0.06334,"REDUCED:(2,)",reduced_non_node0,False,False
+heldout,hold_pool010,10,1,83.21,0.07433,"REDUCED:(8,)",reduced_non_node0,False,False
+heldout,hold_pool017,10,1,63.087,0.05341,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",staggered_source,False,False
+heldout,hold_pool018,10,1,817.935,0.08922,"FULL:(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)",staggered_source,False,False

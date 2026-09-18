@@ -1,0 +1,42 @@
+{
+  "gates": {
+    "T1B_M1_port_semantics": {
+      "pass": true,
+      "evidence": "合同冻结（U_T/U_Ṫ typed port+Δt_ext=1s）；A dt 不变（=边界收敛量级）；B dt-aware 收敛；naive 差分负控制确认 dt 依赖失效"
+    },
+    "T1B_M2_cross_world": {
+      "pass": true,
+      "evidence": "canonical 固定参数：A 30/30、B 30/30 QUALIFIED 跨cal 全域 + v1 ref（A retention=1.000；legacy 假放大5.72 复现）"
+    },
+    "T1B_M3_no_co_adaptation": {
+      "pass": true,
+      "evidence": "cross-pair 30 条件零失败；LORO 两排除域零失败；canonical 未经任何拟合"
+    },
+    "T1B_M4_heldout": {
+      "pass": true,
+      "evidence": "blind 一次（fingerprint 锁定+封存 SHA 校验）：A/B 20/20 QUALIFIED 含全部困难角；legacy 12 DEGRADED+8 SEMANTIC_FAIL 原样登记"
+    },
+    "T1B_M5_replay_purity": {
+      "pass": true,
+      "evidence": "4 代表 eps live=重放逐位；双 twin 无隐藏访问泄漏（A t0 等值/B 可由过去 Y 完整解释）"
+    },
+    "T1B_M6_controlled_reduction": {
+      "pass": true,
+      "evidence": "每 episode 状态带 §37 归因（WORLD_ALREADY_REDUCED vs TRANSDUCTION_LOSS）；legacy 损失全部归因 D 层；A/B 无未归因损失"
+    }
+  },
+  "verdict": "TRANSDUCTION_V2_QUALIFIED",
+  "ruling": {
+    "A_LONG_TERM_PORT_QUALIFIED": "YES",
+    "B_TRANSITION_PORT_QUALIFIED": "YES",
+    "FINAL_MAINLINE_TARGET": "A (U_T thin amplitude, 需 G0_RECONNECT 改 L1 输入语义)",
+    "G0_RECONNECT_BRIDGE": "B (U_dT explicit rate, 兼容现 L1)"
+  },
+  "occurrence_smoke": {
+    "l1_max": 10.0,
+    "collector_max": 1.0016643226401778,
+    "n_occurrences_recorded": 0,
+    "chain_alive": true
+  },
+  "next": "G0_RECONNECT"
+}

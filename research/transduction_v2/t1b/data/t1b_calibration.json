@@ -1,0 +1,28 @@
+{
+  "status_counts": {
+    "legacy": {
+      "DEGRADED": 20,
+      "SEMANTIC_FAIL": 9,
+      "QUALIFIED": 1
+    },
+    "A": {
+      "QUALIFIED": 30
+    },
+    "B": {
+      "QUALIFIED": 30
+    }
+  },
+  "co_adaptation_risk": "LOW",
+  "loro": {
+    "LORO_A_excluded(r_leak<50)": {
+      "n_excluded_eps": 7,
+      "ab_fails": 0
+    },
+    "LORO_B_excluded(3source)": {
+      "n_excluded_eps": 14,
+      "ab_fails": 0
+    }
+  },
+  "legacy_v1_artifact_reproduced": true,
+  "note_legal_region": "线性映射：1e-5..1e3 全 numeric_ok，溢出前无内在失效边界；L1 钳位子域为信息性，非门"
+}

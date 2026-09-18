@@ -1,0 +1,53 @@
+{
+  "legacy": {
+    "A-B": {
+      "D_world_hat": 0.2013,
+      "D_port_hat": 1.1522,
+      "D_port_abs": 0.004435320099823748
+    },
+    "A-C": {
+      "D_world_hat": 0.8617,
+      "D_port_hat": 1.3606,
+      "D_port_abs": 0.005676904219921333
+    },
+    "B-C": {
+      "D_world_hat": 0.8604,
+      "D_port_hat": 1.3089,
+      "D_port_abs": 0.005461116271190594
+    }
+  },
+  "A": {
+    "A-B": {
+      "D_world_hat": 0.2013,
+      "D_port_hat": 0.2013,
+      "D_port_abs": 0.005012157920008728
+    },
+    "A-C": {
+      "D_world_hat": 0.8617,
+      "D_port_hat": 0.8617,
+      "D_port_abs": 0.02145883508920271
+    },
+    "B-C": {
+      "D_world_hat": 0.8604,
+      "D_port_hat": 0.8604,
+      "D_port_abs": 0.021329621583944147
+    }
+  },
+  "B": {
+    "A-B": {
+      "D_world_hat": 0.2013,
+      "D_port_hat": 0.6889,
+      "D_port_abs": 0.021974364532718768
+    },
+    "A-C": {
+      "D_world_hat": 0.8617,
+      "D_port_hat": 0.9903,
+      "D_port_abs": 0.11718082142031887
+    },
+    "B-C": {
+      "D_world_hat": 0.8604,
+      "D_port_hat": 0.999,
+      "D_port_abs": 0.11820274719080497
+    }
+  }
+}

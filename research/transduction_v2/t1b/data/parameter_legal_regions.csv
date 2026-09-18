@@ -1,0 +1,13 @@
+param,value,numeric_ok,canonical
+S,1e-05,True,False
+S,0.001,True,False
+S,0.1,True,False
+S,1.0,True,False
+S,10.0,True,False
+S,1000.0,True,False
+g,1e-05,True,False
+g,0.001,True,False
+g,0.1,True,False
+g,1.0,True,False
+g,10.0,True,False
+g,1000.0,True,False
