@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | WT0/T1-A 两方案评判已交付 | — | — | 下一轮：WT0 执行轮（等用户对 R-1~R-4 裁定，见 交叉比对/WT0与T1A方案评判_2026-09-18.md §五；建议序 WT0→T1-A→W1→T1-B→G0） |
+| （空闲） | WT0 已完成并提交 | — | — | 下一轮：T1-A 转导结构合同轮（第一约束=角色指派+幅值/速率端口语义一致性，见 WT0_WORLD_BOUNDARY_TRANSDUCTION_CONTRACT.md §五.3；候选族三类+Q1 热感受器文献；不冻结最终参数） |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| WT0 | World–Boundary–Transduction 联合资格轮（R-1~R-4 裁定后执行）：三对象合同+Y_B 双配置冻结(R-3)；正对照 ESTABLISHED（三门 PASS，分叉 18.6811=外部基准）；Replay 两 Gate 逐位一致 HIDDEN_SIDE_CHANNEL=PASS；剂量攻击 R-4 复现 CONFIRMED（duration 390 精确吻合，q_max 差~1%归协议时长）；CrossPair 198 对合法域内无保真区（retention>1 失真或=0 湮灭）CO_ADAPTATION_RISK=HIGH；角色审计 OVERLAPPING_UNRESOLVED（u 按 dT_raw 速率语义被消费）→ 终裁 WT0_TRANSDUCTION_CONTRACT_UNRESOLVED（T1-A 解除职责重叠后 W1 方可开工，与 R-1 序一致）；回归 21+vp+tss fast 43 绿 | 2026-09-18 | f8a14da |
 | WT0/T1A评判 | 两外部方案评判分析：窗口数值核实无误；Hidden-World 正对照完全复现且补全缺失协议(t_drive=100/amp=1.0,1.996/边界=node0 单节点)；职责混叠实锤(u 按 dT_raw 速率语义消费 vs ThermalDeltaNeuron dT/dt 合同)；4 项 RULING_REQUIRED(首轮归属/T0-B 命名/Y_B 边界基数/外部 G0 数据复现)；建议合并序 WT0→T1-A→W1→T1-B→G0；存档 交叉比对/ 并抄送主仓 | 2026-09-18 | d5dcb96 |
 | Phase T0 | 𝒟_i 转导合同重资格化（测量轮，nexus_v1/tss 零改动）：资格窗双侧有界 scale∈[0.65,1.5]（0.36 十倍程，地板侧实测夹层含解析预测✓，高幅侧新发现顶棚塌缩）+u_interior 违约（参考类轨迹>92%被地板 clip，占比≤5.3%）+W0-E 窗内放大定性为基线归零失真+下游利用率41%→TRANSDUCTION_V2=REQUIRED；T1 设计要点4项登记；回归21+vp+tss fast 43 绿 | 2026-09-18 | 6548e24 |
 | 主线重启-R1 | TSS收尾与主线重启第一轮(F0+M0+W0)：TSS_FREEZE冻结文档(13项+四分类表替代目录重组)+MAINLINE_COMPONENT_AUDIT(七类归类,温感实例登记层剥离)+WORLD_V1_REQUALIFICATION(W0-A~E实测:3自由度/单尺度/线性单吸引子/域内PRESERVED域外COLLAPSE→塌缩在D_i转导窗非场层;WORLD_V2=REQUIRED)+P2_TSS对照矩阵(7行无一凭名判同);母体21+tss fast 43+G0 7/7绿 | 2026-09-18 | fbccfa1 |
