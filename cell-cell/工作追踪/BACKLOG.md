@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | Phase T0 已完成并提交 | — | — | 下一轮：T1(转导 v2 设计，需 Q1 热感受器传递函数文献) / W1(World v2 设计，与 T1 接口共设计——T0 报告 §八第④条) |
+| （空闲） | WT0/T1-A 两方案评判已交付 | — | — | 下一轮：WT0 执行轮（等用户对 R-1~R-4 裁定，见 交叉比对/WT0与T1A方案评判_2026-09-18.md §五；建议序 WT0→T1-A→W1→T1-B→G0） |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| WT0/T1A评判 | 两外部方案评判分析：窗口数值核实无误；Hidden-World 正对照完全复现且补全缺失协议(t_drive=100/amp=1.0,1.996/边界=node0 单节点)；职责混叠实锤(u 按 dT_raw 速率语义消费 vs ThermalDeltaNeuron dT/dt 合同)；4 项 RULING_REQUIRED(首轮归属/T0-B 命名/Y_B 边界基数/外部 G0 数据复现)；建议合并序 WT0→T1-A→W1→T1-B→G0；存档 交叉比对/ 并抄送主仓 | 2026-09-18 | （见下方登记） |
 | Phase T0 | 𝒟_i 转导合同重资格化（测量轮，nexus_v1/tss 零改动）：资格窗双侧有界 scale∈[0.65,1.5]（0.36 十倍程，地板侧实测夹层含解析预测✓，高幅侧新发现顶棚塌缩）+u_interior 违约（参考类轨迹>92%被地板 clip，占比≤5.3%）+W0-E 窗内放大定性为基线归零失真+下游利用率41%→TRANSDUCTION_V2=REQUIRED；T1 设计要点4项登记；回归21+vp+tss fast 43 绿 | 2026-09-18 | 6548e24 |
 | 主线重启-R1 | TSS收尾与主线重启第一轮(F0+M0+W0)：TSS_FREEZE冻结文档(13项+四分类表替代目录重组)+MAINLINE_COMPONENT_AUDIT(七类归类,温感实例登记层剥离)+WORLD_V1_REQUALIFICATION(W0-A~E实测:3自由度/单尺度/线性单吸引子/域内PRESERVED域外COLLAPSE→塌缩在D_i转导窗非场层;WORLD_V2=REQUIRED)+P2_TSS对照矩阵(7行无一凭名判同);母体21+tss fast 43+G0 7/7绿 | 2026-09-18 | fbccfa1 |
 | F1-R4 | F1 A8-v2 最小物理闭合复审(第四轮)：rail因果化(路径B电导×负载线,断电I_fb逐位0,分界720步=解析T_off*)+N=1最小化(能耗基准83.66/582.42双复现)+方法勘误3件(clamp等时长20s复测DT_LIMITED保持/census全递归1125项/spike_times分类purge实证)+M5-P第六门PASS→F1_A8v2_PHYSICALLY_VALIDATED(条件化Scale-B);新fingerprint bdbdb0305c191e94;21/21+tss fast 43绿 | 2026-09-18 | a312190 |
