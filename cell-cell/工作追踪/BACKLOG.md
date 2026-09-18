@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| T1-B | Transduction v2 跨 World 标定轮（外部 61 节方案 ADOPT with C1-C5）：①合同文档（LAYER_CATEGORY_CONFLICT 合同层裁定+MAINLINE_TIMEBASE_CONTRACT Δt_ext=1s+U_T/U_Ṫ typed port）②五脚本（dataset cal30/hold20 blind→calibration+cross-pair+LORO→timebase 三档→heldout+replay+双twin→终裁六门）③occurrence smoke④四文档+负结果；G0/L1/closure READ_ONLY，nexus/tss/world_v2 零改动 | 2026-09-19 | 评判已交付，开始合同文档 | 合同→dataset→calibration→timebase→heldout(blind一次)→smoke→终裁→收口 |
+| （空闲） | T1-B 已完成并提交（TRANSDUCTION_V2_QUALIFIED） | — | — | 下一轮：G0_RECONNECT（只做定点修改：typed port implementation / L1 input semantics / timebase plumbing / legacy compatibility；G0_PORT_CONTRACT_V2 已冻结待实施）→ Occurrence Revalidation（χ 全重验，closure 阈值 v2 重资格化——smoke 已示 occ=0）→ SCALE-0 → TSS 回接 |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| T1-B | Transduction v2 跨 World 标定轮（外部 61 节方案 ADOPT with C1-C5）：层级冲突 RESOLVED_AT_CONTRACT_LEVEL+MAINLINE_TIMEBASE_CONTRACT(Δt_ext=1s)+U_T/U_Ṫ typed port 冻结；cal30+hold20(SHA封存blind) 零拟合 canonical：A 30/30+20/20、B 30/30+20/20 QUALIFIED，legacy 全域复现旧病；cross-pair+LORO 零失败 CO_ADAPTATION=LOW；timebase 三判据（naive 差分 ×0.100/档定量证伪）；双 twin 无泄漏+replay 逐位；smoke 链路存活 occ=0 登记 → **TRANSDUCTION_V2_QUALIFIED**（A 长期口/B 过渡桥/TARGET=A/BRIDGE=B）；回归 21+vp+fast43+九冻结脚本零 diff | 2026-09-19 | c484be0 |
 | W1 | World v2 构建轮（外部 65 节方案 ADOPT with B1-B6）：world_v2_core（Spec/Sampler/Episode/BoundaryView 纯元组隔离/Ledger，production 零改动，Θ_legal 异质 κ+独立 r_leak）；六门+§39 全 PASS——M1 残差 4.96e-11+dt 三档收敛；M2 Θ_legal 系综 PR 1.06→3.33（单刺激/均匀κ低值如实并报为负结果）；M3 τ_env 100× vs τ_diff 1.00× 解绑；M4 30 episodes；M5 FULL 3.90 vs REDUCED 2e-17；M6 场隐藏+源隐藏双孪生 ESTABLISHED+因果阻断残差 2.5e-13/精确 0.0；B4 谱稳定界四点全符（逐点界漏判勘误）→ **WORLD_V2_RAW_QUALIFIED**+MAINLINE_V2_STARTED；回归 21+vp+fast 43 绿+WT0/T1A 复跑零 diff | 2026-09-18 | 894762f |
 | T1-A | Transduction–L1 职责分离轮（外部方案 ADOPT with A1-A5）：审计三合一（支路级 PORT_SEMANTIC_MISMATCH=CONFIRMED 仅 WORLD_COUPLED；生产支路 SkinPatch.dT 自洽；LAYER_CATEGORY_CONFLICT 新登记；L1=瞬时无态整流器）+Q1 五卡（速率敏感=幅值+受体内适应态涌现，载体在 L1）+R1-R8×5 候选诊断（legacy 八负结果复演；A retention≡1.0 保真基准；B 真速率敏感且不动 L1 自洽；C 层位否决 REJECTED_AT_D_LAYER；M 对照反丢区分度证实"v2 更薄"）+五门（A YES/B YES/C PARTIAL/D NOT_REQUIRED/E PORT_CHANGE_REQUIRED）→ **T1A_ARCHITECTURE_READY**+G0_PORT_CONTRACT_CHANGE_REQUIRED 登记；§29 WT0 四脚本复跑逐位一致+回归 21+vp+fast 43 绿 | 2026-09-18 | 563ac0b |
 | WT0 | World–Boundary–Transduction 联合资格轮（R-1~R-4 裁定后执行）：三对象合同+Y_B 双配置冻结(R-3)；正对照 ESTABLISHED（三门 PASS，分叉 18.6811=外部基准）；Replay 两 Gate 逐位一致 HIDDEN_SIDE_CHANNEL=PASS；剂量攻击 R-4 复现 CONFIRMED（duration 390 精确吻合，q_max 差~1%归协议时长）；CrossPair 198 对合法域内无保真区（retention>1 失真或=0 湮灭）CO_ADAPTATION_RISK=HIGH；角色审计 OVERLAPPING_UNRESOLVED（u 按 dT_raw 速率语义被消费）→ 终裁 WT0_TRANSDUCTION_CONTRACT_UNRESOLVED（T1-A 解除职责重叠后 W1 方可开工，与 R-1 序一致）；回归 21+vp+tss fast 43 绿 | 2026-09-18 | f8a14da |
