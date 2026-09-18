@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | WT0 已完成并提交 | — | — | 下一轮：T1-A 转导结构合同轮（第一约束=角色指派+幅值/速率端口语义一致性，见 WT0_WORLD_BOUNDARY_TRANSDUCTION_CONTRACT.md §五.3；候选族三类+Q1 热感受器文献；不冻结最终参数） |
+| T1-A | Transduction–L1 职责分离与 v2 结构合同（外部方案 ADOPT with A1-A5 修正）：端口语义/量纲/职责矩阵/L1 身份审计 + Q1 文献卡 + 候选族 A/B/C+双对照 + R1-R8 诊断重放套件 + 五门九问终裁；只动 research/transduction_v2/ 与文档；关键预核查已完成（ThermalDeltaNeuron 无速率状态；生产速率提取在 SkinPatch.sample；错位限于 WORLD_COUPLED 支路） | 2026-09-18 | 评判已交付，开始审计文档 | 评判存档→审计→Q1→候选族→原型R1-R8→终裁→§29回归→收口 |
 
 ---
 

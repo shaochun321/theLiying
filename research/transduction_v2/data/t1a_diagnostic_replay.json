@@ -1,0 +1,458 @@
+{
+  "contract_ref": "T1A_CANDIDATE_ARCHITECTURES_AND_METRICS.md",
+  "scenarios": {
+    "R1_rest_small": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "zero_occ": 1.0,
+        "sat_occ": 0.0,
+        "interior_occ": 0.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": -299,
+        "u_min": 0.0,
+        "u_max": 0.0,
+        "L1_max": 0.0,
+        "L1_nonzero_frac": 0.0
+      },
+      "A_thin_amplitude": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 2.736904226587198e-05,
+        "u_max": 0.001700599465017429,
+        "L1_max": 0.3401198930034858,
+        "L1_nonzero_frac": 1.0
+      },
+      "B_rate_port": {
+        "zero_occ": 0.0011111111111111111,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9988888888888889,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": -298,
+        "u_min": -0.005066684407512325,
+        "u_max": 0.005174182333637972,
+        "L1_max": 1.0348364667275944,
+        "L1_nonzero_frac": 0.3322222222222222
+      },
+      "C_sensor_state": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.91,
+        "peak_timing_offset": -134,
+        "u_min": -0.00040034594294662213,
+        "u_max": 0.000792003231522384,
+        "L1_max": 0.15840064630447678,
+        "L1_nonzero_frac": 0.3933333333333333
+      },
+      "M_math_control": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 4.975061575037161e-06,
+        "u_max": 0.00030893326797441534,
+        "L1_max": 0.06178665359488307,
+        "L1_nonzero_frac": 1.0
+      }
+    },
+    "R2_slow_ramp": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "zero_occ": 0.7066666666666667,
+        "sat_occ": 0.0,
+        "interior_occ": 0.29333333333333333,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.0,
+        "u_max": 0.038030257894698244,
+        "L1_max": 7.606051578939649,
+        "L1_nonzero_frac": 0.29333333333333333
+      },
+      "A_thin_amplitude": {
+        "zero_occ": 0.0004761904761904762,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9995238095238095,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.0,
+        "u_max": 0.09306026719180403,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 0.9995238095238095
+      },
+      "B_rate_port": {
+        "zero_occ": 0.0004761904761904762,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9995238095238095,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": 1,
+        "u_min": -0.25963888686411035,
+        "u_max": 0.014051501987347894,
+        "L1_max": 2.810300397469579,
+        "L1_nonzero_frac": 0.7138095238095238
+      },
+      "C_sensor_state": {
+        "zero_occ": 0.0004761904761904762,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9995238095238095,
+        "neg_frac_decay": 0.9766666666666667,
+        "peak_timing_offset": 197,
+        "u_min": -0.02945010759183993,
+        "u_max": 0.013930191493186559,
+        "L1_max": 2.786038298637312,
+        "L1_nonzero_frac": 0.7204761904761905
+      },
+      "M_math_control": {
+        "zero_occ": 0.0004761904761904762,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9995238095238095,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.0,
+        "u_max": 0.00966570164433916,
+        "L1_max": 1.9331403288678322,
+        "L1_nonzero_frac": 0.9995238095238095
+      }
+    },
+    "R3_fast_step": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "zero_occ": 0.29428571428571426,
+        "sat_occ": 0.5119047619047619,
+        "interior_occ": 0.19380952380952388,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": -1065,
+        "u_min": 0.0,
+        "u_max": 0.04,
+        "L1_max": 8.0,
+        "L1_nonzero_frac": 0.7057142857142857
+      },
+      "A_thin_amplitude": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.001368452113293599,
+        "u_max": 0.10538651845955618,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 1.0
+      },
+      "B_rate_port": {
+        "zero_occ": 0.0004761904761904762,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9995238095238095,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": 1,
+        "u_min": -0.2736399646937091,
+        "u_max": 0.25870911668189855,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 0.7138095238095238
+      },
+      "C_sensor_state": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": -1334,
+        "u_min": -0.039415977986372766,
+        "u_max": 0.03960016157611918,
+        "L1_max": 7.920032315223836,
+        "L1_nonzero_frac": 0.7142857142857143
+      },
+      "M_math_control": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.0002486506180971538,
+        "u_max": 0.010264903746541322,
+        "L1_max": 2.0529807493082646,
+        "L1_nonzero_frac": 1.0
+      }
+    },
+    "R4_same_peak": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "D_boundary_abs": 19.31993798744206,
+        "D_boundary_norm": 0.4280892014613338,
+        "D_port_abs": 0.014855107747231467,
+        "D_port_norm": 0.698677833710091,
+        "D_L1_abs": 2.9710215494462933,
+        "D_L1_norm": 0.698677833710091,
+        "zero_occ_mean": 0.6383333333333333,
+        "baseline_zeroing_artifact": true
+      },
+      "A_thin_amplitude": {
+        "D_boundary_abs": 19.31993798744206,
+        "D_boundary_norm": 0.4280892014613338,
+        "D_port_abs": 0.02657093304906844,
+        "D_port_norm": 0.4280892014613338,
+        "D_L1_abs": 3.0626620247416327,
+        "D_L1_norm": 0.3859469693325401,
+        "zero_occ_mean": 0.0004166666666666667,
+        "baseline_zeroing_artifact": false
+      },
+      "B_rate_port": {
+        "D_boundary_abs": 19.31993798744206,
+        "D_boundary_norm": 0.4280892014613338,
+        "D_port_abs": 0.033486772630338196,
+        "D_port_norm": 0.6782436559825654,
+        "D_L1_abs": 4.013677095871048,
+        "D_L1_norm": 0.8032322174563525,
+        "zero_occ_mean": 0.0008333333333333334,
+        "baseline_zeroing_artifact": false
+      },
+      "C_sensor_state": {
+        "D_boundary_abs": 19.31993798744206,
+        "D_boundary_norm": 0.4280892014613338,
+        "D_port_abs": 0.015286838964328031,
+        "D_port_norm": 0.5592938215124136,
+        "D_L1_abs": 2.8414509473258547,
+        "D_L1_norm": 0.6696617641413791,
+        "zero_occ_mean": 0.0004166666666666667,
+        "baseline_zeroing_artifact": false
+      },
+      "M_math_control": {
+        "D_boundary_abs": 19.31993798744206,
+        "D_boundary_norm": 0.4280892014613338,
+        "D_port_abs": 0.002575154158172634,
+        "D_port_norm": 0.3696352884569653,
+        "D_L1_abs": 0.5150308316345268,
+        "D_L1_norm": 0.36963528845696525,
+        "zero_occ_mean": 0.0004166666666666667,
+        "baseline_zeroing_artifact": false
+      }
+    },
+    "R5_hidden_history": {
+      "y_b_config": "REDUCED_N0 (positive-control)",
+      "legacy": {
+        "D_boundary_abs": 7.2704720905894895,
+        "D_boundary_norm": 0.4532664981066319,
+        "D_port_abs": 0.0003043564199467729,
+        "D_port_norm": 1.0,
+        "D_L1_abs": 0.06087128398935458,
+        "D_L1_norm": 1.0,
+        "zero_occ_mean": 0.9836363636363636,
+        "baseline_zeroing_artifact": true
+      },
+      "A_thin_amplitude": {
+        "D_boundary_abs": 7.2704720905894895,
+        "D_boundary_norm": 0.4532664981066319,
+        "D_port_abs": 0.009999163935191869,
+        "D_port_norm": 0.45326649810663194,
+        "D_L1_abs": 1.88315795689092,
+        "D_L1_norm": 0.4413124930192556,
+        "zero_occ_mean": 0.0009090909090909091,
+        "baseline_zeroing_artifact": false
+      },
+      "B_rate_port": {
+        "D_boundary_abs": 7.2704720905894895,
+        "D_boundary_norm": 0.4532664981066319,
+        "D_port_abs": 0.03929335589340667,
+        "D_port_norm": 0.9909223891670129,
+        "D_L1_abs": 1.453012665249214,
+        "D_L1_norm": 0.46487062342449104,
+        "zero_occ_mean": 0.0013636363636363637,
+        "baseline_zeroing_artifact": false
+      },
+      "C_sensor_state": {
+        "D_boundary_abs": 7.2704720905894895,
+        "D_boundary_norm": 0.4532664981066319,
+        "D_port_abs": 0.007734626868694675,
+        "D_port_norm": 0.5486363149159325,
+        "D_L1_abs": 1.4569558441078883,
+        "D_L1_norm": 0.5741380912715378,
+        "zero_occ_mean": 0.0009090909090909091,
+        "baseline_zeroing_artifact": false
+      },
+      "M_math_control": {
+        "D_boundary_abs": 7.2704720905894895,
+        "D_boundary_norm": 0.4532664981066319,
+        "D_port_abs": 0.0012765209189905416,
+        "D_port_norm": 0.39963417205912893,
+        "D_L1_abs": 0.2553041837981083,
+        "D_L1_norm": 0.399634172059129,
+        "zero_occ_mean": 0.0009090909090909091,
+        "baseline_zeroing_artifact": false
+      }
+    },
+    "R6_large": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.9996,
+        "interior_occ": 0.00039999999999995595,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": -1998,
+        "u_min": 0.013392596367574158,
+        "u_max": 0.04,
+        "L1_max": 8.0,
+        "L1_nonzero_frac": 1.0
+      },
+      "A_thin_amplitude": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.06842260566467995,
+        "u_max": 5.27164752346888,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 1.0
+      },
+      "B_rate_port": {
+        "zero_occ": 0.0004,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9996,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": 1,
+        "u_min": -13.684314040836671,
+        "u_max": 12.93545583409493,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 0.7996
+      },
+      "C_sensor_state": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": -1834,
+        "u_min": -1.9790314912670313,
+        "u_max": 1.9800080788059582,
+        "L1_max": 10.0,
+        "L1_nonzero_frac": 0.8
+      },
+      "M_math_control": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.008212951839883093,
+        "u_max": 0.029744198360825043,
+        "L1_max": 5.9488396721650085,
+        "L1_nonzero_frac": 1.0
+      }
+    },
+    "R7_weak": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "zero_occ": 1.0,
+        "sat_occ": 0.0,
+        "interior_occ": 0.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": -1999,
+        "u_min": 0.0,
+        "u_max": 0.0,
+        "L1_max": 0.0,
+        "L1_nonzero_frac": 0.0
+      },
+      "A_thin_amplitude": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 0.0001368452113293599,
+        "u_max": 0.010543295046937753,
+        "L1_max": 2.1086590093875506,
+        "L1_nonzero_frac": 1.0
+      },
+      "B_rate_port": {
+        "zero_occ": 0.0004,
+        "sat_occ": 0.0,
+        "interior_occ": 0.9996,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": 1,
+        "u_min": -0.027368628081673313,
+        "u_max": 0.025870911668189847,
+        "L1_max": 5.17418233363797,
+        "L1_nonzero_frac": 0.7996
+      },
+      "C_sensor_state": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 1.0,
+        "peak_timing_offset": -1834,
+        "u_min": -0.003958062982534056,
+        "u_max": 0.003960016157611918,
+        "L1_max": 0.7920032315223835,
+        "L1_nonzero_frac": 0.8
+      },
+      "M_math_control": {
+        "zero_occ": 0.0,
+        "sat_occ": 0.0,
+        "interior_occ": 1.0,
+        "neg_frac_decay": 0.0,
+        "peak_timing_offset": 0,
+        "u_min": 2.4875209365132942e-05,
+        "u_max": 0.0018724540735826482,
+        "L1_max": 0.3744908147165296,
+        "L1_nonzero_frac": 1.0
+      }
+    },
+    "R8_pulse_vs_sustained": {
+      "y_b_config": "REDUCED_N0",
+      "legacy": {
+        "D_boundary_abs": 19.32649810570668,
+        "D_boundary_norm": 0.9221350227327026,
+        "D_port_abs": 0.009498322431906365,
+        "D_port_norm": 1.324821184299351,
+        "D_L1_abs": 1.899664486381273,
+        "D_L1_norm": 1.324821184299351,
+        "zero_occ_mean": 0.90675,
+        "baseline_zeroing_artifact": true
+      },
+      "A_thin_amplitude": {
+        "D_boundary_abs": 19.32649810570668,
+        "D_boundary_norm": 0.9221350227327026,
+        "D_port_abs": 0.026579955255211986,
+        "D_port_norm": 0.9221350227327025,
+        "D_L1_abs": 3.290406974509105,
+        "D_L1_norm": 0.7212487592614664,
+        "zero_occ_mean": 0.0,
+        "baseline_zeroing_artifact": false
+      },
+      "B_rate_port": {
+        "D_boundary_abs": 19.32649810570668,
+        "D_boundary_norm": 0.9221350227327026,
+        "D_port_abs": 0.18347362876962733,
+        "D_port_norm": 0.981568570753557,
+        "D_L1_abs": 3.1954295220981486,
+        "D_L1_norm": 1.0024574240252213,
+        "zero_occ_mean": 0.0005,
+        "baseline_zeroing_artifact": false
+      },
+      "C_sensor_state": {
+        "D_boundary_abs": 19.32649810570668,
+        "D_boundary_norm": 0.9221350227327026,
+        "D_port_abs": 0.023325882470043198,
+        "D_port_norm": 1.1895751194653135,
+        "D_L1_abs": 3.002306523159848,
+        "D_L1_norm": 1.0933289733933895,
+        "zero_occ_mean": 0.0,
+        "baseline_zeroing_artifact": false
+      },
+      "M_math_control": {
+        "D_boundary_abs": 19.32649810570668,
+        "D_boundary_norm": 0.9221350227327026,
+        "D_port_abs": 0.002676288486939988,
+        "D_port_norm": 0.7338294396027538,
+        "D_L1_abs": 0.5352576973879977,
+        "D_L1_norm": 0.7338294396027539,
+        "zero_occ_mean": 0.0,
+        "baseline_zeroing_artifact": false
+      }
+    }
+  },
+  "candidate_C_duplication": {
+    "corr_uB_uC_on_R3": 0.6209219845757241,
+    "tau_a": 200.0
+  }
+}
