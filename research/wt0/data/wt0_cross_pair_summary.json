@@ -1,0 +1,130 @@
+{
+  "grid": {
+    "kappas": [
+      0.025,
+      0.05,
+      0.1
+    ],
+    "nodes": [
+      0,
+      2
+    ],
+    "amps": [
+      0.65,
+      1.0,
+      1.5
+    ],
+    "timings": [
+      "sus",
+      "pulse"
+    ],
+    "t_window": 2000,
+    "r_leak_binding": "10/kappa (W1 前不解绑)"
+  },
+  "n_pairs": 198,
+  "n_valid": 198,
+  "n_annihilated_full": 6,
+  "n_annihilated_red": 19,
+  "extremes": {
+    "full": {
+      "preserve": {
+        "kappa": 0.1,
+        "r_leak": 100.0,
+        "hist_x": "n0_a1.5_sus",
+        "hist_y": "n2_a1.5_sus",
+        "E_x": 450.0,
+        "E_y": 450.0,
+        "D_world_abs": 4.247642652340362,
+        "D_world_hat": 0.26425332748706737,
+        "D_bnd_red_abs": 5.202278553958026,
+        "D_bnd_red_hat": 0.28118167672675115,
+        "D_tr_full_abs": 0.0037058048187807793,
+        "D_tr_full_hat": 1.3282342929859168,
+        "D_tr_red_abs": 0.0045386654461799965,
+        "D_tr_red_hat": 0.9781494080812836,
+        "retention_full": 5.02636733325873,
+        "retention_red": 3.4787096352364277,
+        "floor_x": 0.9331666666666667,
+        "floor_y": 0.9331666666666667,
+        "ceil_x": 0.0,
+        "ceil_y": 0.0,
+        "int_x": 0.041666666666666664,
+        "int_y": 0.041666666666666664
+      },
+      "loss": {
+        "kappa": 0.1,
+        "r_leak": 100.0,
+        "hist_x": "n0_a0.65_sus",
+        "hist_y": "n0_a1_sus",
+        "E_x": 195.00000000000105,
+        "E_y": 300.0,
+        "D_world_abs": 3.750630610045672,
+        "D_world_hat": 0.3500000000000001,
+        "D_bnd_red_abs": 4.3170131498403395,
+        "D_bnd_red_hat": 0.3500000000000001,
+        "D_tr_full_abs": 0.0,
+        "D_tr_full_hat": 0.0,
+        "D_tr_red_abs": 0.0,
+        "D_tr_red_hat": 0.0,
+        "retention_full": 0.0,
+        "retention_red": 0.0,
+        "floor_x": 1.0,
+        "floor_y": 1.0,
+        "ceil_x": 0.0,
+        "ceil_y": 0.0,
+        "int_x": 0.0,
+        "int_y": 0.0
+      }
+    },
+    "red": {
+      "preserve": {
+        "kappa": 0.1,
+        "r_leak": 100.0,
+        "hist_x": "n0_a1_sus",
+        "hist_y": "n2_a1.5_sus",
+        "E_x": 300.0,
+        "E_y": 450.0,
+        "D_world_abs": 6.382550012806019,
+        "D_world_hat": 0.3970696729413733,
+        "D_bnd_red_abs": 2.666845265984163,
+        "D_bnd_red_hat": 0.1907752849538479,
+        "D_tr_full_abs": 0.002790023445675387,
+        "D_tr_full_hat": 1.0,
+        "D_tr_red_abs": 0.0001883386609973323,
+        "D_tr_red_hat": 1.0,
+        "retention_full": 2.5184497032782667,
+        "retention_red": 5.241769132945699,
+        "floor_x": 1.0,
+        "floor_y": 0.9331666666666667,
+        "ceil_x": 0.0,
+        "ceil_y": 0.0,
+        "int_x": 0.0,
+        "int_y": 0.041666666666666664
+      },
+      "loss": {
+        "kappa": 0.025,
+        "r_leak": 400.0,
+        "hist_x": "n2_a0.65_sus",
+        "hist_y": "n2_a0.65_pulse",
+        "E_x": 195.00000000000105,
+        "E_y": 195.00000000000017,
+        "D_world_abs": 12.219303978524877,
+        "D_world_hat": 0.6568936751761835,
+        "D_bnd_red_abs": 8.890791950577492,
+        "D_bnd_red_hat": 0.55878178843458,
+        "D_tr_full_abs": 0.004652981946350373,
+        "D_tr_full_hat": 1.2650454053650113,
+        "D_tr_red_abs": 0.0,
+        "D_tr_red_hat": 0.0,
+        "retention_full": 1.9257993388743122,
+        "retention_red": 0.0,
+        "floor_x": 0.9498333333333333,
+        "floor_y": 0.977,
+        "ceil_x": 0.0,
+        "ceil_y": 0.0036666666666666666,
+        "int_x": 0.029,
+        "int_y": 0.012
+      }
+    }
+  }
+}

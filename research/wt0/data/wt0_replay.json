@@ -1,0 +1,25 @@
+{
+  "config": {
+    "t_drive": 900,
+    "t_decay": 3000,
+    "drive_node": 0,
+    "drive_amp": 1.0,
+    "site_index": 28,
+    "rearm_min_steps": 500
+  },
+  "gate0_pass": true,
+  "gate1_pass": true,
+  "gate0_first_divergence_step": null,
+  "gate1_first_divergence_step": null,
+  "occurrences_live": [
+    {
+      "t": 3328,
+      "t_up": 673,
+      "t_down": 2828,
+      "t_rearm": 3328,
+      "epoch_id": 1,
+      "count": 1
+    }
+  ],
+  "hidden_side_channel": "PASS"
+}
