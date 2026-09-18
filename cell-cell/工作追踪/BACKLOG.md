@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| W1 | World v2 构建轮（外部 65 节方案 ADOPT with B1-B6）：research/world_v2/ 核心四对象（Spec/Sampler/Episode/BoundaryView/Ledger，production 零改动）+4 资格实验（六门 M1-M6/NC1-5/E1-5/极端案例；阈值预登记 ε_B<1e-2, ε_X>0.2, ε_F>5e-2）+4 文档+终裁十二问；复用 ThermalFieldGraph(总能量/closure_residual 在产)+DynamicHeatSource(energy_remaining 在产)；M3 零代码（r_leak 本就自由参数） | 2026-09-18 | 评判已交付，开始 world_v2_core | 评判存档→core→structure_scan→hidden_twins→physics_audit→final_qualification→文档→收口 |
+| （空闲） | W1 已完成并提交（WORLD_V2_RAW_QUALIFIED） | — | — | 下一轮：T1-B（World v1 reference + v2 calibration + v2 **held-out** 三集合上完成 Transduction v2 终选与参数标定；cross-pair 共谋攻击必做；开工时先裁定 LAYER_CATEGORY_CONFLICT 文字归类——B3 折中）；之后 G0 reconnect→occurrence revalidation→SCALE-0→TSS 回接（§54 主线不再变化） |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| W1 | World v2 构建轮（外部 65 节方案 ADOPT with B1-B6）：world_v2_core（Spec/Sampler/Episode/BoundaryView 纯元组隔离/Ledger，production 零改动，Θ_legal 异质 κ+独立 r_leak）；六门+§39 全 PASS——M1 残差 4.96e-11+dt 三档收敛；M2 Θ_legal 系综 PR 1.06→3.33（单刺激/均匀κ低值如实并报为负结果）；M3 τ_env 100× vs τ_diff 1.00× 解绑；M4 30 episodes；M5 FULL 3.90 vs REDUCED 2e-17；M6 场隐藏+源隐藏双孪生 ESTABLISHED+因果阻断残差 2.5e-13/精确 0.0；B4 谱稳定界四点全符（逐点界漏判勘误）→ **WORLD_V2_RAW_QUALIFIED**+MAINLINE_V2_STARTED；回归 21+vp+fast 43 绿+WT0/T1A 复跑零 diff | 2026-09-18 | 894762f |
 | T1-A | Transduction–L1 职责分离轮（外部方案 ADOPT with A1-A5）：审计三合一（支路级 PORT_SEMANTIC_MISMATCH=CONFIRMED 仅 WORLD_COUPLED；生产支路 SkinPatch.dT 自洽；LAYER_CATEGORY_CONFLICT 新登记；L1=瞬时无态整流器）+Q1 五卡（速率敏感=幅值+受体内适应态涌现，载体在 L1）+R1-R8×5 候选诊断（legacy 八负结果复演；A retention≡1.0 保真基准；B 真速率敏感且不动 L1 自洽；C 层位否决 REJECTED_AT_D_LAYER；M 对照反丢区分度证实"v2 更薄"）+五门（A YES/B YES/C PARTIAL/D NOT_REQUIRED/E PORT_CHANGE_REQUIRED）→ **T1A_ARCHITECTURE_READY**+G0_PORT_CONTRACT_CHANGE_REQUIRED 登记；§29 WT0 四脚本复跑逐位一致+回归 21+vp+fast 43 绿 | 2026-09-18 | 563ac0b |
 | WT0 | World–Boundary–Transduction 联合资格轮（R-1~R-4 裁定后执行）：三对象合同+Y_B 双配置冻结(R-3)；正对照 ESTABLISHED（三门 PASS，分叉 18.6811=外部基准）；Replay 两 Gate 逐位一致 HIDDEN_SIDE_CHANNEL=PASS；剂量攻击 R-4 复现 CONFIRMED（duration 390 精确吻合，q_max 差~1%归协议时长）；CrossPair 198 对合法域内无保真区（retention>1 失真或=0 湮灭）CO_ADAPTATION_RISK=HIGH；角色审计 OVERLAPPING_UNRESOLVED（u 按 dT_raw 速率语义被消费）→ 终裁 WT0_TRANSDUCTION_CONTRACT_UNRESOLVED（T1-A 解除职责重叠后 W1 方可开工，与 R-1 序一致）；回归 21+vp+tss fast 43 绿 | 2026-09-18 | f8a14da |
 | WT0/T1A评判 | 两外部方案评判分析：窗口数值核实无误；Hidden-World 正对照完全复现且补全缺失协议(t_drive=100/amp=1.0,1.996/边界=node0 单节点)；职责混叠实锤(u 按 dT_raw 速率语义消费 vs ThermalDeltaNeuron dT/dt 合同)；4 项 RULING_REQUIRED(首轮归属/T0-B 命名/Y_B 边界基数/外部 G0 数据复现)；建议合并序 WT0→T1-A→W1→T1-B→G0；存档 交叉比对/ 并抄送主仓 | 2026-09-18 | d5dcb96 |
