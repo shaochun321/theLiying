@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| G0-R0 | 统一物理时间与多率回接（外部 45 节方案 ADOPT with D1-D6；**含 D2 勘误：T1-B C2"dt 非物理秒"断言被代码证据推翻，状态 A 成立**）：时间语义普查+census→MultiRateScheduler(N_sub=1000, S0/S1/S2×A/B0/B1)+连续参照→dt_G 不变性攻击+延迟/RC/剂量审计→multirate replay+Twin-2+B bridge 五场景→六门终裁；production READ_ONLY，只增 research/g0_reconnect/r0/ | 2026-09-19 | 评判已交付，开始时间审计 | 审计→scheduler→invariance→replay/bridge→终裁→文档→§42全量回归→收口 |
+| （空闲） | G0-R0 已完成并提交（G0_MULTIRATE_TIMEBASE_QUALIFIED） | — | — | 下一轮：G0-R1（**首次动 production 定点修改**：typed port implementation / B transition bridge / A target port plumbing / L1 input semantics rename / legacy compatibility + G0-R0 例外修复[L1 trace dt 化/delay_steps dt-aware/closure n→t_phys 映射]）→ Occurrence Revalidation（χ 全重验 + closure 阈值与 g 量级物理秒制重标；G0-R0 已示 bridge occ=1×5 与 L1 饱和 33.3% 信号；'逐状态比较非合法验收面'教训） |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| G0-R0 | 统一物理时间与多率回接（外部 45 节 ADOPT with D1-D6）：**状态 A 裁定**（GENERATOR_DT=0.001 物理秒，行为实验 E1-E4；T1-B C2 断言勘误）；census+例外三项定点登记；MultiRateScheduler N_sub=1000，S1=CANONICAL（因果性登记）；全向量 D4 FIRST_RESULT FAIL 原样保留→两层分解：Tier-1 接口一阶收敛（比 0.101）/Tier-2=G0_OSCILLATOR_PHASE_SENSITIVITY（先证 exp_P2A1b_3）；RC τ 五位不变；DELAY_STEP_COUPLING 实证（隐性）；剂量 1.0010 无复制+旧 1:1 耦合=0.00101 定量化；replay 逐位+Twin-2 无泄漏+B 桥五场景 PASS 且 occ=1×5（登记）+B_BRIDGE_L1_SATURATION → **G0_MULTIRATE_TIMEBASE_QUALIFIED**；回归 21+vp+fast43+12 冻结脚本零 diff+git 完整性核查 OK | 2026-09-19 | fbaf57f |
 | T1-B | Transduction v2 跨 World 标定轮（外部 61 节方案 ADOPT with C1-C5）：层级冲突 RESOLVED_AT_CONTRACT_LEVEL+MAINLINE_TIMEBASE_CONTRACT(Δt_ext=1s)+U_T/U_Ṫ typed port 冻结；cal30+hold20(SHA封存blind) 零拟合 canonical：A 30/30+20/20、B 30/30+20/20 QUALIFIED，legacy 全域复现旧病；cross-pair+LORO 零失败 CO_ADAPTATION=LOW；timebase 三判据（naive 差分 ×0.100/档定量证伪）；双 twin 无泄漏+replay 逐位；smoke 链路存活 occ=0 登记 → **TRANSDUCTION_V2_QUALIFIED**（A 长期口/B 过渡桥/TARGET=A/BRIDGE=B）；回归 21+vp+fast43+九冻结脚本零 diff | 2026-09-19 | c484be0 |
 | W1 | World v2 构建轮（外部 65 节方案 ADOPT with B1-B6）：world_v2_core（Spec/Sampler/Episode/BoundaryView 纯元组隔离/Ledger，production 零改动，Θ_legal 异质 κ+独立 r_leak）；六门+§39 全 PASS——M1 残差 4.96e-11+dt 三档收敛；M2 Θ_legal 系综 PR 1.06→3.33（单刺激/均匀κ低值如实并报为负结果）；M3 τ_env 100× vs τ_diff 1.00× 解绑；M4 30 episodes；M5 FULL 3.90 vs REDUCED 2e-17；M6 场隐藏+源隐藏双孪生 ESTABLISHED+因果阻断残差 2.5e-13/精确 0.0；B4 谱稳定界四点全符（逐点界漏判勘误）→ **WORLD_V2_RAW_QUALIFIED**+MAINLINE_V2_STARTED；回归 21+vp+fast 43 绿+WT0/T1A 复跑零 diff | 2026-09-18 | 894762f |
 | T1-A | Transduction–L1 职责分离轮（外部方案 ADOPT with A1-A5）：审计三合一（支路级 PORT_SEMANTIC_MISMATCH=CONFIRMED 仅 WORLD_COUPLED；生产支路 SkinPatch.dT 自洽；LAYER_CATEGORY_CONFLICT 新登记；L1=瞬时无态整流器）+Q1 五卡（速率敏感=幅值+受体内适应态涌现，载体在 L1）+R1-R8×5 候选诊断（legacy 八负结果复演；A retention≡1.0 保真基准；B 真速率敏感且不动 L1 自洽；C 层位否决 REJECTED_AT_D_LAYER；M 对照反丢区分度证实"v2 更薄"）+五门（A YES/B YES/C PARTIAL/D NOT_REQUIRED/E PORT_CHANGE_REQUIRED）→ **T1A_ARCHITECTURE_READY**+G0_PORT_CONTRACT_CHANGE_REQUIRED 登记；§29 WT0 四脚本复跑逐位一致+回归 21+vp+fast 43 绿 | 2026-09-18 | 563ac0b |
