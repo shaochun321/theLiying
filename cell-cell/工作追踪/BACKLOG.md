@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| T1-A | Transduction–L1 职责分离与 v2 结构合同（外部方案 ADOPT with A1-A5 修正）：端口语义/量纲/职责矩阵/L1 身份审计 + Q1 文献卡 + 候选族 A/B/C+双对照 + R1-R8 诊断重放套件 + 五门九问终裁；只动 research/transduction_v2/ 与文档；关键预核查已完成（ThermalDeltaNeuron 无速率状态；生产速率提取在 SkinPatch.sample；错位限于 WORLD_COUPLED 支路） | 2026-09-18 | 评判已交付，开始审计文档 | 评判存档→审计→Q1→候选族→原型R1-R8→终裁→§29回归→收口 |
+| （空闲） | T1-A 已完成并提交 | — | — | 下一轮：W1（World v2 建设——三缺口：局部自由度/独立时间尺度解绑 r_leak=10κ⁻¹/驱动复杂性；不加模态不造混沌；§18 禁按转导窗调参；raw boundary qualification 先行）；T1-B 前须裁定 LAYER_CATEGORY_CONFLICT |
 
 ---
 
@@ -48,6 +48,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| T1-A | Transduction–L1 职责分离轮（外部方案 ADOPT with A1-A5）：审计三合一（支路级 PORT_SEMANTIC_MISMATCH=CONFIRMED 仅 WORLD_COUPLED；生产支路 SkinPatch.dT 自洽；LAYER_CATEGORY_CONFLICT 新登记；L1=瞬时无态整流器）+Q1 五卡（速率敏感=幅值+受体内适应态涌现，载体在 L1）+R1-R8×5 候选诊断（legacy 八负结果复演；A retention≡1.0 保真基准；B 真速率敏感且不动 L1 自洽；C 层位否决 REJECTED_AT_D_LAYER；M 对照反丢区分度证实"v2 更薄"）+五门（A YES/B YES/C PARTIAL/D NOT_REQUIRED/E PORT_CHANGE_REQUIRED）→ **T1A_ARCHITECTURE_READY**+G0_PORT_CONTRACT_CHANGE_REQUIRED 登记；§29 WT0 四脚本复跑逐位一致+回归 21+vp+fast 43 绿 | 2026-09-18 | 563ac0b |
 | WT0 | World–Boundary–Transduction 联合资格轮（R-1~R-4 裁定后执行）：三对象合同+Y_B 双配置冻结(R-3)；正对照 ESTABLISHED（三门 PASS，分叉 18.6811=外部基准）；Replay 两 Gate 逐位一致 HIDDEN_SIDE_CHANNEL=PASS；剂量攻击 R-4 复现 CONFIRMED（duration 390 精确吻合，q_max 差~1%归协议时长）；CrossPair 198 对合法域内无保真区（retention>1 失真或=0 湮灭）CO_ADAPTATION_RISK=HIGH；角色审计 OVERLAPPING_UNRESOLVED（u 按 dT_raw 速率语义被消费）→ 终裁 WT0_TRANSDUCTION_CONTRACT_UNRESOLVED（T1-A 解除职责重叠后 W1 方可开工，与 R-1 序一致）；回归 21+vp+tss fast 43 绿 | 2026-09-18 | f8a14da |
 | WT0/T1A评判 | 两外部方案评判分析：窗口数值核实无误；Hidden-World 正对照完全复现且补全缺失协议(t_drive=100/amp=1.0,1.996/边界=node0 单节点)；职责混叠实锤(u 按 dT_raw 速率语义消费 vs ThermalDeltaNeuron dT/dt 合同)；4 项 RULING_REQUIRED(首轮归属/T0-B 命名/Y_B 边界基数/外部 G0 数据复现)；建议合并序 WT0→T1-A→W1→T1-B→G0；存档 交叉比对/ 并抄送主仓 | 2026-09-18 | d5dcb96 |
 | Phase T0 | 𝒟_i 转导合同重资格化（测量轮，nexus_v1/tss 零改动）：资格窗双侧有界 scale∈[0.65,1.5]（0.36 十倍程，地板侧实测夹层含解析预测✓，高幅侧新发现顶棚塌缩）+u_interior 违约（参考类轨迹>92%被地板 clip，占比≤5.3%）+W0-E 窗内放大定性为基线归零失真+下游利用率41%→TRANSDUCTION_V2=REQUIRED；T1 设计要点4项登记；回归21+vp+tss fast 43 绿 | 2026-09-18 | 6548e24 |
