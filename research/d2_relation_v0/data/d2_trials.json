@@ -1,0 +1,45 @@
+{
+ "T1_mirror_rmse": 0.02152368825416898,
+ "T1_pass_prediction": false,
+ "T2_dt_axis": [
+  4.336114314244926,
+  3.3352082324772376,
+  2.636329852194571
+ ],
+ "T2_pass": true,
+ "T3_rmse": 0.6652334778835973,
+ "T3_pass": true,
+ "T4_order": [
+  5.232840862129589,
+  4.5270800290261715,
+  3.6188382195171602,
+  3.3352082324772376
+ ],
+ "T4_pass": true,
+ "T5_pass": true,
+ "T6_pass": true,
+ "T7_pass": true,
+ "NC1": {
+  "signal_C2": 0.9843725892128987,
+  "signal_C3l": 0.0,
+  "RELATION_SIGNAL": true,
+  "RELATION_PROCESS": "NO (stateless by construction)"
+ },
+ "NC2_memoryless_counterexample": {
+  "t_pre": 0,
+  "x_pre": 0.0,
+  "t_gap": 2475,
+  "x_gap": 1.1890818678623387,
+  "pass": true
+ },
+ "NC3": {
+  "x_max_zero_input": 0.0,
+  "pass": true,
+  "note": "无源 RC，无自持振荡；无父支撑⇒ΔC_phys=0"
+ },
+ "NC4_blockA_rmse": 0.5857357123181702,
+ "NC4_blockB_rmse": 0.6552256755094347,
+ "NC4_pass": true,
+ "attack_replaceB_peak": 3.3469433817281606,
+ "attack_pass": true
+}
