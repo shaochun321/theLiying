@@ -1,0 +1,19 @@
+{
+ "twin": {
+  "t0": 3000,
+  "u_at_t0": [
+   0.0,
+   0.0
+  ],
+  "x_X_t0": 0.5592184329546641,
+  "x_Y_t0": 0.049341368992627574,
+  "dx_t0": 0.5098770639620366,
+  "future_rmse": 0.11854148463224731,
+  "c6_relation_memory": true
+ },
+ "ruling": "RELATION_STATE_CAUSALLY_SUPPORTED",
+ "sham_ok": true,
+ "tier0_insufficient": true,
+ "minimal_sufficient_state_candidate": "RelationCell membrane state (single-cell x_rho carrier)",
+ "stop": "RELATION_MINIMAL_SUFFICIENT_STATE_CANDIDATE + STOP_DEEPER_DECOMPOSITION (反馈§十三/§十七)"
+}
