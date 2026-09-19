@@ -69,6 +69,8 @@ from nexus_v1.components.structural_address import (
     AddressRegistry, GeneratedAddress, DOMAIN_RELATION_PREC,
 )
 from nexus_v1.circuit.bundle import SynapticBundle, BundleConfig
+# G0-R1 D1: shared dt-aware trace decay helper (single source of truth).
+from nexus_v1.somatosensory.transducer_neurons import trace_decay_factor
 from .boundary_process import CollectorBoundaryPort
 
 # ─────────────────────────────────────────────────────────────────────
@@ -99,6 +101,10 @@ class RelationInputNeuron(Neuron):
           比较器完成，此处再加 RC 会双重滤波。
     """
 
+    # G0-R1 D1: per-step factor AT dt=0.001 (canonical GENERATOR_DT);
+    # actual per-call factor is trace_decay_factor(0.99, dt) — same debt
+    # family as the three transducer neurons (this class cites the
+    # ThermalInputNeuron precedent), fixed under the same R-4 ruling.
     _TRACE_DECAY: float = 0.99
 
     def __init__(self, ident: str, position: tuple = (0.0, 0.0, 0.0)) -> None:
@@ -120,7 +126,8 @@ class RelationInputNeuron(Neuron):
                 f"RelationInputNeuron: 关系电流必须非负，收到 {r_current!r}"
                 "——上游必须是 PhysicalThetaComparator 输出")
         self.activation = r_current
-        self.pre_trace = (self.pre_trace * self._TRACE_DECAY
+        # G0-R1 D1: dt-aware decay (bit-exact 0.99 at dt=0.001, see helper).
+        self.pre_trace = (self.pre_trace * trace_decay_factor(self._TRACE_DECAY, dt)
                           + abs(self.activation))
         self.pre_trace = min(self.pre_trace, 10.0)
         self._activation_ema += 0.01 * (abs(self.activation) - self._activation_ema)

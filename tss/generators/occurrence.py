@@ -101,6 +101,11 @@ _DEFAULT_THETA_DOWN = 0.1 * _DEFAULT_THETA_UP
 # EXP-P2A1b3-CALIBRATED：替换原 0 占位值。用
 # exp_P2A1b_3_closure_calibration.py 对真实映射轨迹下的短时重复振荡做
 # rearm_min_steps 扫描标定得出（见模块 docstring Q3 完整推导与已知限制）。
+# G0-R1 D3 物理语义登记：500 generator steps ≡ rearm_tau_s = 0.5 s
+# （GENERATOR_DT=0.001 物理秒，G0-R0 状态A裁定；见 G0R0_PHYSICAL_TIME_AUDIT
+# §三——旧 1:1 耦合下曾被误当作"500 个边界样本=500 s 外部时间"使用）。
+# 计数器表示保留 by design（G0R0_TIMEBASE_CONTRACT §22）；物理秒经
+# `Occurrence.to_physical(dt)` / `OccurrenceClosure.dt` 映射输出。
 _DEFAULT_REARM_MIN_STEPS = 500
 
 
@@ -169,6 +174,19 @@ class Occurrence:
         `generator_address`/`epoch_id` 已经是本对象的既定字段。"""
         return OccurrenceInstanceId(generator_address=self.address, epoch_id=self.epoch_id)
 
+    def to_physical(self, dt: float) -> Tuple[float, float, float]:
+        """G0-R1 D3：n→t_phys 映射——(t_up·dt, t_down·dt, t_rearm·dt) 物理秒。
+
+        计数器三边界保留 by design（G0R0_TIMEBASE_CONTRACT §22：内部允许
+        继续保存 step counter，但正式 occurrence 必须可直接输出物理秒）。
+        `dt` 由调用方显式传入（canonical GENERATOR_DT=0.001，G0-R0 状态A
+        裁定）——不在 frozen dataclass 内存 dt，避免同一 Occurrence 在
+        不同 dt 语境下产生歧义。
+        """
+        if dt <= 0:
+            raise ValueError(f"Occurrence.to_physical: dt must be > 0, got {dt!r}")
+        return (self.t_up * dt, self.t_down * dt, self.t_rearm * dt)
+
 
 @dataclass(frozen=True)
 class TransitionEvent:
@@ -223,6 +241,10 @@ class OccurrenceClosure:
     theta_up: float = _DEFAULT_THETA_UP
     theta_down: float = _DEFAULT_THETA_DOWN
     rearm_min_steps: int = _DEFAULT_REARM_MIN_STEPS
+    # G0-R1 D3：可选物理步长（秒）。None=纯计数器语义（legacy，零改动）；
+    # 设置后消费方可用 `ev.to_physical(closure.dt)` 直接得物理秒三边界。
+    # 不参与状态机逻辑本身——内部三边界仍为 int step_index（by design）。
+    dt: Optional[float] = None
 
     _phase: _ClosurePhase = field(default=_ClosurePhase.ARMED, repr=False)
     _t_up: Optional[int] = field(default=None, repr=False)

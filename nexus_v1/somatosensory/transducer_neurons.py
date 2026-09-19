@@ -57,6 +57,37 @@ _NOCI_TRANSDUCER_GAIN: float = 1.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# G0-R1 D1 fix — dt-aware trace decay (physical time semantics)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# NORM: G0-R1 D1 fix — pre_trace decays in physical time, not per call.
+# Legacy 0.99/step was implicitly calibrated at the canonical
+# GENERATOR_DT = 0.001 s (G0-R0 state-A ruling, G0R0_TIMEBASE_CONTRACT §三):
+#   tau_phys = -REF_DT / ln(0.99) ≈ 99.5 ms  (the "τ ≈ 100 steps = 0.1 s"
+#   annotation on ThermalInputNeuron._TRACE_DECAY).
+# Anchoring: at dt == _TRACE_REF_DT the factor is exactly the legacy
+# per-step constant (bit-exact fast path), so all canonical-dt behavior is
+# unchanged; at any other dt the decay follows decay_ref ** (dt/REF_DT)
+# = exp(-dt/tau_phys), removing the DISCRETE_COUNTER drift measured by
+# G0-R0 E4 (ratio 0.500 across dt halving).
+_TRACE_REF_DT: float = 0.001
+
+
+def trace_decay_factor(decay_at_ref: float, dt: float) -> float:
+    """Per-call trace decay factor for physical timestep ``dt``.
+
+    The ``dt == _TRACE_REF_DT`` branch is a bit-exact numerical anchor
+    (returns the legacy constant unchanged), not a behavioral decision —
+    the general expression evaluates to the same value up to float
+    rounding; the fast path guarantees the G0-R1 zero-diff acceptance
+    criterion at the canonical timestep.
+    """
+    if dt == _TRACE_REF_DT:
+        return decay_at_ref
+    return decay_at_ref ** (dt / _TRACE_REF_DT)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ThermalInputNeuron — TRPV3/TRPM8 warm/cool detector bridge
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,7 +108,9 @@ class ThermalInputNeuron(Neuron):
     # REF: Moqrich et al. 2005 Science 307:1468 — TRPV3 expressed in keratinocytes.
     T_THRESHOLD: float = 0.05
 
-    # Trace decay: τ ≈ 100 steps = 0.1s (for Census/Noether visibility).
+    # Trace decay: tau_phys ≈ 0.1 s (for Census/Noether visibility).
+    # G0-R1 D1: value is the per-step factor AT dt=_TRACE_REF_DT; actual
+    # per-call factor is trace_decay_factor(0.99, dt) — physical-time decay.
     _TRACE_DECAY: float = 0.99
 
     def __init__(self, patch_id: str,
@@ -112,7 +145,8 @@ class ThermalInputNeuron(Neuron):
         self.activation = max(0.0, T_raw - self.T_THRESHOLD)
 
         # Traces for Bundle propagation and Census/Noether audit.
-        self.pre_trace = (self.pre_trace * self._TRACE_DECAY
+        # G0-R1 D1: dt-aware decay (bit-exact 0.99 at dt=0.001, see helper).
+        self.pre_trace = (self.pre_trace * trace_decay_factor(self._TRACE_DECAY, dt)
                           + abs(self.activation))
         self.pre_trace = min(self.pre_trace, 10.0)
         self._activation_ema += 0.01 * (abs(self.activation) - self._activation_ema)
@@ -162,7 +196,8 @@ class NociInputNeuron(Neuron):
         """
         # Rectified passthrough: TRPV1/TRPA1 respond only to positive stimuli
         self.activation = max(0.0, noci_total)
-        self.pre_trace = (self.pre_trace * self._TRACE_DECAY
+        # G0-R1 D1: dt-aware decay (bit-exact 0.99 at dt=0.001, see helper).
+        self.pre_trace = (self.pre_trace * trace_decay_factor(self._TRACE_DECAY, dt)
                           + abs(self.activation))
         self.pre_trace = min(self.pre_trace, 10.0)
         self._activation_ema += 0.01 * (abs(self.activation) - self._activation_ema)
@@ -316,7 +351,8 @@ class ThermalDeltaNeuron(Neuron):
         """
         self.activation = min(
             max(0.0, dT_raw * _WARM_ONSET_GAIN), self._ACTIVATION_MAX)
-        self.pre_trace = (self.pre_trace * self._TRACE_DECAY
+        # G0-R1 D1: dt-aware decay (bit-exact 0.99 at dt=0.001, see helper).
+        self.pre_trace = (self.pre_trace * trace_decay_factor(self._TRACE_DECAY, dt)
                           + abs(self.activation))
         self.pre_trace = min(self.pre_trace, 10.0)
         self._activation_ema += 0.01 * (abs(self.activation) - self._activation_ema)

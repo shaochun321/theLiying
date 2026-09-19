@@ -291,6 +291,32 @@ class BaseGenerator:
         # P2-A1b-3R 传入门控，见 tick() 同名注释。
         return self.closure.update(self.sense(), t_step, phys_support=(self.l1.activation > 0))
 
+    def tick_rate_port(self, sample, dt: float,
+                       t_step: int) -> Optional[Occurrence]:
+        """G0-R1 R1-1：typed 速率口入口（RATE_PORT 语义显式化）。
+
+        L1（ThermalDeltaNeuron）的输入合同是**速率**（dT/dt，Type II AMH，
+        见该类 BIO 注释）——历史上裸 `dT_raw` 浮点数让幅值与速率语义在
+        调用侧混用（WT0 角色审计 OVERLAPPING、T1-A 支路级
+        PORT_SEMANTIC_MISMATCH）。本入口只接受
+        `tss.adapters.typed_ports.UdotTSample`（port=="U_dotT"），把语义
+        检查前移到类型层；幅值样本（UTSample）在此被拒绝——A 长期口的
+        接入属 G0_RECONNECT 升级合同（见 `amplitude_port_stub()`）。
+
+        物理路径与 `tick()` 完全相同（薄包装，不新增电路/不改传播），
+        `dt` 仍是生成元积分步（canonical GENERATOR_DT=0.001 物理秒，
+        G0-R0 状态A裁定）；速率样本在一个 Δt_ext 区间内由调用方按
+        LIVE_CAUSAL_POLICY/REFERENCE_RECONSTRUCTION_POLICY 展开为子步
+        序列（见 typed_ports 模块 docstring 与 MultiRateScheduler）。
+        """
+        from tss.adapters.typed_ports import UdotTSample  # 惰性避环
+        if not isinstance(sample, UdotTSample):
+            raise TypeError(
+                f"tick_rate_port 只接受 UdotTSample（RATE_PORT）；收到 "
+                f"{type(sample).__name__}。幅值口（UTSample）须走 "
+                "G0_RECONNECT 升级合同（amplitude_port_stub）。")
+        return self.tick(sample.value, dt, t_step)
+
 
 def wrap_base_generator(
     circuit, site_index: int, registry: AddressRegistry, *,

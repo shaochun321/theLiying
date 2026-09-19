@@ -46,7 +46,17 @@ class BundleConfig:
     # Propagation delay in steps (models axon conduction time)
     # REF: myelinated axon ~100m/s, unmyelinated ~1m/s
     # feedforward=0, feedback=5, cross_axis=2, shadow=10
+    # DEPRECATED_STEP_SEMANTICS (G0-R1 D2): literal step count whose
+    # physical duration drifts with dt (DELAY_STEP_COUPLING, G0R0
+    # TIMEBASE_CONTRACT §三). Kept bit-identical for all existing call
+    # sites; new code should set delay_tau_s instead.
     delay_steps: int = 0
+    # G0-R1 D2 (new canonical): propagation delay in physical seconds.
+    # When set, SynapticBundle resolves delay_steps = round(delay_tau_s/dt)
+    # at construction (pass dt= to SynapticBundle; precedent: DelayedBundle
+    # in bundle_v2 computes tau_steps = round(tau_ms/dt_ms) the same way).
+    # Mutually exclusive with a non-zero legacy delay_steps.
+    delay_tau_s: Optional[float] = None
     # Bundle role tag for circulation analysis
     bundle_role: str = "feedforward"  # feedforward|feedback|cross_axis|shadow
 
@@ -161,11 +171,30 @@ class SynapticBundle:
     """
 
     def __init__(self, config: BundleConfig,
-                 sources: List[Neuron], targets: List[Neuron]):
+                 sources: List[Neuron], targets: List[Neuron],
+                 dt: Optional[float] = None):
         self.id = config.bundle_id
         self.config = config
         self.sources = sources
         self.targets = targets
+
+        # ── G0-R1 D2: resolve physical-time delay to steps at construction ──
+        # Legacy path (delay_tau_s is None) is untouched: delay_steps keeps
+        # its literal-step semantics and all existing call sites (which never
+        # pass dt) are bit-identical.
+        if config.delay_tau_s is not None:
+            if config.delay_steps:
+                raise ValueError(
+                    f"Bundle {config.bundle_id}: delay_tau_s and legacy "
+                    f"delay_steps are mutually exclusive")
+            if config.delay_tau_s < 0:
+                raise ValueError(
+                    f"Bundle {config.bundle_id}: delay_tau_s must be >= 0")
+            if dt is None or dt <= 0:
+                raise ValueError(
+                    f"Bundle {config.bundle_id}: delay_tau_s requires dt at "
+                    f"construction (N_delay = round(delay_tau_s / dt))")
+            config.delay_steps = round(config.delay_tau_s / dt)
 
         # Create memristor matrix: sources × targets
         # Symmetry breaking: each weight gets deterministic variation

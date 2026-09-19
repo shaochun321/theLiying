@@ -20,10 +20,10 @@
   "E3_physical": true,
   "E4_l1_trace_tau_s": {
     "0.001": 0.09949916247342205,
-    "0.0005": 0.04974958123671104
+    "0.0005": 0.09949916247342237
   },
-  "E4_drift_ratio": 0.5000000000000001,
-  "E4_discrete_counter": true,
+  "E4_drift_ratio": 1.000000000000003,
+  "E4_discrete_counter": false,
   "ruling": "STATE_A",
   "exceptions": [
     "ThermalDeltaNeuron.pre_trace",
