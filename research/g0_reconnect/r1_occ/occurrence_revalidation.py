@@ -117,6 +117,8 @@ def _run_episode(spec, g):
 
 def _replay_closure(col, sup, theta_up, rearm):
     """录制轨迹上的离线 closure 重放（观察者语义，无物理副作用）。"""
+    if not hasattr(_replay_closure, "_addr"):
+        _replay_closure._addr = fresh_g0().closure.address
     h_addr = _replay_closure._addr
     cl = OccurrenceClosure(address=h_addr, theta_up=theta_up,
                            theta_down=0.1 * theta_up,

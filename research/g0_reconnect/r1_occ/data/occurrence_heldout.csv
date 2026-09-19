@@ -1,0 +1,13 @@
+episode,class,occ,triggered,col_peak,l1_sat_frac,energy_drop,ok
+hold_K1,K1,1,True,1.0012323547591826,0.0,7.6,True
+hold_K1s,K1,1,True,1.001008802035028,0.0,7.6,True
+hold_K2,K2,1,True,1.000825786283594,0.0,7.6,True
+hold_K2s,K2,1,True,1.0008257860297307,0.0,7.6,True
+hold_K3,K3,1,True,1.0012323549284663,0.0,7.6,True
+hold_K4,K4,1,True,1.0011150170260978,0.0,7.6,True
+hold_K5a,K5,1,True,1.0,0.0,5.7,True
+hold_K5b,K5,1,True,1.0,0.0,6.646007669146981,True
+hold_K6,K6,1,True,1.001295616895847,0.0,7.6,True
+hold_K7,K7,1,True,1.000959387892746,0.0,10.292873061890967,True
+hold_K8,K8,2,True,1.0012324289140928,0.0,7.6,True
+hold_K8s,K8,2,True,1.0012324288229164,0.0,7.6,True

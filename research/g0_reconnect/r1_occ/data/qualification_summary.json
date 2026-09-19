@@ -1,0 +1,73 @@
+{
+ "frozen_params": {
+  "g_v2": 0.02512531302148503,
+  "theta_up": 0.01,
+  "rearm": 500,
+  "dt_g": 0.001,
+  "live_policy": "S0",
+  "bridge": "B0"
+ },
+ "gates": {
+  "OCC-M1": {
+   "pass": true,
+   "occurrence_t_phys": [
+    0.1,
+    0.23900000000000002,
+    0.739
+   ],
+   "delay_tau_0.005s->steps": 5,
+   "rearm_500steps_s": 0.5
+  },
+  "OCC-M2": {
+   "pass": true,
+   "rate_sample_accepted": true,
+   "amplitude_sample_rejected": true
+  },
+  "OCC-M3": {
+   "pass": true,
+   "contract": {
+    "trigger_after_support_on": true,
+    "latency_steps": 558,
+    "sustain_finite_gt1": true,
+    "duration_steps": 139,
+    "exit_by_state_machine": true,
+    "exit_mode": "internal_dynamics",
+    "rearm_gap_eq_rearm_min": true,
+    "t_phys_s": [
+     1.558,
+     1.697,
+     2.197
+    ],
+    "all_pass": true
+   },
+   "canonical": [
+    0.01,
+    500
+   ]
+  },
+  "OCC-M4": {
+   "pass": true,
+   "sha_verified": true,
+   "n": 12,
+   "failures": []
+  },
+  "OCC-M5": {
+   "pass": true,
+   "ledger_rows_finite": true,
+   "port_no_semantic_labels": true,
+   "lineage_present": true
+  },
+  "OCC-M6": {
+   "pass": true,
+   "ruling": "HIDDEN_STATE_CAUSALLY_SUPPORTED",
+   "stop": "CURRENT_MINIMAL_SUFFICIENT_STATE_CANDIDATE + STOP_DEEPER_DECOMPOSITION (¡ì14)",
+   "minimal_state": "Z_full(hc+ensemble+collector full state)"
+  }
+ },
+ "terminal_state": {
+  "terminal": "A",
+  "G0_OCCURRENCE_V2_QUALIFIED": true,
+  "D1_SUFFICIENT_FOR_D2": true,
+  "hard_stop": "FREEZE G0-CENTRIC MAINLINE (¡ì25)"
+ }
+}
