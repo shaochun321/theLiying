@@ -19,7 +19,8 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | **G0 主线已冻结（FREEZE G0-CENTRIC MAINLINE，§25，2026-09-19）**——G0-R1/OCC 六门全 PASS 终态 A。下一轮：**D2-0 / P2-B**（多个真实 χ_i^(0) 经候选自然化 𝒩 进入关系结构 𝒞_ρ；消费口=tss/adapters/occurrence_port_v2.py，D2 不得读 G0 内部 neuron state；冻结参数 g_v2=2.5125e-2/theta=0.01/rearm=500/S0+B0）。禁止 G0-R2/R1b/Occurrence-v3/Entropy redesign/World-v3/Transduction-v3，除非 D2 产生可复现阻断性反例 | — | — | 等待 D2-0/P2-B 方案 |
+| （空闲） | D2-0/P2-B 方案评判已完成（ADOPT with amendments），等待用户裁定 R-1~R-3（见 交叉比对/D2-0-P2-B方案评判_2026-09-20.md §五）后开工 D2-0/P2-B 六步执行序 | — | — | 等待裁定 |
+| （备注） | **G0 主线已冻结（FREEZE G0-CENTRIC MAINLINE，§25，2026-09-19）**——G0-R1/OCC 六门全 PASS 终态 A。下一轮：**D2-0 / P2-B**（多个真实 χ_i^(0) 经候选自然化 𝒩 进入关系结构 𝒞_ρ；消费口=tss/adapters/occurrence_port_v2.py，D2 不得读 G0 内部 neuron state；冻结参数 g_v2=2.5125e-2/theta=0.01/rearm=500/S0+B0）。禁止 G0-R2/R1b/Occurrence-v3/Entropy redesign/World-v3/Transduction-v3，除非 D2 产生可复现阻断性反例 | — | — | 等待 D2-0/P2-B 方案 |
 | （旧指针） | G0-R0 已完成（G0_MULTIRATE_TIMEBASE_QUALIFIED）；G0-R1 范围原文：（**首次动 production 定点修改**：typed port implementation / B transition bridge / A target port plumbing / L1 input semantics rename / legacy compatibility + G0-R0 例外修复[L1 trace dt 化/delay_steps dt-aware/closure n→t_phys 映射]）→ Occurrence Revalidation（χ 全重验 + closure 阈值与 g 量级物理秒制重标；G0-R0 已示 bridge occ=1×5 与 L1 饱和 33.3% 信号；'逐状态比较非合法验收面'教训） |
 
 ---
@@ -49,6 +50,7 @@
 
 | ID | 任务描述 | 完成日期 | Commit |
 |:---|:---|:---|:---|
+| D2-0评判 | 外部方案《MAINLINE V2 — D2-0/P2-B》评判分析：与 G0-R1 终裁衔接无一处失真；§36 UTF-8 实测属实（r1_revalidation.json 为 GBK）；§38 实测答案=否（tss/relations 全家 live 电路耦合，元件级可复用，缺口=replay adapter）；修正案 E-1~E-7（raw track 缺口致 N3 当前不可计算/换能强制 HC-009 路径/N1,N2 因果性条款/自激门继承 epoch 门控/UTF-8 范围/预算核算）；RULING_REQUIRED R-1（site28,31主+23攻击）/R-2（不建 relations_v2）/R-3（UTF-8 范围）→ **ADOPT with amendments** | 2026-09-20 | 51f2cec |
 | G0-R1/OCC | 生产回接+基础发生最终资格轮（R-1~R-4 裁定后执行）：**六门全 PASS → G0_OCCURRENCE_V2_QUALIFIED + D1_SUFFICIENT_FOR_D2 + FREEZE G0 主线**。Step1 三笔时间债务修复零 diff（D1 trace dt 化×4 类，E4 审计漂移比 0.500→1.000 独立证实；D2 delay_tau_s 双字段；D3 to_physical 映射）；Step2 typed 端口（UdotTSample 类型强制+amplitude 存根）+B 桥 g_v2=2.5125e-2（预注册规则推导，g_v1 饱和 0.578 清偿；负结果 N-1：S0+B1=结构性错误，live=S0+B0）；Step3 cal16/hold12 SHA 封存+重验（canonical=(0.01,500)=v1 值 v2 域内确认，合法域 42/64 失败沿双侧定位，dose latency 严格有序）；Step4 hidden dynamics 第一例（相位 twin 可见 1e-5/隐藏 L2=1.37→未来分叉→Z_full 移植逐位等化=SUPPORTED，Z_low 不充分=相位在膜电荷，STOP §14）；Step5 hold12 盲评 12/12 零回调+OccurrencePortV2。回归 21/21+fast43+17 冻结脚本零 diff | 2026-09-19 | 2fe5f8d/38eae9d/4b95339/d037eb7/79070a4/46fb873 |
 | G0-R1-OCC评判 | 外部方案《MAINLINE V2 — G0-R1-OCC》评判分析：存档事实引用全部核实无误（33.3% 饱和/occ=1×5/rearm=0.5s/S1 因果性登记/例外三项均与 G0-R0/T1-B 报告吻合，范围与 G0R0_FINAL_RULING 下轮建议逐字对齐）；三笔时间债务代码逐行证实；勘误 E-1~E-10（§28 nexus_v1/generators/ 已迁 tss/、§11 REUSE 与 census GAP 冲突、D1 行为零 diff 判据、D2 legacy 逐位不变、live=S0 属合同修订、统计量预注册、DEG-018 重跑义务、held-out 扩集重封存、干预登记 DIAGNOSTIC、§15 预期管理）；RULING_REQUIRED R-1~R-4 → **ADOPT with amendments** | 2026-09-19 | 0f47a4d |
 | G0-R0 | 统一物理时间与多率回接（外部 45 节 ADOPT with D1-D6）：**状态 A 裁定**（GENERATOR_DT=0.001 物理秒，行为实验 E1-E4；T1-B C2 断言勘误）；census+例外三项定点登记；MultiRateScheduler N_sub=1000，S1=CANONICAL（因果性登记）；全向量 D4 FIRST_RESULT FAIL 原样保留→两层分解：Tier-1 接口一阶收敛（比 0.101）/Tier-2=G0_OSCILLATOR_PHASE_SENSITIVITY（先证 exp_P2A1b_3）；RC τ 五位不变；DELAY_STEP_COUPLING 实证（隐性）；剂量 1.0010 无复制+旧 1:1 耦合=0.00101 定量化；replay 逐位+Twin-2 无泄漏+B 桥五场景 PASS 且 occ=1×5（登记）+B_BRIDGE_L1_SATURATION → **G0_MULTIRATE_TIMEBASE_QUALIFIED**；回归 21+vp+fast43+12 冻结脚本零 diff+git 完整性核查 OK | 2026-09-19 | fbaf57f |
