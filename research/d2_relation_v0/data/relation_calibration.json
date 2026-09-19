@@ -1,0 +1,26 @@
+{
+ "parameter": "g_rel (relation transduction gain, frozen bundle synapse_gain)",
+ "physical_meaning": "phase-drive -> relation cell current gain; x_rho must live in cell linear regime (clamp 10)",
+ "legal_region": {
+  "lo_bracket_dead": 0.0009765625,
+  "hi_bracket_sat": 1.0,
+  "rule": "response above silent floor AND below activation clamp"
+ },
+ "failure_boundary": {
+  "g_sat_bracket": 1.0,
+  "g_dead_bracket": 0.0009765625
+ },
+ "canonical_reference": {
+  "g_rel": 0.25,
+  "rule": "peak x(cal_C2_sim) in [4.5,5.5] (mid linear, endpoint-anchoring family) — NOT optimum"
+ },
+ "provenance": "adaptive boundary search (canonical->descend->ascend->bracket), evals<=16 (反馈§十九); tau_cell=0.5s anchored Wang2002/delay-domain (impl Q3)",
+ "measured": {
+  "u_silent": 0.0,
+  "u_work": 5.232840862129589,
+  "tau_decay_s": 0.456,
+  "tau_cell_design_s": 0.5,
+  "energy_drop_canonical": 0.0
+ },
+ "n_evals": 7
+}
