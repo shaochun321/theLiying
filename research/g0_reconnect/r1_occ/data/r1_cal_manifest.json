@@ -1,0 +1,460 @@
+{
+ "cal_K1a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K1a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K1b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K1b",
+  "initial_charges": [],
+  "kappas": [
+   0.03,
+   0.03,
+   0.03,
+   0.03
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 15.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 5
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K2a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K2a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 20.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K2b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K2b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 50.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K3a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K3a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   },
+   {
+    "energy": 12.0,
+    "node": 2,
+    "power": 1.0,
+    "t_start": 20
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K3b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K3b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 10.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   },
+   {
+    "energy": 10.0,
+    "node": 4,
+    "power": 1.0,
+    "t_start": 10
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K4a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   1
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K4a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K4b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K4b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 7,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 20.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K5a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K5a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 16.0,
+    "node": 3,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K5b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K5b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 16.0,
+    "node": 4,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K6a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K6a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 3.0,
+    "node": 0,
+    "power": 0.3,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K6b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K6b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 5.0,
+    "node": 0,
+    "power": 0.5,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K7a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K7a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 60.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K7b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K7b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 45.0,
+    "node": 0,
+    "power": 0.8,
+    "t_start": 0
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K8a": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K8a",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 5.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 0
+   },
+   {
+    "energy": 5.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 30
+   }
+  ],
+  "t_total": 60
+ },
+ "cal_K8b": {
+  "boundary_config": "REDUCED",
+  "boundary_nodes": [
+   0
+  ],
+  "dt": 1.0,
+  "episode_id": "cal_K8b",
+  "initial_charges": [],
+  "kappas": [
+   0.05,
+   0.05,
+   0.05,
+   0.05
+  ],
+  "n_nodes": 5,
+  "r_leak_ambient": 200.0,
+  "seed": -1,
+  "sources": [
+   {
+    "energy": 4.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 5
+   },
+   {
+    "energy": 6.0,
+    "node": 0,
+    "power": 1.0,
+    "t_start": 35
+   }
+  ],
+  "t_total": 60
+ }
+}

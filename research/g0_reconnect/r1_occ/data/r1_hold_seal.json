@@ -1,0 +1,5 @@
+{
+ "hold_manifest_sha256": "a4c9ad7e5c61cdefb966806f13f3788809125b95519db94a85b11882ce2c2671",
+ "sealed": "2026-09-19",
+ "discipline": "hold set MUST NOT participate in any closure/g recalibration (\u00a79/E-8); evaluated once with frozen params in final_qualification only"
+}
