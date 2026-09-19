@@ -1,0 +1,6 @@
+arm,latency,occ,rmse_vs_A,equalized
+A_ref,92,1,0.0,True
+B_baseline,30,1,0.33294286671574186,False
+B+sham,30,1,0.33294286671574186,False
+B+Z_low,35,1,0.33037136438794545,False
+B+Z_full,92,1,0.0,True
