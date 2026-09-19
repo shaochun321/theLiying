@@ -1,0 +1,5 @@
+candidate,verdict,detail
+N0_count,INSUFFICIENT,"{""reason"": ""恒 1，无时序/剂量/历史区分能力（存在基准，预期兑现，反馈 §九）""}"
+N1_phase,QUALIFIED_REFERENCE,"{""tag"": ""REPLAY_REFERENCE_ONLY"", ""q2_range_ok"": true, ""note"": ""ϑ∈[0,1]+τ_phys 保留；live 因果变体已登记CAUSAL_VARIANT_REQUIRED_BEFORE_LIVE_D2""}"
+N2_relative_timing,QUALIFIED_REFERENCE,"{""tag"": ""REPLAY_REFERENCE_ONLY"", ""q4_ordering"": {""C3"": [0.32707355242515324, 0.948356807510253, 2.374021909229462], ""C4"": [-0.3020344287945195, -0.9233176838796192, -2.345852895144999], ""strict"": true}, ""note"": ""带符号→Step3 半波双通道整流分裂（warm/cool 先例）""}"
+N3_activity,INSUFFICIENT,"{""q6_spread"": 0.24920292233259295, ""q7_max_reldiff"": 0.04059382475007125, ""note"": ""E-1 raw track 合同兑现；ρ_i 同时保留 A_i""}"
