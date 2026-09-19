@@ -19,7 +19,7 @@
 
 | ID | 任务描述 | 开始日期 | 当前进度 | 下一步 |
 |:---|:---|:---|:---|:---|
-| （空闲） | D2-0/P2-B 方案评判已完成（ADOPT with amendments），等待用户裁定 R-1~R-3（见 交叉比对/D2-0-P2-B方案评判_2026-09-20.md §五）后开工 D2-0/P2-B 六步执行序 | — | — | 等待裁定 |
+| D2-0/P2-B | 自然化接口与第一次真实关系生成（反馈全盘接受 E-1~E-7+R-1~R-3，READY_TO_EXECUTE，执行序 §26 冻结）：Step0 UTF-8 修复 → Step1 site28/31 parent 轨迹+raw track IMMUTABLE_CACHE+port+cal12/hold8 SHA 封存 → Step2 N0-N3 独立资格 → Step3 replay adapter+换能链+RelationCell+adaptive 标定 → Step4 C0-C5+NC1-4 → Step4b C6+hidden dynamics → Step5 closure candidate+hold 盲评+六门 D2-M1~M6+四终态 | 2026-09-20 | Step0 开工 | 终态 A 则 FREEZE D2-0 → D2-1/P2-C |
 | （备注） | **G0 主线已冻结（FREEZE G0-CENTRIC MAINLINE，§25，2026-09-19）**——G0-R1/OCC 六门全 PASS 终态 A。下一轮：**D2-0 / P2-B**（多个真实 χ_i^(0) 经候选自然化 𝒩 进入关系结构 𝒞_ρ；消费口=tss/adapters/occurrence_port_v2.py，D2 不得读 G0 内部 neuron state；冻结参数 g_v2=2.5125e-2/theta=0.01/rearm=500/S0+B0）。禁止 G0-R2/R1b/Occurrence-v3/Entropy redesign/World-v3/Transduction-v3，除非 D2 产生可复现阻断性反例 | — | — | 等待 D2-0/P2-B 方案 |
 | （旧指针） | G0-R0 已完成（G0_MULTIRATE_TIMEBASE_QUALIFIED）；G0-R1 范围原文：（**首次动 production 定点修改**：typed port implementation / B transition bridge / A target port plumbing / L1 input semantics rename / legacy compatibility + G0-R0 例外修复[L1 trace dt 化/delay_steps dt-aware/closure n→t_phys 映射]）→ Occurrence Revalidation（χ 全重验 + closure 阈值与 g 量级物理秒制重标；G0-R0 已示 bridge occ=1×5 与 L1 饱和 33.3% 信号；'逐状态比较非合法验收面'教训） |
 

@@ -120,14 +120,14 @@ def main() -> int:
     cal_j = json.dumps(_dump(cal), indent=1, sort_keys=True)
     hold_j = json.dumps(_dump(hold), indent=1, sort_keys=True)
     with open(os.path.join(DATA, 'r1_cal_manifest.json'), 'w',
-              newline='\n') as f:
+              newline='\n', encoding='utf-8') as f:
         f.write(cal_j)
     with open(os.path.join(DATA, 'r1_hold_manifest.json'), 'w',
-              newline='\n') as f:
+              newline='\n', encoding='utf-8') as f:
         f.write(hold_j)
     sha = hashlib.sha256(hold_j.encode('utf-8')).hexdigest()
     with open(os.path.join(DATA, 'r1_hold_seal.json'), 'w',
-              newline='\n') as f:
+              newline='\n', encoding='utf-8') as f:
         json.dump({"hold_manifest_sha256": sha,
                    "sealed": "2026-09-19",
                    "discipline": "hold set MUST NOT participate in any "

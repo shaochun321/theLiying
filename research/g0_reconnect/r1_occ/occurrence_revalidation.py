@@ -234,13 +234,13 @@ def main() -> int:
 
     # ── 输出 ──
     with open(os.path.join(DATA, 'occurrence_trials.csv'), 'w',
-              newline='') as f:
+              newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(trial_rows[0]))
         w.writeheader(); w.writerows(trial_rows)
-    with open(os.path.join(DATA, 'energy_ledger.csv'), 'w', newline='') as f:
+    with open(os.path.join(DATA, 'energy_ledger.csv'), 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(ledgers[0]))
         w.writeheader(); w.writerows(ledgers)
-    with open(os.path.join(DATA, 'dose_structure.csv'), 'w', newline='') as f:
+    with open(os.path.join(DATA, 'dose_structure.csv'), 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(dose_rows[0]))
         w.writeheader(); w.writerows(dose_rows)
     timing = []
@@ -254,7 +254,7 @@ def main() -> int:
                                "t_up_s": tp[0], "t_down_s": tp[1],
                                "t_rearm_s": tp[2], "epoch": ev.epoch_id})
         with open(os.path.join(DATA, 'closure_timing.csv'), 'w',
-                  newline='') as f:
+                  newline='', encoding='utf-8') as f:
             w = csv.DictWriter(f, fieldnames=list(timing[0]))
             w.writeheader(); w.writerows(timing)
 
@@ -280,7 +280,7 @@ def main() -> int:
                       "provenance": "EXP-P2A1b3 同网格 v2 输入重测"},
         },
     }
-    with open(os.path.join(DATA, 'r1_revalidation.json'), 'w') as f:
+    with open(os.path.join(DATA, 'r1_revalidation.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=1, ensure_ascii=False)
 
     ok = bool(legal) and can is not None and \

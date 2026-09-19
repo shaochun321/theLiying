@@ -198,14 +198,14 @@ def main() -> int:
 
     # ── 输出 ──
     with open(os.path.join(DATA, 'hidden_twin_pairs.csv'), 'w',
-              newline='') as f:
+              newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(vis))
         w.writeheader(); w.writerow(vis)
     with open(os.path.join(DATA, 'hidden_interventions.csv'), 'w',
-              newline='') as f:
+              newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader(); w.writerows(rows)
-    with open(os.path.join(DATA, 'minimal_state_ruling.json'), 'w') as f:
+    with open(os.path.join(DATA, 'minimal_state_ruling.json'), 'w', encoding='utf-8') as f:
         json.dump(ruling, f, indent=1, ensure_ascii=False)
 
     print("=" * 60)

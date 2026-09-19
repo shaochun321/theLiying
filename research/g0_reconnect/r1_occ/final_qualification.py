@@ -128,7 +128,7 @@ def gate_m4(g) -> dict:
         print(f"    hold {eid}: occ={n} trig={trig} "
               f"peak={led['col_peak']:.4f} {'OK' if ok else 'FAIL'}")
     with open(os.path.join(DATA, 'occurrence_heldout.csv'), 'w',
-              newline='') as f:
+              newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader(); w.writerows(rows)
     return {"pass": not fails, "sha_verified": True, "n": len(rows),
@@ -199,7 +199,7 @@ def main() -> int:
                                  "rearm": CANONICAL[1], "dt_g": DT_G,
                                  "live_policy": "S0", "bridge": "B0"},
                "gates": gates, "terminal_state": state}
-    with open(os.path.join(DATA, 'qualification_summary.json'), 'w') as f:
+    with open(os.path.join(DATA, 'qualification_summary.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=1, ensure_ascii=False)
     print("=" * 60)
     print("TERMINAL STATE:", json.dumps(state, ensure_ascii=False))

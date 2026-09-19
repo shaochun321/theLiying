@@ -155,7 +155,7 @@ def main() -> int:
         p["alive"] for p in probes) else None
 
     with open(os.path.join(DATA, 'port_calibration.csv'), 'w',
-              newline='') as f:
+              newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=["g", "sat_frac", "max_u"])
         w.writeheader()
         w.writerows(rows)
@@ -182,7 +182,7 @@ def main() -> int:
         "scheduler": {"live": "S0", "note": "R-3 ruling 2026-09-19"},
         "probes": probes,
     }
-    with open(os.path.join(DATA, 'r1_calibration.json'), 'w') as f:
+    with open(os.path.join(DATA, 'r1_calibration.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
     print(f"\n  max|dY/dt|_cal = {max_rate:.6f} T/s over {n_total} substeps")
