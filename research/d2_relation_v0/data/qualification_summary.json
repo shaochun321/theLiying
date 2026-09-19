@@ -1,0 +1,74 @@
+{
+ "frozen_params": {
+  "g_rel": 0.25,
+  "theta_up_rho": 2.6164204310647947,
+  "theta_down_rho": 0.2616420431064795,
+  "rearm_rho_steps": 456,
+  "dt": 0.001
+ },
+ "cal_occurrence_map": {
+  "cal_C2_sim": 1,
+  "cal_C3_s": 1,
+  "cal_C3_m": 1,
+  "cal_C3_l": 1,
+  "cal_C4_s": 1,
+  "cal_C4_m": 1,
+  "cal_C4_l": 1,
+  "cal_C5_weak": 1,
+  "cal_C5_strong": 1,
+  "cal_C0_A": 0,
+  "cal_C1_B": 0
+ },
+ "cal_expectation_ok": true,
+ "gates": {
+  "D2-M1": {
+   "pass": true,
+   "verdicts": {
+    "N0_count": "INSUFFICIENT",
+    "N1_phase": "QUALIFIED_REFERENCE",
+    "N2_relative_timing": "QUALIFIED_REFERENCE",
+    "N3_activity": "INSUFFICIENT"
+   }
+  },
+  "D2-M2": {
+   "pass": true,
+   "c6": true,
+   "minimal_state": "RelationCell membrane state (single-cell x_rho carrier)"
+  },
+  "D2-M3": {
+   "pass": true,
+   "carrier": "Neuron membrane RC (C=0.1,R=5)",
+   "forbidden_patterns_found": []
+  },
+  "D2-M4": {
+   "pass": true,
+   "blockA_rmse": 0.5857357123181702,
+   "blockB_rmse": 0.6552256755094347
+  },
+  "D2-M5": {
+   "pass": true,
+   "replay_bit_exact": true,
+   "sha_verified": true,
+   "hold_failures": []
+  },
+  "D2-M6": {
+   "pass": true,
+   "evidence": "NC2 同(标签,瞬时输入)双时刻 x 不同值(x_pre=0 vs x_gap=1.18908) + C6 同输入不同前史未来分叉——无 (A_id,B_id,timing) 无记忆函数可复现 x_ρ"
+  }
+ },
+ "terminal_state": {
+  "terminal": "A",
+  "D2_RELATION_PROCESS_V0_QUALIFIED": true,
+  "RELATION_OCCURRENCE_CANDIDATE": true,
+  "READY_FOR_D2-1": true,
+  "hard_stop": "FREEZE D2-0（反馈 §二十四：禁 Naturalization-v2/RelationCell-v2/更多 site/更多模态/更大网络/更大扫描）"
+ },
+ "rho_lineage": {
+  "uid": "relation.r_rho:d2_rho0",
+  "depth": 1,
+  "parents": [
+   "occ.thermal:thermpt28_warm",
+   "occ.thermal:thermpt31_warm"
+  ]
+ }
+}

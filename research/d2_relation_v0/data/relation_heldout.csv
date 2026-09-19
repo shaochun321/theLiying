@@ -1,0 +1,9 @@
+traj,x_peak,relation_occ,status,legal
+hold_delay1,3.7306339631603045,1,relation_occ=1,True
+hold_delay2,2.876884349357102,1,relation_occ=1,True
+hold_dose1,0.0,0,STRUCTURALLY_NO_RELATION,True
+hold_dose2,3.336874862482727,1,relation_occ=1,True
+hold_dur1,0.0,0,STRUCTURALLY_NO_RELATION,True
+hold_dur2,3.3352082324772376,1,relation_occ=1,True
+hold_hist1,2.731682452848567,1,relation_occ=1,True
+hold_hist2,3.2993547820392357,1,relation_occ=1,True

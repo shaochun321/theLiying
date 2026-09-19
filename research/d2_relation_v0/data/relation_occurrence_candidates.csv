@@ -1,0 +1,10 @@
+traj,status,t_up,t_down,t_rearm,t_up_s,t_down_s,t_rearm_s,epoch,rho_uid,generation_depth,parents
+cal_C2_sim,RELATION_OCCURRENCE_CANDIDATE,1961,3127,3583,1.961,3.1270000000000002,3.583,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C3_s,RELATION_OCCURRENCE_CANDIDATE,2053,3240,3696,2.053,3.24,3.696,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C3_m,RELATION_OCCURRENCE_CANDIDATE,2617,3515,3971,2.617,3.515,3.971,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C3_l,RELATION_OCCURRENCE_CANDIDATE,3674,4320,4776,3.674,4.32,4.776,2,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C4_s,RELATION_OCCURRENCE_CANDIDATE,2054,3238,3694,2.054,3.238,3.694,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C4_m,RELATION_OCCURRENCE_CANDIDATE,2600,3511,3967,2.6,3.511,3.967,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C4_l,RELATION_OCCURRENCE_CANDIDATE,3663,4310,4766,3.6630000000000003,4.3100000000000005,4.766,2,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C5_weak,RELATION_OCCURRENCE_CANDIDATE,2142,3406,3862,2.142,3.406,3.862,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
+cal_C5_strong,RELATION_OCCURRENCE_CANDIDATE,2032,3210,3666,2.032,3.21,3.666,1,relation.r_rho:d2_rho0,1,occ.thermal:thermpt28_warm|occ.thermal:thermpt31_warm
