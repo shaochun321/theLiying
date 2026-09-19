@@ -1,0 +1,65 @@
+{
+  "parameter": "g (B bridge, U_dotT gain)",
+  "physical_meaning": "rate->L1-current gain; u=g*dY/dt_ext must stay inside L1 linear regime (clamp onset u=0.05)",
+  "legal_region": {
+    "lo_observed_alive": 0.002512531302148503,
+    "hi_analytic": 0.05025062604297006,
+    "rule": "sat_frac==0 AND chain alive"
+  },
+  "failure_boundary": {
+    "g_sat_onset": 0.05025062604297006,
+    "g_dead": 0.0002512531302148503
+  },
+  "canonical_reference": {
+    "g_v2": 0.02512531302148503,
+    "rule": "(u_clamp_onset/2)/max|dY/dt|_cal ¡ª pre-registered, NOT searched; CANONICAL_REFERENCE != OPTIMAL"
+  },
+  "provenance": "G0R0 B_BRIDGE_L1_SATURATION(33.3%@g_v1) + FIX-019 clamp constants + T1B endpoint-anchoring style; scenarios C1/C2/C3 cal-only (held-out untouched)",
+  "v1_reference": {
+    "g_v1": 0.275062,
+    "sat_frac_v1": 0.5777777777777777
+  },
+  "max_rate_cal": 0.9950124791926823,
+  "scheduler": {
+    "live": "S0",
+    "note": "R-3 ruling 2026-09-19"
+  },
+  "probes": [
+    {
+      "g": 2.512531302148503e-05,
+      "collector_max": 0.0,
+      "alive": false,
+      "occ_registered_only": 0
+    },
+    {
+      "g": 0.0002512531302148503,
+      "collector_max": 0.0,
+      "alive": false,
+      "occ_registered_only": 0
+    },
+    {
+      "g": 0.002512531302148503,
+      "collector_max": 1.0000005302062465,
+      "alive": true,
+      "occ_registered_only": 1
+    },
+    {
+      "g": 0.02512531302148503,
+      "collector_max": 1.0011150170260978,
+      "alive": true,
+      "occ_registered_only": 1
+    },
+    {
+      "g": 0.05025062604297006,
+      "collector_max": 1.0012323549284663,
+      "alive": true,
+      "occ_registered_only": 1
+    },
+    {
+      "g": 0.275062,
+      "collector_max": 1.0012323547592656,
+      "alive": true,
+      "occ_registered_only": 1
+    }
+  ]
+}
