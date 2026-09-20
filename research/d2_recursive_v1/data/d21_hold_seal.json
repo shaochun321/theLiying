@@ -1,0 +1,5 @@
+{
+ "hold_manifest_sha256": "2a3deab06eb921797a5e40324890fec4c4ed9f111db4e94a7e49d84892168338",
+ "sealed": "2026-09-21",
+ "discipline": "RelationCell_2/adapter params MUST NOT be tuned from hold cases; hold exposure => FAIL, no re-run"
+}

@@ -1,0 +1,7 @@
+{
+ "NF-1": {
+  "finding": "transduction latency drifts with pulse onset (t_on 1000→521 steps / 2400→527 / 3000→542 / 3600→559 / 5000→637); at t_on=5000 collector crossing (k=5637) lands outside support window => ΔC_phys=0 gate refuses confirmation => zero occurrence (gate working as designed, honest registration)",
+  "evidence": "data/site23_traces/s23_far.csv (immutable)",
+  "consequence": "far-gap role reassigned to s23_far_b (t_on=4000, gap>tau_decay)"
+ }
+}

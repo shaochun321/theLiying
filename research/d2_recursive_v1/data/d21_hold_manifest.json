@@ -1,0 +1,49 @@
+{
+ "cases": [
+  {
+   "case": "H1_unseen_rho_duration",
+   "rho_traj": "cal_C2_sim",
+   "site23": "s23_ov"
+  },
+  {
+   "case": "H2_unseen_rel_timing",
+   "rho_traj": "cal_C3_m",
+   "site23": "s23_hold_timing"
+  },
+  {
+   "case": "H3_site23_dose",
+   "rho_traj": "cal_C3_m",
+   "site23": "s23_hold_dose"
+  },
+  {
+   "case": "H4_weak_rho",
+   "rho_traj": "cal_C5_weak",
+   "site23": "s23_ov"
+  },
+  {
+   "case": "H5_strong_rho",
+   "rho_traj": "cal_C5_strong",
+   "site23": "s23_ov"
+  },
+  {
+   "case": "H6_structural_no_relation",
+   "rho_traj": null,
+   "site23": "s23_ov"
+  }
+ ],
+ "legality": "legal outcomes include STRUCTURALLY_NO_RELATION; failures limited to illegal state/nonfinite/replay mismatch/lineage missing (D2-0 反馈§20 rule)",
+ "site23_hold_specs": {
+  "s23_hold_dose": {
+   "amp": 0.04,
+   "length": 600,
+   "note": "未见剂量（hold_dose2 先例域内）",
+   "t_on": 2400
+  },
+  "s23_hold_timing": {
+   "amp": 0.03,
+   "length": 600,
+   "note": "未见相对时序（跨 ρ 窗尾）",
+   "t_on": 3000
+  }
+ }
+}

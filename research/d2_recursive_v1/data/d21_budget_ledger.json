@@ -1,0 +1,9 @@
+{
+ "stepB": {
+  "new_G0_physical_trajectories": 7,
+  "depth1_relation_replays": 4,
+  "relation2_calibration_points": 0,
+  "a8_twins": 0,
+  "interventions": 0
+ }
+}

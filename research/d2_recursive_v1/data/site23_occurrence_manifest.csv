@@ -1,0 +1,7 @@
+traj,parent,occurrence_id,lineage_uid,t_up,t_down,t_rearm,t_up_s,t_down_s,t_rearm_s,raw_track_ref
+s23_ov,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,2927,3066,3566,2.927,3.0660000000000003,3.5660000000000003,research/d2_recursive_v1/data/site23_traces/s23_ov.csv
+s23_lead,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,2022,2161,2661,2.0220000000000002,2.161,2.661,research/d2_recursive_v1/data/site23_traces/s23_lead.csv
+s23_lag,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,4159,4298,4798,4.159,4.298,4.798,research/d2_recursive_v1/data/site23_traces/s23_lag.csv
+s23_far_b,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,4577,4716,5216,4.577,4.716,5.216,research/d2_recursive_v1/data/site23_traces/s23_far_b.csv
+s23_hold_timing,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,3542,3681,4181,3.5420000000000003,3.681,4.181,research/d2_recursive_v1/data/site23_traces/s23_hold_timing.csv
+s23_hold_dose,C,occ.thermal:thermpt23_warm#e1,occ.thermal:thermpt23_warm,2876,3015,3515,2.876,3.015,3.515,research/d2_recursive_v1/data/site23_traces/s23_hold_dose.csv
