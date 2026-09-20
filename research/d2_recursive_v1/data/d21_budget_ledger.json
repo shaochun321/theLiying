@@ -1,9 +1,10 @@
 {
- "stepB": {
-  "new_G0_physical_trajectories": 7,
-  "depth1_relation_replays": 4,
-  "relation2_calibration_points": 0,
-  "a8_twins": 0,
-  "interventions": 0
+ "final": {
+  "new_G0_physical_trajectories": "7/8",
+  "depth1_relation_replays": "4/16",
+  "relation2_calibration_points": "9/10",
+  "a8_twins": "1/4",
+  "interventions": "3/4",
+  "held_out": "6/6"
  }
 }

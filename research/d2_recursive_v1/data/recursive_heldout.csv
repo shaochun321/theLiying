@@ -1,0 +1,7 @@
+case,rho,site23,x_peak,relation2_occ,status,legal
+H1_unseen_rho_duration,cal_C2_sim,s23_ov,7.049428886466012,1,relation2_occ=1,True
+H2_unseen_rel_timing,cal_C3_m,s23_hold_timing,5.411370248540525,1,relation2_occ=1,True
+H3_site23_dose,cal_C3_m,s23_hold_dose,5.120479784403104,1,relation2_occ=1,True
+H4_weak_rho,cal_C5_weak,s23_ov,6.145261606822754,1,relation2_occ=1,True
+H5_strong_rho,cal_C5_strong,s23_ov,6.747334246983549,1,relation2_occ=1,True
+H6_structural_no_relation,-,s23_ov,2.5465681411976906,0,relation2_occ=0,True

@@ -1,0 +1,111 @@
+{
+ "frozen_params": {
+  "g_rel2": 0.01313900648833929,
+  "theta_up_rho2": 2.620888259792134,
+  "theta_down_rho2": 0.2620888259792134,
+  "rearm_rho2_steps": 456,
+  "dt": 0.001
+ },
+ "gates": {
+  "D21-M1": {
+   "pass": true,
+   "rt1_window": [
+    2617,
+    3971
+   ],
+   "n_relation_ports": 4,
+   "adapter": "same build_phase_drive as depth-0 (RC-1 typed acceptance)"
+  },
+  "D21-M2": {
+   "pass": true,
+   "carrier": "Neuron membrane RC (C=0.1,R=5)",
+   "forbidden_patterns_found": [],
+   "no_self_excitation": true
+  },
+  "D21-M3": {
+   "pass": true,
+   "S1_rmse": 1.3474703030353206,
+   "S2_rmse": 1.3437412499119155
+  },
+  "D21-M4": {
+   "pass": true,
+   "existence_divergence": true,
+   "sham_ok": true,
+   "tier0_insufficient": true,
+   "minimal_state": "RelationCell_2 membrane state (single-cell x_rho2 carrier)"
+  },
+  "D21-M5": {
+   "pass": true,
+   "existence_level": true
+  },
+  "D21-M6": {
+   "pass": true,
+   "sha_verified": true,
+   "hold_failures": [],
+   "replay_bit_exact": true,
+   "lineage_ok": true,
+   "budget": {
+    "new_G0_physical_trajectories": [
+     7,
+     8
+    ],
+    "depth1_relation_replays": [
+     4,
+     16
+    ],
+    "relation2_calibration_points": [
+     9,
+     10
+    ],
+    "a8_twins": [
+     1,
+     4
+    ],
+    "interventions": [
+     3,
+     4
+    ],
+    "held_out": [
+     6,
+     6
+    ]
+   },
+   "disclosure": "H6 drive combo == E1 rc_C_only control (no parameter depended on it); H3 dose enters via latency (51-step earlier window)"
+  }
+ },
+ "terminal_state": {
+  "terminal": "A",
+  "D2_1_RECURSIVE_GENERATION_QUALIFIED": true,
+  "G1_QUALIFIED": true,
+  "READY_FOR_POSTERIOR_0": true,
+  "scope": "REPLAY/REFERENCE QUALIFICATION（方案 §7）——live 端到端仍受 D2-0 登记的 CAUSAL_VARIANT_REQUIRED_BEFORE_LIVE_D2 约束",
+  "hard_stop": "禁 D2-1b/G1-v2/more relation cells/more sites/more modalities/large recursive sweep（§30）；下一阶段=Posterior-0"
+ },
+ "first_screen": {
+  "1_reconsumable": true,
+  "2_physical_relation_cell_2": true,
+  "3_chi_rho2_generated": true,
+  "4_depth0_substitution_reconstructs": false,
+  "5_same_parent_state_diff_relation_state_diff_future": true,
+  "6_transplant_closes_divergence": true,
+  "7_block_changes_future": true,
+  "8_minimal_hidden_state": "RelationCell_2 membrane state (single-cell x_rho2 carrier)",
+  "9_stop_deeper_decomposition": true,
+  "10_hold6_one_pass": true,
+  "11_verdict": "G1_QUALIFIED",
+  "12_posterior_0_allowed": true
+ },
+ "negative_findings_carried": [
+  "NF-1 latency drift",
+  "NF-2 single-parent trigger",
+  "RT-2 v1 falsified (peak metric saturation)"
+ ],
+ "rho2_lineage": {
+  "uid": "relation.r_rho:d21_rho2",
+  "depth": 2,
+  "parents": [
+   "relation.r_rho:d2_rho0",
+   "occ.thermal:thermpt23_warm"
+  ]
+ }
+}
