@@ -1,0 +1,155 @@
+{
+ "frozen_params_readonly": true,
+ "gates": {
+  "PC0-M1": {
+   "pass": true,
+   "T_residual_qrel_end": 6131,
+   "delta_t_up": 5402,
+   "overlap_steps": 729,
+   "tau_residual_membrane": 500.0000000000028,
+   "note": "usable substrate: qrel residual window contains a legal posterior event (feedback §25 M1: not just nonzero)"
+  },
+  "PC0-M2": {
+   "pass": true,
+   "path": "C pulse → G0 site23 transduction (R1C_FALLBACK P=900, paired control t_on=4780/P=600 registered) → OccurrencePortV2 → build_phase_drive → tin_c → bundle_c → RelationCell",
+   "no_direct_state_write": true,
+   "delta_no_new_occurrence": true
+  },
+  "PC0-M3": {
+   "pass": true,
+   "z11_z10_membrane_at_washout": 1.141238535956966,
+   "resource_trace_excluded": true,
+   "resource_trace_e11_e10": 0.0
+  },
+  "PC0-M4": {
+   "pass": true,
+   "I_W_traj_activation_primary": 0.016512132399904903,
+   "I_W_traj_membrane": 3.0904623937793897e-15,
+   "I_W_occ_event_face": 0,
+   "event_face_note": "occ_Q inert (Q ramp peaks at support-window end, ΔC_phys gate refuses — NF-1 semantics); margin face M_Q sign-flips (+0.25 vs −0.065, heldout) — continuous criterion governs (feedback §16)",
+   "timing_dependence": {
+    "I_W_near_act": 0.016512132399904903,
+    "I_W_tc_act": 0.0024591230276788897,
+    "ratio_near_over_tc": 6.714642664905761,
+    "I_W_mid_act": 0.002477559621023818,
+    "timing_dependent": true
+   }
+  },
+  "PC0-M5": {
+   "pass": true,
+   "transplant": {
+    "forward_rmse": 0.0,
+    "reverse_rmse": 0.0,
+    "sham_preserves": true
+   },
+   "block": {
+    "interaction_removed": true,
+    "bitwise_vs_10": 0.0,
+    "audit_five_items": {
+     "tin_c_received_delta": true,
+     "tin_c_state_changed": true,
+     "tin_c_energy_used": false,
+     "bundle_c_transmission_zero": true,
+     "cell_delta_dose_zero": true
+    },
+    "limitation": "tin_c energy item unmeasurable (zero dissipation for subthreshold transduction on this substrate) — BLOCK_LIMITATION disclosed per feedback §25 M5, no auto-FAIL; transplant is the primary causal gate"
+   },
+   "minimal_state": "POSTERIOR_MINIMAL_SUFFICIENT_STATE_CANDIDATE=RelationCell membrane state (single cell); STOP_DEEPER_DECOMPOSITION"
+  },
+  "PC0-M6": {
+   "pass": true,
+   "past_sha_unchanged": true,
+   "git_dirty_lines": [],
+   "frozen_input_shas": {
+    "relation2_occurrence_candidates.csv": "84dd511ad393a02761f1f1468bf637facb337eadde1e09098b6a3686f70cd4dd",
+    "site23_occurrence_manifest.csv": "a5e2e8c7b8b5dfe9210a231a949733ba37834f5b478b37f26b2ff6d32c4d49d9",
+    "relation_occurrence_manifest.csv": "6b89dbeb7bdbbadc64f7a96b4fc47758a6b4998277a70e0ca1523eaf3ff134c6"
+   },
+   "hold6": {
+    "sha_verified": true,
+    "n_cases": 6,
+    "failures": [],
+    "one_pass_zero_recall": true
+   },
+   "budget": {
+    "new_g0_trajectories": [
+     4,
+     4
+    ],
+    "prior_state_replays": [
+     7,
+     12
+    ],
+    "posterior_timing_points": [
+     0,
+     4
+    ],
+    "factorial_sets": [
+     0,
+     4
+    ],
+    "state_interventions": [
+     3,
+     4
+    ],
+    "path_blocks": [
+     1,
+     3
+    ],
+    "heldout": [
+     6,
+     6
+    ]
+   },
+   "replay_deterministic": true
+  }
+ },
+ "terminal_state": {
+  "terminal": "A_CONDITIONAL",
+  "POSTERIOR_STATE_REORGANIZATION_V0_QUALIFIED": true,
+  "scope": "prior-conditioned readout projection H_W (plan §23/§24 operator definition surface); REPLAY/REFERENCE (CAUSAL_VARIANT constraint unchanged)",
+  "POSTERIOR_OPERATOR_CANDIDATE": true,
+  "operator_class": "THRESHOLD_READOUT_GATING",
+  "operator_mechanism": "Delta residual lifts the operating point across the DEG-019 hard threshold (vm=0.3), gating the downstream visibility of the W residual; carrier membrane component strictly additive (w_shift_vm=3.01e-15)",
+  "negative_finding_NF_P1": "B=id on linear Z-primary carrier component — no carrier warping; reorganization lives in readout projection only",
+  "RULING_EXPOSURE": "if user rules carrier-component change is the governing criterion (feedback §19 spirit extended to the no-new-occurrence case), this terminal demotes to C = POSTERIOR_EFFECT_ADDITIVE_ONLY(carrier) + THRESHOLD_READOUT_INTERACTION registered as positive finding (pre-registered demotion path)",
+  "sec19_literal_trigger": "not fired (no new occurrence in Delta epoch; PNS=False)",
+  "READY_FOR_POSTERIOR_1": "pending user ruling on RULING_EXPOSURE"
+ },
+ "first_screen": {
+  "1_causal_history_substrate_after_rearm": "YES on membrane (tau≈500 steps, qrel window→6131); activation readout collapses at vm<0.3 (DEG-019, readout not substrate)",
+  "2_posterior_physical_entry": "YES (C transduction, R1C_FALLBACK P=900; probe1 P=600 paired control occ=0)",
+  "3_past_raw_record_unchanged": true,
+  "4_delta_alone": "subthreshold response, peak 2.87 < θ₂; no occurrence; leaves decaying membrane tail",
+  "5_W_alone": "membrane residual τ≈500 steps; history-only RMS act=8.81e-03",
+  "6_W_plus_delta_exceeds_additive": "YES on activation readout (E1 D1≠D0, diff 9.85e-03); NO on membrane (bitwise additive)",
+  "7_interaction_I_W": {
+   "near_act": 0.016512132399904903,
+   "near_vm": 3.0904623937793897e-15,
+   "middle_act": 0.002477559621023818,
+   "tc_act": 0.0024591230276788897
+  },
+  "8_interaction_survives_washout": "YES (eval window starts after 456-step washout)",
+  "9_standardized_query_changed": "YES: M_Q sign flip (+0.25 delta arms vs −0.065 sham arms, heldout)",
+  "10_path_block_removes_effect": true,
+  "11_transplant_rebuilds_effect": true,
+  "12_minimal_sufficient_posterior_carrier": "RelationCell membrane state (single cell, tier1)",
+  "13_stop_deeper_decomposition": true,
+  "14_hold6_one_pass": true,
+  "15_terminal": "A_CONDITIONAL",
+  "16_B_neq_id_physical_evidence": "YES on H_W readout projection (causally closed); B=id on linear carrier component — see RULING_EXPOSURE"
+ },
+ "negative_findings": [
+  "NF-P1 carrier-component additivity (B=id on Z-primary linear component)",
+  "NF-P2 occ_Q event face inert (Q ramp peak at support end, ΔC_phys refuses — NF-1 semantics)",
+  "BLOCK_LIMITATION tin_c energy item unmeasurable",
+  "LIM-POSTERIOR-TIMING-FAR not attempted (budget)"
+ ],
+ "limits": [
+  {
+   "id": "LIM-POSTERIOR-TIMING-FAR",
+   "status": "NOT_ATTEMPTED",
+   "reason": "new_g0 budget 4/4 exhausted (probe1+r1c+middle+hold); extrapolation t_on~6540/P=900 possibly reachable but untested — honest registration, not proven unreachable"
+  }
+ ]
+}

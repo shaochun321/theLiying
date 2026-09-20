@@ -1,0 +1,28 @@
+{
+ "block_window": [
+  5387,
+  6497
+ ],
+ "I_W_with_delta": 0.016512132399904903,
+ "interaction_removed": true,
+ "removal_evidence": "blocked arm bitwise == (1,0) arm ⇒ all Delta influence rides bundle_c ⇒ I_W'=0",
+ "blocked_arm_bitwise_vs_10_rmse": 0.0,
+ "tin_c_extra_dissipation_vs_10": 0.0,
+ "audit_raw": {
+  "blocked_steps": 1110,
+  "tin_c_drive_sum_block": 319.00000000000006,
+  "tin_c_act_peak_block": 0.9984350547730829,
+  "tin_c_energy_block_start": 1.0,
+  "tin_c_energy_block_end": 1.0,
+  "cell_dose_block": 0.0
+ },
+ "audit_five_items": {
+  "tin_c_received_delta": true,
+  "tin_c_state_changed": true,
+  "tin_c_energy_used": false,
+  "bundle_c_transmission_zero": true,
+  "cell_delta_dose_zero": true
+ },
+ "causal_path_block_valid": false,
+ "registration": "DIAGNOSTIC_INTERVENTION (research only)"
+}

@@ -1,0 +1,12 @@
+{
+ "t0": 6496,
+ "sham_vs_near10_rmse": 0.0,
+ "forward_vs_near11_rmse": 0.0,
+ "reverse_vs_near10_rmse": 0.0,
+ "baseline_divergence_11_10": 0.42815505868055626,
+ "sham_preserves_divergence": true,
+ "forward_equalizes": true,
+ "reverse_equalizes": true,
+ "verdict": "POSTERIOR_MINIMAL_SUFFICIENT_STATE_CANDIDATE=RelationCell membrane state (single cell); STOP_DEEPER_DECOMPOSITION",
+ "registration": "DIAGNOSTIC_INTERVENTION (research only)"
+}

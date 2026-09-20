@@ -1,0 +1,50 @@
+{
+ "epsilon_num": 1e-06,
+ "theta2": 2.620888259792134,
+ "sets": [
+  {
+   "set": "near",
+   "eval_window": [
+    6497,
+    7592
+   ],
+   "I_W_traj_activation": 0.016512132399904903,
+   "I_W_traj_membrane": 3.0904623937793897e-15,
+   "I_W_occ": 0,
+   "pl1_membrane_z11_z10": 1.141238535956966,
+   "pl1_activation_z11_z10": 0.7725907632077378,
+   "resource_trace_e11_e10": 0.0,
+   "parallel_new_state_arm11": false,
+   "parallel_new_state_arm01": false,
+   "PL1_pass_membrane": true,
+   "PL2_pass_primary_activation": true
+  },
+  {
+   "set": "timing_control",
+   "eval_window": [
+    6497,
+    7592
+   ],
+   "I_W_traj_activation": 0.0024591230276788897,
+   "I_W_traj_membrane": 3.818334365580945e-15,
+   "note": "CONTROL: delta placed pre-rearm (inside W occurrence); tests dose-sum alternative (plan §18)"
+  },
+  {
+   "set": "middle",
+   "eval_window": [
+    7439,
+    8534
+   ],
+   "I_W_traj_activation": 0.002477559621023818,
+   "I_W_traj_membrane": 2.8600378835186772e-15,
+   "I_W_occ": 0,
+   "pl1_membrane_z11_z10": 1.1412385359569672,
+   "pl1_activation_z11_z10": 0.7206494401853709,
+   "resource_trace_e11_e10": 0.0,
+   "parallel_new_state_arm11": false,
+   "parallel_new_state_arm01": false,
+   "PL1_pass_membrane": true,
+   "PL2_pass_primary_activation": true
+  }
+ ]
+}

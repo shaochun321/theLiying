@@ -1,0 +1,84 @@
+{
+ "p0_probe_near": {
+  "spec": {
+   "t_on": 4780,
+   "length": 600,
+   "amp": 0.03,
+   "t_total": 10000,
+   "tag": "probe1_P600"
+  },
+  "occ": [],
+  "diag": {
+   "cross_k": 5402,
+   "support_first": 4780,
+   "support_last": 5379,
+   "cause": "support_window_too_short"
+  }
+ },
+ "p0_probe_near_r1c": {
+  "spec": {
+   "t_on": 4780,
+   "length": 900,
+   "amp": 0.03,
+   "t_total": 10000,
+   "tag": "R1C_FALLBACK"
+  },
+  "occ": [
+   [
+    5402,
+    5541,
+    6041
+   ]
+  ],
+  "diag": {
+   "cross_k": 5402,
+   "support_first": 4780,
+   "support_last": 5679,
+   "cause": null
+  }
+ },
+ "p0_middle": {
+  "spec": {
+   "t_on": 5660,
+   "length": 900,
+   "amp": 0.03,
+   "t_total": 10000,
+   "tag": "middle_R1C_duration"
+  },
+  "occ": [
+   [
+    6344,
+    6483,
+    6983
+   ]
+  ],
+  "diag": {
+   "cross_k": 6344,
+   "support_first": 5660,
+   "support_last": 6559,
+   "cause": null
+  }
+ },
+ "p0_hold_timing": {
+  "spec": {
+   "t_on": 5000,
+   "length": 900,
+   "amp": 0.03,
+   "t_total": 10000,
+   "tag": "hold_unseen_timing_R1C"
+  },
+  "occ": [
+   [
+    5637,
+    5776,
+    6276
+   ]
+  ],
+  "diag": {
+   "cross_k": 5637,
+   "support_first": 5000,
+   "support_last": 5899,
+   "cause": null
+  }
+ }
+}

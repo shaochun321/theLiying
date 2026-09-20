@@ -1,0 +1,5 @@
+{
+ "hold_manifest_sha256": "edeff45cc85f97bacb9546f7e6e3c6d9647472a170574545da06a2003794ff11",
+ "sealed": "2026-09-21",
+ "discipline": "no parameter/threshold/window may be tuned from hold cases; hold exposure => FAIL, no re-run (zero-recall)"
+}

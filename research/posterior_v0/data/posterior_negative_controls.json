@@ -1,0 +1,47 @@
+{
+ "eval_window": [
+  6497,
+  7592
+ ],
+ "E1_later_event_only": {
+  "D1_act": 0.4966158844420057,
+  "D0_act": 0.48677067711253474,
+  "D1_vm": 0.5413372461251887,
+  "D0_vm": 0.5413372461251879,
+  "additive_on_activation": false,
+  "additive_on_membrane": true
+ },
+ "E2_history_only": {
+  "hist_act": 0.00881012222556248,
+  "hist_vm": 0.012946422799094089,
+  "interaction_exceeds_history_note": "I_W measures W×Delta beyond history residual by construction (double difference)"
+ },
+ "E3_timing_control": {
+  "I_W_near_act": 0.016512132399904903,
+  "I_W_tc_act": 0.0024591230276788897,
+  "ratio_near_over_tc": 6.714642664905761,
+  "I_W_mid_act": 0.002477559621023818,
+  "timing_dependent": true
+ },
+ "E4_separability_sec19": {
+  "window": [
+   5402,
+   7592
+  ],
+  "w_component_shift_membrane": 3.0122145359560904e-15,
+  "w_component_shift_activation": 0.05990104503257569,
+  "carrier_level_additive": true,
+  "ruling_input": "PARALLEL_NEW_STATE(carrier)=TRUE: Delta did not alter the W-attributable membrane component (B=id on Z-primary); readout-level interaction registered as THRESHOLD_READOUT_INTERACTION"
+ },
+ "interaction_localization": {
+  "k_star": 6497,
+  "pointwise_max": 0.04710679462521805,
+  "vm_at_k_star": {
+   "11": 1.174264956945205,
+   "10": 0.03530661710397211,
+   "01": 1.1470260475154834,
+   "00": 0.008067707674249988
+  },
+  "vm_threshold": 0.3
+ }
+}

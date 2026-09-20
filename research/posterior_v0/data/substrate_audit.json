@@ -1,0 +1,96 @@
+{
+ "frozen": {
+  "g_rel2": 0.01313900648833929,
+  "theta2": 2.620888259792134,
+  "rearm2": 456,
+  "rc_main": [
+   3332,
+   4931,
+   5387
+  ]
+ },
+ "A1": {
+  "activation_readout": {
+   "surface": "activation",
+   "residual_start": 0.0006620594245617965,
+   "tau_residual": 6.435368025486853,
+   "last_step_above_epsilon": 5426,
+   "eps_censored_at_t_total": false,
+   "last_step_query_relevant": null,
+   "epsilon_num": 1e-06
+  },
+  "membrane_z_primary": {
+   "surface": "membrane_vm",
+   "residual_start": 0.32507970543128434,
+   "tau_residual": 500.0000000000028,
+   "last_step_above_epsilon": 11732,
+   "eps_censored_at_t_total": false,
+   "last_step_query_relevant": 6131,
+   "epsilon_num": 1e-06
+  },
+  "query_relevant_threshold": 0.07338487127417975,
+  "query_relevant_method": "DERIVED: NF-2 C-only peak deficit 2.8%*theta2 (gm=1 linear domain); upper-bound estimate, live-checked in Step D",
+  "readout_note": "activation collapse below vm=0.3 is DEG-019 hard cutoff (readout), NOT substrate loss; Z-primary carrier = membrane vm (DIAGNOSTIC_READ, observation only)"
+ },
+ "A2": {
+  "posterior_near_reachable": true,
+  "latest_reachable_t_up": 5402,
+  "reachable_window": [
+   5402,
+   5541,
+   6041
+  ],
+  "support_failure_boundary": null,
+  "r1c_fallback_used": true,
+  "probes": {
+   "probe1": {
+    "spec": {
+     "tid": "p0_probe_near",
+     "t_on": 4780,
+     "length": 600,
+     "amp": 0.03,
+     "t_total": 10000
+    },
+    "occ": [],
+    "diag": {
+     "cross_k": 5402,
+     "support_first": 4780,
+     "support_last": 5379,
+     "cause": "support_window_too_short"
+    }
+   },
+   "probe2_r1c": {
+    "spec": {
+     "tid": "p0_probe_near_r1c",
+     "t_on": 4780,
+     "length": 900,
+     "amp": 0.03,
+     "t_total": 10000
+    },
+    "occ": [
+     [
+      5402,
+      5541,
+      6041
+     ]
+    ],
+    "diag": {
+     "cross_k": 5402,
+     "support_first": 4780,
+     "support_last": 5679,
+     "cause": null
+    },
+    "tag": "R1C_FALLBACK"
+   }
+  },
+  "reachable_traj": "p0_probe_near_r1c"
+ },
+ "gate": {
+  "near_reachable": true,
+  "r1c_fallback_used": true,
+  "delta_within_membrane_eps_window": true,
+  "delta_within_membrane_qrel_window": true,
+  "delta_within_activation_eps_window": true,
+  "gate": "PROCEED_STEP_B"
+ }
+}

@@ -1,0 +1,69 @@
+{
+ "timing": {
+  "W": {
+   "traj": "rc_main",
+   "rho_port": "cal_C3_m",
+   "s23": "s23_ov",
+   "boundaries": [
+    3332,
+    4931,
+    5387
+   ]
+  },
+  "NEAR": {
+   "window": [
+    5402,
+    5541,
+    6041
+   ],
+   "traj": "p0_probe_near_r1c",
+   "tag": "R1C_FALLBACK",
+   "paired_control": "p0_probe_near (t_on=4780 P=600, occ=0, feedback §3 clause 6)"
+  },
+  "MIDDLE": {
+   "window": [
+    6344,
+    6483,
+    6983
+   ],
+   "traj": "p0_middle",
+   "tag": "R1C_FALLBACK",
+   "position_vs_residual": "outside qrel window (end 6131), inside eps window (end 11732) — §19 boundary point"
+  },
+  "TIMING_CONTROL": {
+   "window": [
+    4577,
+    4716,
+    5216
+   ],
+   "traj": "s23_far_b",
+   "tag": "CONTROL",
+   "note": "same duration 639, placed pre-rearm; NOT a legal posterior condition"
+  },
+  "H3_HOLD": {
+   "window": [
+    5637,
+    5776,
+    6276
+   ],
+   "traj": "p0_hold_timing",
+   "tag": "R1C_FALLBACK"
+  },
+  "washout_steps": 456,
+  "q_window_len": 639,
+  "q_up_near_set": 6497,
+  "q_up_mid_set": 7439,
+  "t_total_near_set": 8000,
+  "t_total_mid_set": 9000,
+  "eval_window": "[q_up, q_up+639+456) per set",
+  "parallel_new_state_window": "[5387, q_up)"
+ },
+ "limits": [
+  {
+   "id": "LIM-POSTERIOR-TIMING-FAR",
+   "status": "NOT_ATTEMPTED",
+   "reason": "new_g0 budget 4/4 exhausted (probe1+r1c+middle+hold); extrapolation t_on~6540/P=900 possibly reachable but untested — honest registration, not proven unreachable"
+  }
+ ],
+ "hold_sha256": "edeff45cc85f97bacb9546f7e6e3c6d9647472a170574545da06a2003794ff11"
+}

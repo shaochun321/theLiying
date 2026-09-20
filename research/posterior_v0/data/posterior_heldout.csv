@@ -1,0 +1,7 @@
+case,W,delta,q_up,occ_all,pns_delta_epoch,occ_q,m_q,z_pre_q_membrane,x_peak,legal,checks
+H1_unseen_W_rc_lead,rc_lead,NEAR,6497,"[[3540, 4826, 5282]]",[],[],0.25226392606742243,1.1699161124974728,4.192279394559753,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"
+H2_unseen_W_rc_R_only,rc_R_only,NEAR,6497,"[[3658, 4802, 5258]]",[],[],0.25189463526784284,1.1685932087497712,3.985049427327385,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"
+H3_unseen_posterior_timing,rc_main,H3_HOLD,6732,"[[3332, 4931, 5387]]",[],[],0.2504308254485026,1.1633494293267568,5.241776519584268,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"
+H4_unseen_Q_timing,rc_main,NEAR,6797,"[[3332, 4931, 5387], [6039, 6683, 7139]]",[],[],0.10593941437829235,0.6457404625336812,5.241776519584268,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"
+H5_unseen_W_no_posterior,rc_lead,sham,6497,"[[3540, 4826, 5282]]",[],[],-0.06631472501309688,0.028677576540506407,4.192279394559753,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"
+H6_structural_no_posterior,rc_main,sham,6497,"[[3332, 4931, 5387]]",[],[],-0.06444448569573025,0.03537730099851329,5.241776519584268,True,"{""finite"": true, ""w_boundary_bitexact"": true, ""delta_is_closed_past"": true}"

@@ -1,0 +1,180 @@
+{
+ "caps": {
+  "new_g0_trajectories": 4,
+  "prior_state_replays": 12,
+  "posterior_timing_points": 4,
+  "factorial_sets": 4,
+  "state_interventions": 4,
+  "path_blocks": 3,
+  "heldout": 6
+ },
+ "counting_rules": {
+  "prior_state_replays": "each full run of a W=1 history arm counts 1 (per-arm, NOT per 2x2 set)",
+  "heldout": "hold6 runs (incl. their W arms) counted here, not under prior_state_replays (declared up front, feedback §21)",
+  "attempted_run": "aborted/duplicate/unreachable executions are still logged (feedback §22)"
+ },
+ "entries": [
+  {
+   "category": "prior_state_replays",
+   "item": "A1_w_only",
+   "note": "substrate audit",
+   "attempted_only": false
+  },
+  {
+   "category": "new_g0_trajectories",
+   "item": "p0_probe_near",
+   "note": "t_on=4780 P=600 amp=0.03 tag=probe1_P600",
+   "attempted_only": false
+  },
+  {
+   "category": "new_g0_trajectories",
+   "item": "p0_probe_near_r1c",
+   "note": "t_on=4780 P=900 amp=0.03 tag=R1C_FALLBACK",
+   "attempted_only": false
+  },
+  {
+   "category": "new_g0_trajectories",
+   "item": "p0_middle",
+   "note": "t_on=5660 P=900 amp=0.03 tag=middle_R1C_duration",
+   "attempted_only": false
+  },
+  {
+   "category": "new_g0_trajectories",
+   "item": "p0_hold_timing",
+   "note": "t_on=5000 P=900 amp=0.03 tag=hold_unseen_timing_R1C",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "near_11",
+   "note": "StepD near set",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "near_10",
+   "note": "StepD near set",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "tc_11",
+   "note": "StepD timing control",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "middle_11",
+   "note": "StepD mid set",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "middle_10",
+   "note": "StepD mid set",
+   "attempted_only": false
+  },
+  {
+   "category": "prior_state_replays",
+   "item": "near_11_blocked",
+   "note": "StepF1 block arm",
+   "attempted_only": false
+  },
+  {
+   "category": "path_blocks",
+   "item": "near_block_rearm_to_q",
+   "note": "bundle_c blocked in [t_rearm_W,q_up), tin_c active (DIAGNOSTIC_INTERVENTION)",
+   "attempted_only": false
+  },
+  {
+   "category": "state_interventions",
+   "item": "iv_sham",
+   "note": "no transplant control; stage source runs included in protocol",
+   "attempted_only": false
+  },
+  {
+   "category": "state_interventions",
+   "item": "iv_forward",
+   "note": "Z10<-Z11 at t0 (tier1 cell state); stage source runs included in protocol",
+   "attempted_only": false
+  },
+  {
+   "category": "state_interventions",
+   "item": "iv_reverse",
+   "note": "Z11<-Z10 at t0 (reinforcement); stage source runs included in protocol",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H1_unseen_W_rc_lead",
+   "note": "W=rc_lead delta=NEAR q=std",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H2_unseen_W_rc_R_only",
+   "note": "W=rc_R_only delta=NEAR q=std",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H3_unseen_posterior_timing",
+   "note": "W=rc_main delta=H3_HOLD q=delta_rearm+456",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H4_unseen_Q_timing",
+   "note": "W=rc_main delta=NEAR q=std+300",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H5_unseen_W_no_posterior",
+   "note": "W=rc_lead delta=sham q=std",
+   "attempted_only": false
+  },
+  {
+   "category": "heldout",
+   "item": "H6_structural_no_posterior",
+   "note": "W=rc_main delta=sham q=std",
+   "attempted_only": false
+  },
+  {
+   "category": "posterior_timing_points",
+   "item": "NEAR",
+   "note": "R1C window 5402",
+   "attempted_only": false
+  },
+  {
+   "category": "posterior_timing_points",
+   "item": "MIDDLE",
+   "note": "6344 boundary point",
+   "attempted_only": false
+  },
+  {
+   "category": "posterior_timing_points",
+   "item": "TC",
+   "note": "pre-rearm control 4577",
+   "attempted_only": false
+  },
+  {
+   "category": "factorial_sets",
+   "item": "near",
+   "note": "StepD",
+   "attempted_only": false
+  },
+  {
+   "category": "factorial_sets",
+   "item": "middle",
+   "note": "StepD",
+   "attempted_only": false
+  },
+  {
+   "category": "factorial_sets",
+   "item": "tc_half",
+   "note": "StepD",
+   "attempted_only": false
+  }
+ ]
+}

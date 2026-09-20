@@ -1,0 +1,103 @@
+{
+ "cases": [
+  {
+   "W": "rc_lead",
+   "case": "H1_unseen_W_rc_lead",
+   "delta": "NEAR",
+   "q": "std"
+  },
+  {
+   "W": "rc_R_only",
+   "case": "H2_unseen_W_rc_R_only",
+   "delta": "NEAR",
+   "q": "std"
+  },
+  {
+   "W": "rc_main",
+   "case": "H3_unseen_posterior_timing",
+   "delta": "H3_HOLD",
+   "q": "delta_rearm+456"
+  },
+  {
+   "W": "rc_main",
+   "case": "H4_unseen_Q_timing",
+   "delta": "NEAR",
+   "q": "std+300"
+  },
+  {
+   "W": "rc_lead",
+   "case": "H5_unseen_W_no_posterior",
+   "delta": "sham",
+   "q": "std"
+  },
+  {
+   "W": "rc_main",
+   "case": "H6_structural_no_posterior",
+   "delta": "sham",
+   "q": "std"
+  }
+ ],
+ "legality": "legal outcomes include null/negative; failures limited to illegal state/nonfinite/replay mismatch/lineage missing (D2-1 convention)",
+ "timing": {
+  "H3_HOLD": {
+   "tag": "R1C_FALLBACK",
+   "traj": "p0_hold_timing",
+   "window": [
+    5637,
+    5776,
+    6276
+   ]
+  },
+  "MIDDLE": {
+   "position_vs_residual": "outside qrel window (end 6131), inside eps window (end 11732) — §19 boundary point",
+   "tag": "R1C_FALLBACK",
+   "traj": "p0_middle",
+   "window": [
+    6344,
+    6483,
+    6983
+   ]
+  },
+  "NEAR": {
+   "paired_control": "p0_probe_near (t_on=4780 P=600, occ=0, feedback §3 clause 6)",
+   "tag": "R1C_FALLBACK",
+   "traj": "p0_probe_near_r1c",
+   "window": [
+    5402,
+    5541,
+    6041
+   ]
+  },
+  "TIMING_CONTROL": {
+   "note": "same duration 639, placed pre-rearm; NOT a legal posterior condition",
+   "tag": "CONTROL",
+   "traj": "s23_far_b",
+   "window": [
+    4577,
+    4716,
+    5216
+   ]
+  },
+  "W": {
+   "boundaries": [
+    3332,
+    4931,
+    5387
+   ],
+   "rho_port": "cal_C3_m",
+   "s23": "s23_ov",
+   "traj": "rc_main"
+  },
+  "eval_window": "[q_up, q_up+639+456) per set",
+  "parallel_new_state_window": "[5387, q_up)",
+  "q_up_mid_set": 7439,
+  "q_up_near_set": 6497,
+  "q_window_len": 639,
+  "t_total_mid_set": 9000,
+  "t_total_near_set": 8000,
+  "washout_steps": 456
+ },
+ "w_arm_rejection_audit": {
+  "rc_lag": "t_rearm=6007 > NEAR t_up=5402 — delta inside its occurrence window, not a closed past; excluded by timing audit (not data picking)"
+ }
+}
