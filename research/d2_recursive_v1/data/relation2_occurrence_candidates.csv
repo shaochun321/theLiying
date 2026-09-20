@@ -1,0 +1,6 @@
+run,status,t_up,t_down,t_rearm,t_up_s,t_down_s,t_rearm_s,epoch,rho2_uid,generation_depth,parents
+rc_main,RELATION2_OCCURRENCE_CANDIDATE,3332,4931,5387,3.332,4.931,5.3870000000000005,1,relation.r_rho:d21_rho2,2,relation.r_rho:d2_rho0|occ.thermal:thermpt23_warm
+rc_lead,RELATION2_OCCURRENCE_CANDIDATE,3540,4826,5282,3.54,4.8260000000000005,5.282,1,relation.r_rho:d21_rho2,2,relation.r_rho:d2_rho0|occ.thermal:thermpt23_warm
+rc_lag,RELATION2_OCCURRENCE_CANDIDATE,3658,5551,6007,3.658,5.551,6.007000000000001,2,relation.r_rho:d21_rho2,2,relation.r_rho:d2_rho0|occ.thermal:thermpt23_warm
+rc_far,RELATION2_OCCURRENCE_CANDIDATE,3658,5902,6358,3.658,5.902,6.3580000000000005,2,relation.r_rho:d21_rho2,2,relation.r_rho:d2_rho0|occ.thermal:thermpt23_warm
+rc_R_only,RELATION2_OCCURRENCE_CANDIDATE,3658,4802,5258,3.658,4.8020000000000005,5.258,1,relation.r_rho:d21_rho2,2,relation.r_rho:d2_rho0|occ.thermal:thermpt23_warm

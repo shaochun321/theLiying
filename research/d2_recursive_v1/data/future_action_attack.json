@@ -1,0 +1,36 @@
+{
+ "with": {
+  "peak": 5.241776519584268,
+  "occ": 1,
+  "bounds": [
+   [
+    3332,
+    4931,
+    5387
+   ]
+  ],
+  "energy_drop": 0.0
+ },
+ "blockR": {
+  "peak": 2.5465681411976906,
+  "occ": 0,
+  "bounds": [],
+  "energy_drop": 0.0,
+  "rmse_vs_with": 1.1827875685601126,
+  "existence_level_difference": true
+ },
+ "blockC_secondary": {
+  "peak": 3.985049427327385,
+  "occ": 1,
+  "bounds": [
+   [
+    3658,
+    4802,
+    5258
+   ]
+  ],
+  "rmse_vs_with": 0.6317374510464382,
+  "note": "NF-2 consequence registration: site23 parentage is trajectory/boundary-level, not existence-level"
+ },
+ "verdict": "FUTURE_CAUSAL_ACTION_CONFIRMED"
+}

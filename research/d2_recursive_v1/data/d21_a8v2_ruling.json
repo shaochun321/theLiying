@@ -1,0 +1,23 @@
+{
+ "twin": {
+  "t0": 4200,
+  "u_at_t0": [
+   0.0,
+   0.0
+  ],
+  "x_X_t0": 2.410497200679754,
+  "x_Y_t0": 0.0,
+  "dx_t0": 2.410497200679754,
+  "future_rmse": 0.604588333507014,
+  "future_peak_X": 2.9018414459903688,
+  "future_peak_Y": 2.5465681411976906,
+  "theta2": 2.620888259792134,
+  "existence_divergence": true,
+  "parent_state_insufficient": true
+ },
+ "ruling": "G1_STATE_DIMENSION_CAUSALLY_SUPPORTED",
+ "sham_ok": true,
+ "tier0_insufficient": true,
+ "minimal_sufficient_state_candidate": "RelationCell_2 membrane state (single-cell x_rho2 carrier)",
+ "stop": "STOP_DEEPER_DECOMPOSITION (D2-0 反馈§十三/§十七先例)"
+}

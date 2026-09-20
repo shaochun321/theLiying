@@ -174,6 +174,39 @@ def relation_address():
     return rho
 
 
+def relation2_address():
+    """χ_ρ₂ 谱系地址：depth=2，父=(ρ 地址 depth1, site23 生成元地址 depth0)。
+
+    真实 AddressRegistry 注册（谱系单一事实来源）；返回 (rho2, rho, c)。
+    """
+    from d2_common import SITE_A, SITE_B, SITE_C, build_parents
+    from nexus_v1.components.structural_address import (
+        AddressRegistry, DOMAIN_RELATION_RHO)
+    _circuit, handles = build_parents({"A": SITE_A, "B": SITE_B,
+                                       "C": SITE_C})
+    addr_a = handles["A"].closure.address
+    addr_b = handles["B"].closure.address
+    addr_c = handles["C"].closure.address
+    reg = AddressRegistry()
+    rho = reg.register_generated(DOMAIN_RELATION_RHO, "d2_rho0",
+                                 (addr_a, addr_b), generation_depth=1)
+    rho2 = reg.register_generated(DOMAIN_RELATION_RHO, "d21_rho2",
+                                  (rho, addr_c), generation_depth=2)
+    return rho2, rho, addr_c
+
+
+def frozen_relation2_params() -> Tuple[float, float, int]:
+    """(g_rel2, theta_up_ρ2, rearm_ρ2) —— StepC 实测的新鲜推导
+    （同一规则族：θ=u_work/2，rearm=round(τ_decay/dt)；数值非抄用）。"""
+    with open(os.path.join(DATA, 'relation2_calibration.json'),
+              encoding='utf-8') as f:
+        c = json.load(f)
+    g = c["canonical_reference"]["g_rel2"]
+    theta_up = c["measured"]["u_work"] / 2.0
+    rearm = round(c["measured"]["tau_decay2_s"] / DT_G)
+    return g, theta_up, rearm
+
+
 # ── RelationOccurrencePortV1 manifest ──
 
 def load_relation_ports() -> Dict[str, RelationOccurrencePortV1]:

@@ -1,0 +1,44 @@
+{
+ "functional_criterion": "collapse iff RMSE<1e-6 AND same occ count AND bit-equal boundaries",
+ "full": {
+  "peak": 5.241776519584268,
+  "occ": 1,
+  "bounds": [
+   [
+    3332,
+    4931,
+    5387
+   ]
+  ]
+ },
+ "S1_sum": {
+  "rmse_vs_full": 1.3474703030353206,
+  "peak": 3.393670177384525,
+  "occ": 1,
+  "bounds": [
+   [
+    2607,
+    4309,
+    4765
+   ]
+  ],
+  "boundaries_equal": false,
+  "collapse": false
+ },
+ "S2_envelope": {
+  "rmse_vs_full": 1.3437412499119155,
+  "peak": 3.8303629394167125,
+  "occ": 1,
+  "bounds": [
+   [
+    2507,
+    4321,
+    4777
+   ]
+  ],
+  "boundaries_equal": false,
+  "collapse": false
+ },
+ "verdict": "DEPTH_NON_COLLAPSE",
+ "scope_note": "substitution restricted to the same naturalization family (phase drives) — bespoke decoders are outside the typed-interface contract (registered boundary of this attack)"
+}

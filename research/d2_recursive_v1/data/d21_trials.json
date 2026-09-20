@@ -1,0 +1,70 @@
+{
+ "RT1_pass": true,
+ "RT1_window": [
+  2617,
+  3971
+ ],
+ "RT2_order": [
+  5.241776519584268,
+  4.192279394559753,
+  3.985049427327385,
+  3.985049427327385
+ ],
+ "RT2_v1_prediction": false,
+ "RT2_v1_status": "FALSIFIED_PREDICTION: peak metric saturates in non-overlap regime (global peak = R-hump ceiling); root cause verified by RT-2r (POST_HOC diagnostic, not a gate)",
+ "RT2a_pass": true,
+ "RT2r": {
+  "same_R_hump": true,
+  "argmax": {
+   "rc_lag": 3970,
+   "rc_far": 3970,
+   "rc_R_only": 3970
+  },
+  "rmse_lag_vs_Ronly": 0.6651786579471876,
+  "rmse_far_vs_Ronly": 0.6203083554238705,
+  "rmse_lag_vs_far": 0.5598795630621544,
+  "c_local_increment": {
+   "rc_lag": 3.0961816982447625,
+   "rc_far": 2.898786307767664
+  },
+  "pass": true,
+  "status": "POST_HOC_DIAGNOSTIC (root cause of RT-2 falsification; not a qualification gate)"
+ },
+ "RT3_pass": true,
+ "RT4_pass": true,
+ "RT5_pass": true,
+ "RT6_pass": true,
+ "RT7_occ_map": {
+  "rc_main": 1,
+  "rc_lead": 1,
+  "rc_lag": 1,
+  "rc_far": 1,
+  "rc_R_only": 1,
+  "rc_C_only": 0
+ },
+ "RT7_main_pass": true,
+ "RT7_single_channel": {
+  "R_only": {
+   "peak": 3.985049427327385,
+   "occ": 1,
+   "margin_vs_theta2": 0.520495737442635
+  },
+  "C_only": {
+   "peak": 2.5465681411976906,
+   "occ": 0,
+   "margin_vs_theta2": -0.0283568436451914
+  }
+ },
+ "lineage": {
+  "rho2_uid": "relation.r_rho:d21_rho2",
+  "depth": 2,
+  "parents": [
+   "relation.r_rho:d2_rho0",
+   "occ.thermal:thermpt23_warm"
+  ]
+ },
+ "NF2_single_parent_trigger": {
+  "finding": "R-channel-alone crosses theta2 (margin +0.520); dual-parent necessity does NOT hold for asymmetric channels under the u_work/2 rule family; C_only margin -0.028 (marginal, below)",
+  "consequence": "site23 parentage is trajectory/boundary-level (NC4-style block shifts, not existence-level); rho parentage is existence-level (block R => occ 1->0)"
+ }
+}

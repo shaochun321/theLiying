@@ -1,0 +1,6 @@
+arm,x_t0,rmse_vs_X,equalized
+X_ref,2.410497200679754,0.0,True
+Y_baseline,0.0,0.604588333507014,False
+Y+sham,0.0,0.604588333507014,False
+Y+tier0,0.0,0.604588333507014,False
+Y+tier1,0.0,0.0,True
