@@ -391,18 +391,33 @@ class WriteGate:
     def w(self) -> float:
         return self.mem.w
 
-    def write(self, e: float, m: float) -> float:
+    def write(self, e: float, m: float, dt: float = DT_G) -> float:
         """一步写入：I_write = FET_e(e)·FET_M(M) → Memristor.update。
 
         任一因子阈下 ⇒ 该 FET conduct 精确为 0 ⇒ I_write=0 ⇒ dw=0
         （负例是精确零，非近似——DEG-019 硬截零）。
+
+        **WRITE_DT_CORRECTION（量纲修正，Step C 装配时发现）**：
+        `Memristor.update` 的实现是 `dw = 0.5·current·(pre−post)` 后直接
+        `w += dw`（semiconductor.py:246-280），**没有 dt 因子**。但它自称
+        Strukov 型，而 Strukov 方程是 `dw/dt ∝ i(t)`，离散化必须是
+        `Δw = k·i·Δt`。在 dt=1.0 的旧约定下两者恰好等价；在本轮冻结的
+        dt_G=0.001 下，不补 dt 会使每步写入量放大 1000×——实测量级：
+        重叠窗内 I_write 峰 ≈ 1.0 ⇒ 单步 dw ≈ −0.5 ⇒ 一步即撞 w_min 钳位。
+
+        这是评判 E-10 所述步制地雷在 `Memristor.update` 上的又一实例
+        （同族：bundle.py 的 eligibility_tau / da_ema_tau、compensation.py
+        的全部 τ 注释）。本轮**不改 production**，在调用侧传
+        `current = I_write·dt` 补上时间积分，等价于正确的
+        `Δw = −0.5·∫I_write dt`。该修正是量纲正确性，不是效应量调参——
+        它对所有臂、所有 timing 一视同仁，且在任何 factorial 运行之前确定。
         """
         i_e = self.fet_e.conduct(e)
         i_m = self.fet_m.conduct(m)
         i_write = i_e * i_m
         self.i_write_last = i_write
-        # WRITE_POLARITY=DEPLETION：dw = 0.5·I·(pre−post) = −0.5·I
-        self.mem.update(current=i_write, pre_trace=0.0,
+        # WRITE_POLARITY=DEPLETION：dw = 0.5·(I·dt)·(pre−post) = −0.5·I·dt
+        self.mem.update(current=i_write * dt, pre_trace=0.0,
                         post_trace=POST_TRACE_UNIT)
         return i_write
 

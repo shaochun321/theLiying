@@ -1,0 +1,61 @@
+{
+ "step": "C1/C3",
+ "gate": "Persistent-state baseline (z = w)",
+ "initial_w": 0.9,
+ "five_questions": {
+  "1_real_device_state": true,
+  "2_w_controls_R": {
+   "pass": true,
+   "R_at_w0": 1.0899999999999999,
+   "R_at_w0_minus_0.1": 2.0799999999999996
+  },
+  "3_R_controls_G": {
+   "pass": true,
+   "G_at_w0": 0.9174311926605506,
+   "G_at_w0_minus_0.1": 0.48076923076923084,
+   "analytic_G_w0": 0.9174311926605506
+  },
+  "4_G_changes_downstream_current": {
+   "pass": true,
+   "I_at_w0": 0.9174311926605506,
+   "I_at_w0_minus_0.1": 0.48076923076923084
+  },
+  "5_different_w_measurable_same_input": {
+   "pass": true,
+   "probe_delta_w": 0.001,
+   "rms_response_diff": 0.05292345246506167,
+   "floor": 1e-06
+  }
+ },
+ "determinism": {
+  "same_w_repeat_rms_diff": 0.0,
+  "bit_exact": true,
+  "no_hidden_python_cache": true
+ },
+ "persistence_contract": {
+  "W_METABOLIC_LEAK": false,
+  "zero_input_drift_5000_steps": 0.0,
+  "not_via_bundle_learn": true,
+  "identity": "marginal continuous persistence / integrator-like",
+  "NOT": "bistable latch",
+  "evidence": "A8 F4 measured lambda = 1.000 (whole-domain marginal continuum) — w has no restoring force; it persists because nothing pulls it back, not because it has two attractors"
+ },
+ "positive_control_C3": {
+  "role": "MEASUREMENT_CHAIN_POSITIVE_CONTROL",
+  "railatch_available": true,
+  "railatch_note": "RailLatch imported from research/A8_state_audit/rail_latch.py",
+  "railatch_qualifiers_E6": [
+   "not a main-trunk primitive — lives only in research/A8_state_audit/rail_latch.py",
+   "its persistent quantity is capacitor voltage V_C, NOT w",
+   "canonical n_feedback_fets = 1; bistability needs k* ~ 2.40",
+   "its F1 terminal (F1_A8v2_PHYSICALLY_VALIDATED) is conditional (Scale-B self-disclosure)"
+  ],
+  "chain_sensitivity_probe": {
+   "delta_w": 0.001,
+   "rms_response_diff": 0.05292345246506167,
+   "detectable_vs_replay_floor": true
+  },
+  "not_an_alternative_z": true
+ },
+ "FIVE_QUESTIONS": "PASS"
+}

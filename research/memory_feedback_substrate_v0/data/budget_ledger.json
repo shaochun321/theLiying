@@ -51,6 +51,24 @@
    "item": "stepB_D0_t12000",
    "note": "first run, matched control",
    "attempted_only": true
+  },
+  {
+   "category": "persistent_baseline",
+   "item": "stepC1_five_questions",
+   "note": "z=w baseline audit (no write performed)",
+   "attempted_only": false
+  },
+  {
+   "category": "persistent_baseline",
+   "item": "stepC2_readout_feasibility",
+   "note": "analytic + numeric readout feasibility (plan §13.1)",
+   "attempted_only": false
+  },
+  {
+   "category": "persistent_baseline",
+   "item": "stepC2_e_envelope",
+   "note": "re-run of the Step A W=1 arm to obtain e(t) for integration",
+   "attempted_only": false
   }
  ]
 }

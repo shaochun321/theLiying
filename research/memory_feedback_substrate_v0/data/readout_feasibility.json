@@ -1,0 +1,118 @@
+{
+ "step": "C2",
+ "gate": "READOUT_FEASIBILITY (plan §13.1) — decided BEFORE factorial",
+ "w0": 0.9,
+ "analytic_sensitivity": {
+  "G_w0": 0.9174311926605506,
+  "R_w0": 1.0899999999999999,
+  "relative_dG_over_G_per_dw_at_w0": 9.08256880733945,
+  "relative_dG_over_G_per_dw_at_LIM_RPREC_point": 1.1097535002073782,
+  "relative_improvement_vs_LIM_RPREC": 8.184311926605506,
+  "absolute_dG_dw_at_w0": 8.332631933338947,
+  "absolute_dG_dw_at_LIM_RPREC_point": 0.12439927588106338,
+  "absolute_improvement_vs_LIM_RPREC": 66.98296171197711,
+  "honest_note": "The relative-effect improvement from moving w0 0.109 -> 0.90 is 8.18x, NOT three orders of magnitude. The often-quoted dG/dw = 990 belongs to w -> 1.0 (R -> r_min = 0.1), not to w0 = 0.90 (R = 1.09). Our own critique quoted the w->1.0 limit; the operative number here is the 8.18x relative gain."
+ },
+ "lim_rprec_comparison": {
+  "registry": "cell-cell/docs/degradation_registry.md LIM-RPREC-READOUT-001",
+  "its_measured_dG_over_G": 0.00117,
+  "its_threshold": 0.01,
+  "why_MFS0_is_not_bound_by_that_threshold": "LIM-RPREC's 1% is a PRE-REGISTERED EFFECT-SIZE criterion inherited from the r_prec round, where the readout competed with training-period integration dilution (stage B, 35.8x) in a live learning loop. MFS0's epsilon_Q is derived instead from plan §18's first priority — the deterministic replay floor — which this system measures as EXACTLY ZERO (sham-repeat RMS = 0.000e+00). Any non-zero response difference is therefore resolvable here. This is a difference in what the threshold MEANS, not a relaxation of it."
+ },
+ "expected_dw_from_measured_envelopes": {
+  "method": "dw = -0.5 * sum_k conduct_e(e_k) * conduct_M(M_k) * dt (WRITE_DT_CORRECTION applied)",
+  "e_source": "Step A W=1 arm (qualified)",
+  "M_source": "Step B Delta=1 chain, per candidate later timing",
+  "e_write_reachable_window": [
+   2893,
+   4689
+  ],
+  "candidates": [
+   {
+    "delta_tid": "s23_ov",
+    "delta_window": [
+     2927,
+     3566
+    ],
+    "steps_with_nonzero_write_current": 722,
+    "I_write_peak": 0.24624769199859783,
+    "integral_I_dt": 0.12156237515406886,
+    "expected_dw": -0.06078118757703443,
+    "expected_abs_dw": 0.06078118757703443,
+    "inside_e_write_window": true
+   },
+   {
+    "delta_tid": "s23_hold_timing",
+    "delta_window": [
+     3542,
+     4181
+    ],
+    "steps_with_nonzero_write_current": 722,
+    "I_write_peak": 1.1958348214260617,
+    "integral_I_dt": 0.4500175294685791,
+    "expected_dw": -0.22500876473428955,
+    "expected_abs_dw": 0.22500876473428955,
+    "inside_e_write_window": true
+   },
+   {
+    "delta_tid": "s23_lag",
+    "delta_window": [
+     4159,
+     4798
+    ],
+    "steps_with_nonzero_write_current": 528,
+    "I_write_peak": 1.0076242359211154,
+    "integral_I_dt": 0.13615218532729267,
+    "expected_dw": -0.06807609266364634,
+    "expected_abs_dw": 0.06807609266364634,
+    "inside_e_write_window": true
+   },
+   {
+    "delta_tid": "s23_far_b",
+    "delta_window": [
+     4577,
+     5216
+    ],
+    "steps_with_nonzero_write_current": 110,
+    "I_write_peak": 0.09264644047508508,
+    "integral_I_dt": 0.00443898016362161,
+    "expected_dw": -0.002219490081810805,
+    "expected_abs_dw": 0.002219490081810805,
+    "inside_e_write_window": true
+   }
+  ],
+  "expected_abs_dw_range": [
+   0.002219490081810805,
+   0.22500876473428955
+  ]
+ },
+ "numeric_readout": {
+  "sham_repeat_rms": 0.0,
+  "replay_floor_is_exactly_zero": true,
+  "probes": [
+   {
+    "delta_w": 0.002219490081810805,
+    "rms_response_diff": 0.1162296568131733,
+    "relative_dG_over_G_exact": -0.01976032939844632,
+    "relative_dG_over_G_linear_extrapolation": -0.020158671385254102,
+    "linear_approximation_valid": true,
+    "note": ""
+   },
+   {
+    "delta_w": 0.22500876473428955,
+    "rms_response_diff": 4.035709046004203,
+    "relative_dG_over_G_exact": -0.6714479302935202,
+    "relative_dG_over_G_linear_extrapolation": -2.043657587953639,
+    "linear_approximation_valid": false,
+    "note": "linear extrapolation rel_w0*dw is only valid for small dw; G(w) is hyperbolic, so at this dw the exact ratio governs"
+   }
+  ]
+ },
+ "epsilon_Q_frozen_here": {
+  "value": 1e-06,
+  "basis": "plan §18 priority 1 (deterministic replay floor) measured as exactly 0 -> fall back to numeric precision floor 1e-6, same convention as Posterior-0 EPSILON_NUM",
+  "applies_to": "RMS of the readout membrane-voltage trajectory difference under an identical Q"
+ },
+ "READOUT_FEASIBILITY": "PASS",
+ "verdict_note": "Expected signal exceeds epsilon_Q — Step D/E may proceed once this batch is signed off."
+}
