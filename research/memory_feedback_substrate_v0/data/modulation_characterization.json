@@ -1,0 +1,96 @@
+{
+ "step": "B2",
+ "gate": "MFS0-M3 Physical Later Modulation",
+ "M_SOURCE": "H_tau_delta",
+ "chain": "site23 window -> build_phase_drive -> RelationEventAdapter (transduce -> frozen bundle -> spiking collector -> CollectorBoundaryPort) -> PhysicalEntryGate (b_up) -> PhysicalHistoryKernel (H_tau^Delta) -> M(t)",
+ "delta_material": {
+  "tid": "s23_lag",
+  "support_window": [
+   4159,
+   4798
+  ]
+ },
+ "D1": {
+  "M_peak": 0.9983347214509387,
+  "t_peak": 4162,
+  "tau_M_measured_s": 0.6000000000000115,
+  "tau_M_registered_s": 0.6,
+  "tau_M_rel_error": 1.924386576016938e-14,
+  "baseline_end": 7.568645165718104e-08,
+  "existence_window": [
+   4162,
+   12450
+  ],
+  "write_reachable_window": [
+   4162,
+   4883
+  ],
+  "write_reachable_window_len": 722,
+  "collector_spikes": 60.0,
+  "entry_gate_b_up_count": 1,
+  "injected_charge": 1.0,
+  "leaked_charge": 0.9999999243135475,
+  "support_window": [
+   4159,
+   4798
+  ]
+ },
+ "D0": {
+  "M_peak": 0.0,
+  "t_peak": -1,
+  "tau_M_measured_s": NaN,
+  "tau_M_registered_s": 0.6,
+  "tau_M_rel_error": NaN,
+  "baseline_end": 0.0,
+  "existence_window": [
+   -1,
+   -1
+  ],
+  "write_reachable_window": [
+   -1,
+   -1
+  ],
+  "write_reachable_window_len": 0,
+  "collector_spikes": 0.0,
+  "entry_gate_b_up_count": 0,
+  "injected_charge": 0.0,
+  "leaked_charge": 0.0,
+  "support_window": null
+ },
+ "criteria": {
+  "formation_via_physical_pulse": true,
+  "finite_decay_to_floor": true,
+  "tau_within_tolerance": true,
+  "D1_vs_D0_contrast": true,
+  "no_preset_modulation": true
+ },
+ "MFS0_M3": "PASS",
+ "independence_R1": {
+  "no_shared_e_carrier": true,
+  "check": "assert_paths_independent (object identity) — PASS",
+  "lineage_parents": "site23 generator address only; the relation port of W never enters this chain"
+ },
+ "semantics": {
+  "represents": "local entry history left by a later occurrence",
+  "does_not_represent": [
+   "reward",
+   "punishment",
+   "success",
+   "failure",
+   "good outcome",
+   "bad outcome",
+   "error",
+   "value"
+  ],
+  "audit_ref": "data/semantic_erasure_audit.json"
+ },
+ "write_reachability_of_M": {
+  "window": [
+   4162,
+   4883
+  ],
+  "len_steps": 722,
+  "fet_v_threshold": 0.3,
+  "note": "M must also clear the FET_M threshold for a non-zero write current; reported here for the Step D overlap analysis (overlap of e-window and M-window is what makes a NEAR timing writable at all)."
+ }
+}

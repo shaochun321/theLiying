@@ -1,0 +1,129 @@
+{
+ "step": "B1",
+ "audit": "SEMANTIC_ERASURE_AUDIT",
+ "plan_section": "§6",
+ "rejected_paths": [
+  {
+   "semantic": "intake reward",
+   "symbol": "intake_to_da_reward",
+   "site": "nexus_v1/circuit/variant_adapter.py:3969-3978",
+   "why": "BIO comment cites VTA phasic DA during food intake (Schultz 1997) — explicit reward semantics; source activation is also overwritten at :2577 (transduction bypass)"
+  },
+  {
+   "semantic": "RPE / reward prediction error",
+   "symbol": "da_gate (DADifferentialGate) direct injection",
+   "site": "nexus_v1/circuit/variant_adapter.py:2992-2995 + nexus_v1/components/da_differential_gate.py:63-71",
+   "why": "half-wave rectifier hard-codes 'energy going up = reward'; also bypasses SynapticBundle entirely"
+  },
+  {
+   "semantic": "hunger drive",
+   "symbol": "hunger_to_da",
+   "site": "nexus_v1/circuit/variant_adapter.py:4219-4229 (+ Python ReLU with hard-wired setpoint 0.5 at :2953)",
+   "why": "'energy deficit = drive' is a valence assignment"
+  },
+  {
+   "semantic": "satiety suppression",
+   "symbol": "satiety_to_da",
+   "site": "nexus_v1/circuit/variant_adapter.py:3944-3952 (sign_gate=-1.0)",
+   "why": "strong valence: satiety inhibits DA"
+  },
+  {
+   "semantic": "satiety aggregation (four hand-set signs)",
+   "symbol": "intake/fillrate/dwell/hunger _to_satiety",
+   "site": "nexus_v1/circuit/variant_adapter.py:1411-1418",
+   "why": "four artificial sign assignments feeding the satiety node"
+  },
+  {
+   "semantic": "warming-good",
+   "symbol": "thermo_delta_to_da",
+   "site": "nexus_v1/somatosensory/transducer_neurons.py:379-391",
+   "why": "dT/dt>0 (warming) routed to DA = 'getting warmer is good'"
+  },
+  {
+   "semantic": "positive-valence clamp",
+   "symbol": "_phasic_pos",
+   "site": "nexus_v1/circuit/variant_adapter.py:3363",
+   "why": "max(0, ...) keeps only the 'approaching' half — a valence clamp"
+  },
+  {
+   "semantic": "fill-rate reward",
+   "symbol": "fill_rate_sensor bypass",
+   "site": "nexus_v1/circuit/variant_adapter.py:2613-2616",
+   "why": "feeds the RPE gate; same reward semantics"
+  },
+  {
+   "semantic": "transduction bypass of the intake sensor",
+   "symbol": "intake_sensor.activation overwrite",
+   "site": "nexus_v1/circuit/variant_adapter.py:2577",
+   "why": "activation directly overwritten (HC-008 family) — not a modulation source at all"
+  },
+  {
+   "semantic": "preset DA constant",
+   "symbol": "da_concentration=<const>",
+   "site": "tss/relations/temporal_r_prec_plastic.py (fed by tss/tests/test_r_prec_plastic_learning.py:63,69)",
+   "why": "this is exactly the 'modulation = preset_number' pattern the plan §5 forbids — claimed below as a legacy path"
+  }
+ ],
+ "rejected_count": 10,
+ "legacy_claim": {
+  "path": "tss/relations/temporal_r_prec_plastic.py",
+  "fed_by": "tss/tests/test_r_prec_plastic_learning.py:63,69 (da_concentration=0.5 / 0.0, constants)",
+  "registration": "LEGACY_SEMANTIC / TEST CONVENIENCE PATH — NOT MFS0 INPUT",
+  "note": "This is the concrete instance of the 'modulation = preset_number' pattern plan §5 forbids. MFS0 replaces exactly this position with a physical H_tau^Delta state. The legacy path is left untouched (production READ_ONLY) and claimed here so it cannot be mistaken for an MFS0 input."
+ },
+ "m_chain_scan": {
+  "sources": [
+   "tss/relations/relation_event_adapter.py",
+   "tss/relations/entry_gate.py",
+   "tss/relations/history_kernel.py",
+   "tss/adapters/relation_replay_adapter.py",
+   "research/memory_feedback_substrate_v0/mfs0_common.py"
+  ],
+  "banned_symbols": [
+   "da_concentration",
+   "dopamine",
+   "reward",
+   "hunger",
+   "satiety",
+   "intake",
+   "rpe",
+   "fill_fraction",
+   "phasic",
+   "valence"
+  ],
+  "hits": {
+   "tss/relations/relation_event_adapter.py": [],
+   "tss/relations/entry_gate.py": [],
+   "tss/relations/history_kernel.py": [],
+   "tss/adapters/relation_replay_adapter.py": [],
+   "research/memory_feedback_substrate_v0/mfs0_common.py": []
+  },
+  "total_hits": 0,
+  "clean": true
+ },
+ "m_source_positive_declaration": {
+  "source": "H_tau_delta",
+  "physical_quantity": "h^Delta(t) = V of the H_tau^Delta history capacitor, charged once per b^up pulse from the later occurrence and decaying with tau_h = 0.600 s",
+  "what_it_means": "a later occurrence happened recently, and its entry history is still physically present",
+  "what_it_does_NOT_mean": [
+   "good outcome",
+   "bad outcome",
+   "success",
+   "failure",
+   "reward",
+   "error",
+   "value"
+  ],
+  "no_valence_argument": "The quantity is the voltage of an RC pool driven by an entry-gate pulse. It carries no sign asymmetry between 'desirable' and 'undesirable' events: every legal later occurrence charges it identically, regardless of what the organism's energy / temperature / intake state is. There is no term anywhere in the chain that reads an outcome variable.",
+  "dopamine_primitives_not_used": {
+   "Neuromodulator": "in production this is a DEAD ODE — variant_adapter.py:3023-3025 assigns _concentration directly and comments \"Don't call dopamine.step()\"; it has degenerated into a stateless gain converter. NOT used by MFS0.",
+   "DADifferentialGate": "despite the 'Capacitor' comment it is a one-step delay register plus Python max/min rectification, with no tau, no decay and no energy ledger. NOT used by MFS0."
+  }
+ },
+ "path_independence_R1": {
+  "checked": "assert_paths_independent (object identity)",
+  "result": "PASS — Past->e and Later->M share no object",
+  "why_it_matters": "if W fed H_tau^Delta, M would merely be a second encoding of e (plan §3 R-1)"
+ },
+ "SEMANTIC_ERASURE_AUDIT": "PASS"
+}

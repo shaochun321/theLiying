@@ -184,7 +184,13 @@ W_RELATION_TRAJ = "cal_C3_m"   # D2-1 主 parent（d21_common RHO_MAIN_TRAJ）
 DELTA_S23_TID_STEPB = "s23_lag"  # Step B 仅证明 Δ→M 可行；NEAR/TC 的正式
                                  # 选择在 Step D（本轮不做）
 T_TOTAL_STEPA = 12000          # 含零驱动垫尾，观测 e 的完整衰减
-T_TOTAL_STEPB = 12000
+                               # （实测 e 末次越 ε 在 8473 步，余量充足）
+T_TOTAL_STEPB = 14000          # 首跑 12000 不足：M 在 t_peak=4162 起以
+                               # τ_M=0.6 s 衰减，降到 ε_M=1e-6 需
+                               # ln(0.998/1e-6)·600 = 8288 步 ⇒ t ≈ 12450。
+                               # 这是**观测窗**长度，不是物理参数（τ_M 冻结
+                               # 未动，w0/amplitude/timing 均未动）；首跑与
+                               # 重跑双双登记 attempted_run（方案 §25）。
 
 BUDGET_CAPS = {"new_g0_trajectories": 0,
                "eligibility_calibration": 6,

@@ -27,6 +27,30 @@
    "item": "stepA_W0",
    "note": "matched W=0 control arm (empty typed port list)",
    "attempted_only": false
+  },
+  {
+   "category": "modulation_calibration",
+   "item": "stepB_D1",
+   "note": "full replay of the Delta=1 modulation arm",
+   "attempted_only": false
+  },
+  {
+   "category": "modulation_calibration",
+   "item": "stepB_D0",
+   "note": "matched Delta=0 control arm (empty window list)",
+   "attempted_only": false
+  },
+  {
+   "category": "modulation_calibration",
+   "item": "stepB_D1_t12000",
+   "note": "first run, t_total=12000 — observation window too short to reach eps_M; no physical parameter changed",
+   "attempted_only": true
+  },
+  {
+   "category": "modulation_calibration",
+   "item": "stepB_D0_t12000",
+   "note": "first run, matched control",
+   "attempted_only": true
   }
  ]
 }
