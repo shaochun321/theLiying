@@ -16,3 +16,7 @@ cell-cc-other/
 # Miscellaneous backup folder
 x/
 /.backup/
+
+# Saved-webpage asset bundles (duplicated 1.5MB css / favicons / png, no content value).
+# The page bodies themselves (*.html / *.md / *.py / *.json) ARE tracked.
+cell-cell/网页/*_files/
