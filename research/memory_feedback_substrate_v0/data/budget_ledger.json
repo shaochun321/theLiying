@@ -1,0 +1,19 @@
+{
+ "caps": {
+  "new_g0_trajectories": 0,
+  "eligibility_calibration": 6,
+  "modulation_calibration": 6,
+  "persistent_baseline": 6,
+  "timing_points": 4,
+  "factorial_sets": 4,
+  "timing_controls": 3,
+  "state_interventions": 4,
+  "path_blocks": 3,
+  "heldout": 6
+ },
+ "counting_rules": {
+  "attempted_run": "error/aborted/duplicate/unreachable/support failure executions are still logged (plan §25)",
+  "new_g0_trajectories": "frozen at 0 — MFS0 reuses the existing G0/site23 window inventory (plan §14; critique E-11c)"
+ },
+ "entries": []
+}

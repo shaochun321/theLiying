@@ -1,0 +1,19 @@
+{
+ "targets": {
+  "research/d2_relation_v0/data/relation_calibration.json": "ba7afc20ea7f473ef23a96234c0c667279bcd68de7ac2db7997aaec66b91833f",
+  "research/d2_relation_v0/data/relation_occurrence_candidates.csv": "d79aca4dae3116f864fe2b0e3a5f35c045d5dca55bf7b82731a790c0b54b66d1",
+  "research/d2_relation_v0/data/occurrence_parent_manifest.csv": "8b4e66d2dc6b6bc12897550977e46e87a94799375e4723d2d6a09170e31ad1cf",
+  "research/d2_recursive_v1/data/relation2_calibration.json": "986a646a75c51a1f809670f792bec1170fc201e0a1e5da1eb88c18f41fb8860d",
+  "research/d2_recursive_v1/data/relation2_occurrence_candidates.csv": "a921c4ce4b7547e24026c8bf7260716e68e3ce51ee8c3af4fc9abc39dfaa53cd",
+  "research/d2_recursive_v1/data/relation_occurrence_manifest.csv": "46d80979fc65ba2b7f230047b78e0f4efbff1ba59cb0ad2c8b490e24b7775dda",
+  "research/d2_recursive_v1/data/site23_occurrence_manifest.csv": "c81d2405a1b1487a627cad7f07b05009ff46c72b6cc0d1fac9d7676efc838904",
+  "tss/adapters/relation_occurrence_port_v1.py": "0eeb15360df9ac81b1f470f03a246a30b3f1327a84a435347cb9d3e49873a5b1",
+  "tss/adapters/occurrence_port_v2.py": "91522a1e0f76977ecdd6b95e2c9908ac2530bd233dc16cde3fe8c190df7f2dcd",
+  "tss/adapters/relation_replay_adapter.py": "67787810ad68093b1f06bc93c885bbbada6ac4e42d66cc85fc2d4e86d01901d5",
+  "tss/relations/relation_event_adapter.py": "ea4fb0f1e172170883a51b47d3dd8b06e5d95bedf9ca9f7cbfaa4a83a368f5f7",
+  "tss/relations/entry_gate.py": "a6653b37187c55875ed04a4774a2b8c22ca69ab2177eca60997f56d341b11cdb",
+  "tss/relations/history_kernel.py": "8d444d9c79ac2ecec22a262f22d417b1b994d6207a9711f6db8752a4aa895964",
+  "nexus_v1/components/semiconductor.py": "98e2b00e1d43bb3eb57e5423f6e7b43571c1556d732e235f21e253b8d16d7237"
+ },
+ "rule": "recompute at closure; BEFORE == AFTER required, otherwise MFS0-INTEGRITY = FAIL (plan §10.1)"
+}
