@@ -1,0 +1,84 @@
+{
+ "step": "A",
+ "gate": "MFS0-M2 Physical Eligibility",
+ "W_material": {
+  "traj": "cal_C3_m",
+  "occurrence_id": "relation.r_rho:d2_rho0#e1",
+  "window_steps": [
+   2617,
+   3515,
+   3971
+  ],
+  "lineage": "relation.r_rho:d2_rho0"
+ },
+ "chain": "RelationOccurrencePortV1 -> build_phase_drive -> RelationInputNeuron -> frozen SynapticBundle -> Neuron(_membrane=Capacitor)",
+ "canonical_readout": "capacitor voltage (plan §4.4)",
+ "W1": {
+  "e_peak": 3.30536855754319,
+  "t_peak": 3970,
+  "t_peak_s": 3.97,
+  "tau_e_measured_s": 0.29999999999999577,
+  "tau_e_registered_s": 0.3,
+  "tau_e_rel_error": 1.4062824978585317e-14,
+  "last_step_above_epsilon": 8473,
+  "existence_window": [
+   2618,
+   8473
+  ],
+  "existence_window_len": 5856,
+  "write_reachable_window": [
+   2893,
+   4689
+  ],
+  "write_reachable_window_len": 1797,
+  "i_gate_peak": 3.00536855754319,
+  "activation_peak_DIAGNOSTIC_ONLY": 3.016404836314178,
+  "charge_in": 0.9577432477309672,
+  "charge_out": 0.957743247730183,
+  "transport_cost": 0.0,
+  "energy_end": 2.0
+ },
+ "W0": {
+  "e_peak": 0.0,
+  "t_peak": 0,
+  "t_peak_s": 0.0,
+  "tau_e_measured_s": NaN,
+  "tau_e_registered_s": 0.3,
+  "tau_e_rel_error": NaN,
+  "last_step_above_epsilon": -1,
+  "existence_window": [
+   -1,
+   -1
+  ],
+  "existence_window_len": 0,
+  "write_reachable_window": [
+   -1,
+   -1
+  ],
+  "write_reachable_window_len": 0,
+  "i_gate_peak": 0.0,
+  "activation_peak_DIAGNOSTIC_ONLY": 0.0,
+  "charge_in": 0.0,
+  "charge_out": 0.0,
+  "transport_cost": 0.0,
+  "energy_end": 2.0
+ },
+ "criteria": {
+  "formation": true,
+  "finite_decay_to_floor": true,
+  "tau_within_tolerance": true,
+  "physical_carrier_charge_flow": true,
+  "W1_vs_W0_contrast": true
+ },
+ "MFS0_M2": "PASS",
+ "write_reachability": {
+  "reachable": true,
+  "window": [
+   2893,
+   4689
+  ],
+  "window_len_steps": 1797,
+  "fet_v_threshold": 0.3,
+  "note": "This is NOT part of M2. It is the Step D constraint: sub-threshold e produces exactly zero write current (DEG-019 hard cutoff), so NEAR must be chosen inside this window, not merely inside the existence window."
+ }
+}

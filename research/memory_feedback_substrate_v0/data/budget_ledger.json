@@ -15,5 +15,18 @@
   "attempted_run": "error/aborted/duplicate/unreachable/support failure executions are still logged (plan §25)",
   "new_g0_trajectories": "frozen at 0 — MFS0 reuses the existing G0/site23 window inventory (plan §14; critique E-11c)"
  },
- "entries": []
+ "entries": [
+  {
+   "category": "eligibility_calibration",
+   "item": "stepA_W1",
+   "note": "full replay of the W=1 eligibility arm",
+   "attempted_only": false
+  },
+  {
+   "category": "eligibility_calibration",
+   "item": "stepA_W0",
+   "note": "matched W=0 control arm (empty typed port list)",
+   "attempted_only": false
+  }
+ ]
 }
