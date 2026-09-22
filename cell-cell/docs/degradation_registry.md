@@ -435,3 +435,38 @@
   未达标可见（xfail 原样）；剩余候选方向缩窄为：读出工作点上移
   （受 w≤0.5 饱和边缘约束）/ 判据改机制层等效量（需外部评判认可）。
 - **关联**: DEG-016（单纤维 N=1 信噪比），外部实测反馈清单 §1/§8
+
+### LIM-POSTERIOR-TIMING-FAR: Posterior-0 FAR 时点（δt=4τ）未测
+
+- **首次登记**: 2026-09-21（Posterior-0 轮内本地登记，commit `410eeae`）；
+  2026-09-22 转入本注册表（此前仅存在于轮内文件，跨轮不可见）
+- **status**: `NOT_ATTEMPTED`（**不是** UNREACHABLE）
+- **⚠ 与本节 LIM 定义的偏差（诚实登记）**: 本节 LIM 定义要求"已定量证明
+  在当前结构下不可达"，本条**不满足**该要求——它是预算耗尽导致的未测，
+  外推提示**可能可达**。沿用 LIM 命名是因为外部反馈 §三已预先指定
+  「FAR 不可达登记 `LIM-POSTERIOR-TIMING`，它不是实验失败」；登记目的
+  是跨轮可见性，而非宣告结构性不可达。若后续补测确认不可达，再改
+  status 并补根因。
+- **现象**: 方案 §19 的三点时窗网格 δt = {1,2,4}×τ_residual，本轮只完成
+  NEAR（δt=1τ，t_up=5402，R1C_FALLBACK）与 MIDDLE（δt=2τ，t_up=6344）；
+  FAR（δt=4τ）未尝试 ⇒ §19 "interaction alive → boundary → interaction
+  gone" 的第三段（gone）未实测，时窗结论只到 MIDDLE 的边界值
+  （I_W=2.478e-3，NEAR 的 1/6.7）。
+- **原因**: `new_g0` 物理轨迹预算 4/4 耗尽——probe1（t_on=4780/P=600，
+  零 occurrence，NF-1 尾容限 <23 步）/ probe2_r1c（同 t_on，P=900，成功）/
+  middle / hold_timing。其中 1 条消耗在 NEAR 点的可达性探边上
+  （R-1(a) 主路径实测失败 → R-1(c) 一次后备）。
+- **外推（未测）**: `t_on ≈ 6540 / P = 900` 可能可达；NF-1 潜伏期漂移模型
+  在 t_on=5660 处外推误差仅 10 步（预测 6334 vs 实测 6344），仍近线性，
+  但 P=900 支撑窗在更晚 t_on 的尾容限未验证。
+- **解除路径**: 补测 1 条 `new_g0` 轨迹（t_on≈6540/P=900）；须在新一轮的
+  预算 ledger 中预注册，不得挪用 Posterior-0 已冻结的预算口径。若补测
+  仍零 occurrence，则本条按 NF-1 家族根因升级为真 LIM 并补定量根因。
+- **证据位置**: `research/posterior_v0/POSTERIOR0_NEGATIVE_RESULTS.md`
+  （§LIM-POSTERIOR-TIMING-FAR）/ `data/p0_timing_freeze.json` `limits[0]`
+  （机读）/ `data/qualification_summary.json` / 生成点
+  `research/posterior_v0/dataset_builder.py:98`（同处另有条件性
+  `LIM-POSTERIOR-TIMING-MIDDLE`，本轮 MIDDLE 可达故未触发）
+- **关联**: NF-1（site23 换能潜伏期随 t_on 单调漂移，D2-1 轮登记）、
+  DEG-019（MOSFET 阈下截零——本轮读出面机制）；Posterior-0 终态
+  `A_CONDITIONAL` 不依赖 FAR 点（六门判据均在 NEAR 面成立）
