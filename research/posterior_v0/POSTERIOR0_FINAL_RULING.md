@@ -31,6 +31,9 @@ operator_class = THRESHOLD_READOUT_GATING
 门控 W 历史残余的下游可见性——"后来的事件改变了过去在当前系统中的
 存在方式"在本架构的物理形态 = 历史残余的可读性被后验事件重新组织。
 
+> **⚖ 2026-09-23 裁定已落地（RULING-P0-1 = DEMOTED_TO_C）——本节以下的"终态"为
+> 测量时（2026-09-21）记录，生效终态见文末《裁定落地》一节。实验数值一字未改。**
+
 ## ⚠ RULING_EXPOSURE（自曝条款，F1 A8-v2 条件化先例）
 
 **NF-P1**：Z-primary 线性载体分量上 𝔅=id（w_shift_vm=3.0e-15）——Δ 不弯曲
@@ -60,3 +63,40 @@ Q=ramp639@Δ_rearm+456 / hold6 SHA=edeff45cc85f97ba…；
 G0/D2-0/D2-1 全程 READ_ONLY 未动（git 逐字节验证）。
 下一步（终态 A 确认后）= Posterior-1：跨多个 W,ΔΓ 提取重复出现的后验算子族
 （方案 §35）；若降格 C 则下一步问题 = "载体级可重组织的基质在哪里"。
+
+---
+
+## ⚖ 裁定落地（RULING-P0-1，2026-09-23）
+
+用户裁定经《MAINLINE V2 — MFS0-E0 修订执行方案》§3 R-3 下发
+（`POSTERIOR0_TERMINAL_C_FROZEN = TRUE`）：**采纳"载体分量改变是支配判据"**，
+上文 RULING_EXPOSURE 预登记的降格路径**予以行使**。
+
+```text
+effective_terminal = C
+POSTERIOR_EFFECT_ADDITIVE_ONLY = TRUE (at carrier)
+POSTERIOR_STATE_REORGANIZATION_V0_QUALIFIED = FALSE
+POSTERIOR_OPERATOR_CANDIDATE = FALSE
+READY_FOR_POSTERIOR_1 = FALSE
+POSTERIOR0_TERMINAL_C_FROZEN = TRUE
++ THRESHOLD_READOUT_INTERACTION = POSITIVE_FINDING
+```
+
+**`(at carrier)` 限定为必需**：方案 §34 对终态 C 的定义文字是 `I_W = 0`，而本轮实测
+`I_W^traj(act) = 1.651e-2 ≫ 0` 且因果闭合齐全（时序依赖 6.71×、block 逐位消除 RMSE=0.0、
+transplant 正反向 RMSE=0.0、hold6 一次过零回调）。不带限定的字符串会与数据直接矛盾。
+该限定把"加法性"的主张范围锁定在 NF-P1 真正证明的东西上——Z-primary 线性载体分量
+（`w_shift_vm = 3.01e-15`）。上述交互与因果闭合的全部实测值作为
+`THRESHOLD_READOUT_INTERACTION` **正发现保留**。
+
+**数值完整性**：六门、轨迹、CSV 与 `p0_hold_seal.json` 逐字节未改；仅终态解释被取代。
+`qualification_summary.json` 采用**追加式**记录（原 `terminal_state` 区块原样保留 +
+新增 `ruling_applied` 区块）。
+
+**日期勘误**：降格生效于 **2026-09-23**（本裁定），**不是 2026-09-22**。2026-09-22 那轮的
+产出只有《交叉比对/Posterior-0终裁读法对照与建议_2026-09-22.md》（主建议=**维持
+A_CONDITIONAL**，明确不建议降格 C），并写明"裁定点保持 OPEN"。方案 §0 的
+「按 2026-09-22 后续修补终态冻结为 TERMINAL C」系对该轮的误述。
+
+**下一步问题**（降格分支指定）：「载体级可重组织的基质在哪里」→ 由 MFS0-E0
+（memristive `w`）回答；按 §3 R-3，MFS0 的结果**不得反向修改**本轮结论。

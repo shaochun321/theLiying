@@ -114,7 +114,36 @@
   "negative_finding_NF_P1": "B=id on linear Z-primary carrier component — no carrier warping; reorganization lives in readout projection only",
   "RULING_EXPOSURE": "if user rules carrier-component change is the governing criterion (feedback §19 spirit extended to the no-new-occurrence case), this terminal demotes to C = POSTERIOR_EFFECT_ADDITIVE_ONLY(carrier) + THRESHOLD_READOUT_INTERACTION registered as positive finding (pre-registered demotion path)",
   "sec19_literal_trigger": "not fired (no new occurrence in Delta epoch; PNS=False)",
-  "READY_FOR_POSTERIOR_1": "pending user ruling on RULING_EXPOSURE"
+  "READY_FOR_POSTERIOR_1": "pending user ruling on RULING_EXPOSURE",
+  "superseded_by": "ruling_applied (RULING-P0-1, decided 2026-09-23). This block is preserved verbatim as the 2026-09-21 measurement-time terminal; the EFFECTIVE terminal is in ruling_applied."
+ },
+ "ruling_applied": {
+  "ruling_id": "RULING-P0-1",
+  "decision": "DEMOTED_TO_C",
+  "decision_date": "2026-09-23",
+  "decided_by": "user ruling, delivered via 'MAINLINE V2 — MFS0-E0 修订执行方案' §3 R-3 (POSTERIOR0_TERMINAL_C_FROZEN = TRUE)",
+  "governing_criterion_adopted": "carrier-component change is the governing criterion for 'reorganization' (feedback §19 spirit extended to the no-new-occurrence case) — the pre-registered demotion path in RULING_EXPOSURE is hereby exercised",
+  "effective_terminal": "C",
+  "POSTERIOR_EFFECT_ADDITIVE_ONLY": "TRUE (at carrier)",
+  "at_carrier_qualifier_is_mandatory": "Plan §34 defines terminal C by I_W = 0. Measured I_W_traj_activation = 1.651e-2 >> 0 with full causal closure, so the unqualified string would contradict the data. The qualifier scopes the additivity claim to the Z-primary linear carrier component (w_shift_vm = 3.01e-15), which is what NF-P1 actually established.",
+  "POSTERIOR_STATE_REORGANIZATION_V0_QUALIFIED": false,
+  "POSTERIOR_OPERATOR_CANDIDATE": false,
+  "READY_FOR_POSTERIOR_1": false,
+  "POSTERIOR0_TERMINAL_C_FROZEN": true,
+  "positive_finding_retained": {
+   "id": "THRESHOLD_READOUT_INTERACTION",
+   "status": "POSITIVE_FINDING",
+   "I_W_traj_activation": 0.016512132399904903,
+   "timing_dependence_ratio_near_over_tc": 6.714642664905761,
+   "path_block_bitwise_vs_10": 0.0,
+   "transplant_forward_rmse": 0.0,
+   "transplant_reverse_rmse": 0.0,
+   "hold6_one_pass_zero_recall": true,
+   "mechanism": "Delta residual lifts the operating point across the DEG-019 hard threshold (vm=0.3), gating downstream visibility of the W residual"
+  },
+  "measured_values_unchanged": "All six gates, traces, CSVs and p0_hold_seal.json are byte-for-byte unchanged. Only the terminal-state interpretation is superseded.",
+  "date_correction": "The demotion took effect 2026-09-23 (this ruling), NOT 2026-09-22. The 2026-09-22 round produced only '交叉比对/Posterior-0终裁读法对照与建议_2026-09-22.md' (recommendation: KEEP A_CONDITIONAL; C not recommended) and explicitly left the ruling point OPEN. The plan's §0 phrasing '按 2026-09-22 后续修补终态冻结为 TERMINAL C' misstates that round.",
+  "next_question": "Where is the carrier-level reorganizable substrate? — answered by MFS0-E0 (memristive w), which must NOT retroactively modify this Posterior-0 result (plan §3 R-3)."
  },
  "first_screen": {
   "1_causal_history_substrate_after_rearm": "YES on membrane (tau≈500 steps, qrel window→6131); activation readout collapses at vm<0.3 (DEG-019, readout not substrate)",
